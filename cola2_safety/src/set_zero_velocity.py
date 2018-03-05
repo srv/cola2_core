@@ -24,12 +24,12 @@ import rospy
 
 import threading
 
-from auv_msgs.msg import WorldWaypointReq
-from auv_msgs.msg import BodyVelocityReq
-from auv_msgs.msg import BodyForceReq
+from cola2_msgs.msg import WorldWaypointReq
+from cola2_msgs.msg import BodyVelocityReq
+from cola2_msgs.msg import BodyForceReq
+from cola2_msgs.msg import GoalDescriptor
+from cola2_msgs.msg import NavSts
 
-from auv_msgs.msg import GoalDescriptor
-from auv_msgs.msg import NavSts
 from cola2_lib import cola2_ros_lib
 
 
@@ -192,7 +192,7 @@ class SetZeroVelocity(object):
 if __name__ == '__main__':
     try:
         rospy.init_node('set_zero_velocity')
-        __set_zero_velocity__ = SetZeroVelocity(rospy.get_name())
+        set_zero_velocity = SetZeroVelocity(rospy.get_name())
         rospy.spin()
     except rospy.ROSInterruptException:
         pass

@@ -7,17 +7,21 @@
 
 
 import rospy
-from auv_msgs.msg import BodyVelocityReq
-from auv_msgs.msg import GoalDescriptor
-from auv_msgs.msg import NavSts
+
+from cola2_msgs.msg import BodyVelocityReq
+from cola2_msgs.msg import GoalDescriptor
+from cola2_msgs.msg import NavSts
+
 from cola2_lib import cola2_ros_lib
-from dynamic_reconfigure.server import Server
-from cola2_msgs.cfg import SafeDepthAltitudeConfig
 from cola2_lib.diagnostic_helper import DiagnosticHelper
+
+from cola2_safety.cfg import SafeDepthAltitudeConfig
+
+from dynamic_reconfigure.server import Server
 from diagnostic_msgs.msg import DiagnosticStatus
 
 """
- @@> Prevents the vehicle to go behind a maximum depth or a minimum altitude 
+ @@> Prevents the vehicle to go behind a maximum depth or a minimum altitude
 by sending a BodyVelocityReq asking a negative heave with maximum priority.<@@
 """
 """
@@ -55,7 +59,7 @@ class SafeDepthAltitude(object):
                          self.update_nav_sts,
                          queue_size=1)
 
-        # Create dynamic reconfigure servoce
+        # Create dynamic reconfigure service
         self.dynamic_reconfigure_srv = Server(SafeDepthAltitudeConfig,
                                               self.dynamic_reconfigure_callback)
 
