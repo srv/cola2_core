@@ -39,8 +39,6 @@
   <!--   <test_depend>gtest</test_depend> -->
   <!-- a former stack run depends only on all its child packages -->
   <buildtool_depend>catkin</buildtool_depend>
-  <run_depend>cola2_lib</run_depend>
-  <run_depend>cola2_msgs</run_depend>
   <run_depend>cola2_safety</run_depend>
   <run_depend>cola2_sim</run_depend>
   <run_depend>cola2_control</run_depend>
