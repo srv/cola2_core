@@ -1,0 +1,50 @@
+//
+// Created by narcis on 6/03/18.
+//
+
+#include <cola2_control/mission_utils/mission_action.h>
+
+MissionAction::MissionAction()
+{
+}
+
+MissionAction::MissionAction(std::string action_id, std::vector<std::string> parameters)
+    : action_id_(action_id), parameters_(parameters), is_empty_(true)
+{
+  if (parameters_.size() > 0)
+    is_empty_ = false;
+}
+
+MissionAction::~MissionAction()
+{
+}
+
+void MissionAction::show()
+{
+  std::cout << *this;
+}
+
+std::string MissionAction::getActionId() const
+{
+  return action_id_;
+}
+
+void MissionAction::setActionId(const std::string value)
+{
+  action_id_ = value;
+}
+
+void MissionAction::addParameters(const std::string param)
+{
+  parameters_.push_back(param);
+}
+
+std::vector<std::string> MissionAction::getParameters() const
+{
+  return parameters_;
+}
+
+bool MissionAction::getIsEmpty() const
+{
+  return is_empty_;
+}
