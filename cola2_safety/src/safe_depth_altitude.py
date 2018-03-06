@@ -12,8 +12,8 @@ from cola2_msgs.msg import BodyVelocityReq
 from cola2_msgs.msg import GoalDescriptor
 from cola2_msgs.msg import NavSts
 
-from cola2_lib import cola2_ros_lib
-from cola2_lib.diagnostic_helper import DiagnosticHelper
+from cola2_lib.rosutils import param_loader
+from cola2_lib.rosutils.diagnostic_helper import DiagnosticHelper
 
 from cola2_safety.cfg import SafeDepthAltitudeConfig
 
@@ -48,20 +48,15 @@ class SafeDepthAltitude(object):
         self.diagnostic = DiagnosticHelper(self.name, "soft")
 
         # Publisher
-        self.pub_body_velocity_req = rospy.Publisher(
-            "/cola2_control/body_velocity_req",
-            BodyVelocityReq,
-            queue_size=2)
+        resolved_namespace = rospy.get_namespace()
+        self.pub_body_velocity_req = rospy.Publisher(resolved_namespace + "cola2_control/body_velocity_req",
+                                                     BodyVelocityReq, queue_size=2)
 
         # Subscriber
-        rospy.Subscriber("/cola2_navigation/nav_sts",
-                         NavSts,
-                         self.update_nav_sts,
-                         queue_size=1)
+        rospy.Subscriber(resolved_namespace + "cola2_navigation/nav_sts", NavSts, self.update_nav_sts, queue_size=1)
 
         # Create dynamic reconfigure service
-        self.dynamic_reconfigure_srv = Server(SafeDepthAltitudeConfig,
-                                              self.dynamic_reconfigure_callback)
+        self.dynamic_reconfigure_srv = Server(SafeDepthAltitudeConfig, self.dynamic_reconfigure_callback)
 
         # Show message
         rospy.loginfo("%s: initialized", self.name)
@@ -79,7 +74,8 @@ class SafeDepthAltitude(object):
         self.diagnostic.add("altitude", str(nav.altitude))
         self.diagnostic.add("depth", str(nav.position.depth))
 
-        if (nav.altitude > 0 and nav.altitude < self.min_altitude and nav.position.depth > 0.5) or (nav.position.depth > self.max_depth):
+        if (nav.altitude > 0 and nav.altitude < self.min_altitude and nav.position.depth > 0.5) or \
+            nav.position.depth > self.max_depth:
             # Show message
             self.diagnostic.setLevel(DiagnosticStatus.WARN, 'Invalid depth/altitude! Moving vehicle up.')
             if (nav.altitude > 0 and nav.altitude < self.min_altitude and nav.position.depth > 0.5):
@@ -117,7 +113,7 @@ class SafeDepthAltitude(object):
         param_dict = {'max_depth': 'safe_depth_altitude/max_depth',
                       'min_altitude': 'safe_depth_altitude/min_altitude'}
 
-        if not cola2_ros_lib.getRosParams(self, param_dict, self.name):
+        if not param_loader.get_ros_params(self, param_dict, self.name):
             self.bad_config_timer = rospy.Timer(rospy.Duration(0.4),
                                                 self.bad_config_message)
 

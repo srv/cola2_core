@@ -16,24 +16,23 @@ import roslib
 import rospy
 
 from std_srvs.srv import Empty, EmptyResponse
-from auv_msgs.msg import NavSts
-from cola2_msgs.msg import TotalTime
-from cola2_lib.diagnostic_helper import DiagnosticHelper
 from diagnostic_msgs.msg import DiagnosticStatus
-from cola2_lib import cola2_ros_lib
 
+from cola2_msgs.msg import NavSts
+from cola2_msgs.msg import TotalTime
+
+from cola2_lib.rosutils.diagnostic_helper import DiagnosticHelper
 
 class UpTime(object):
-    """ This node keeps track of the cola2 running time.
-     Counts the up time since the architecture started (actually since the start of this node)
-     or since the last time reset, which can be done through a provided service.
+    """ This node keeps track of the cola2 running time. Counts the up time since the architecture started (actually
+     since the start of this node) or since the last time reset, which can be done through a provided service.
      Publishes the current up time together with the value of the safety timeout parameter. """
 
 
     def __init__(self, name):
         """ Constructor """
         self.name = name
-        
+
         # Initial time
         self.init_time = rospy.Time.now().to_sec()
 
@@ -44,15 +43,12 @@ class UpTime(object):
         self.diagnostic = DiagnosticHelper(self.name, "soft")
 
         # Publisher
-        self.pub_total_time = rospy.Publisher("/cola2_safety/total_time",
-                                            TotalTime,
-                                            queue_size = 2)
+        resolved_namespace = rospy.get_namespace()
+        self.pub_total_time = rospy.Publisher(resolved_namespace + "cola2_safety/total_time", TotalTime, queue_size = 2)
 
         # Create reset timeout service
-        self.reset_timeout_srv = rospy.Service('/cola2_safety/reset_timeout',
-                                        Empty,
-                                        self.reset_timeout)
-        
+        self.reset_timeout_srv = rospy.Service(resolved_namespace + 'cola2_safety/reset_timeout', Empty, self.reset_timeout)
+
         # Timer to publish time since init (or last time reset)
         rospy.Timer(rospy.Duration(1.0), self.check_timeout)
 
@@ -63,24 +59,19 @@ class UpTime(object):
         self.nav = NavSts()
         self.init_navigator_check = False
         self.last_navigator_callback = rospy.Time.now().to_sec()
-        rospy.Subscriber("/cola2_navigation/nav_sts",
-                         NavSts,
-                         self.update_nav_sts,
-                         queue_size = 1)
+        rospy.Subscriber(resolved_namespace + "cola2_navigation/nav_sts", NavSts, self.update_nav_sts, queue_size = 1)
 
         # Show message
         rospy.loginfo("%s: initialized", self.name)
-        
-        
+
+
     def check_timeout(self, event):
         """ This is the callback of the main timer """
-        self.diagnostic.add("up_time",
-                            str(rospy.Time.now().to_sec() - self.init_time))
+        self.diagnostic.add("up_time", str(rospy.Time.now().to_sec() - self.init_time))
 
         # This should not be in this node
         if self.init_navigator_check:
-            self.diagnostic.add("last_nav_data",
-                                str(rospy.Time.now().to_sec() - self.last_navigator_callback))
+            self.diagnostic.add("last_nav_data", str(rospy.Time.now().to_sec() - self.last_navigator_callback))
 
         self.diagnostic.setLevel(DiagnosticStatus.OK)
 
