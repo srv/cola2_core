@@ -40,6 +40,7 @@ find_package(catkin REQUIRED COMPONENTS rospy actionlib_msgs geometry_msgs
 #find_package(catkin REQUIRED dynamic_reconfigure)
 generate_dynamic_reconfigure_options(
   cfg/SafeDepthAltitude.cfg
+  cfg/VirtualCageInfo.cfg
 )
 
 ###################################
