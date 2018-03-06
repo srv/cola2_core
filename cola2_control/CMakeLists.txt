@@ -35,6 +35,7 @@ find_package(catkin REQUIRED COMPONENTS
         roscpp
         sensor_msgs
         std_msgs
+        cola2_msgs
         )
 
 ## System dependencies are found with CMake's conventions
@@ -147,7 +148,7 @@ find_package(TinyXML REQUIRED)
 catkin_package(
         #  INCLUDE_DIRS include
         #  LIBRARIES nmea_gps
-        CATKIN_DEPENDS cola2_lib roscpp sensor_msgs std_msgs
+        CATKIN_DEPENDS cola2_lib roscpp sensor_msgs std_msgs cola2_msgs
         #  DEPENDS system_lib
 )
 ###########
@@ -189,7 +190,19 @@ add_library(mission_utils SHARED
         )
 target_link_libraries(mission_utils ${TinyXML_LIBRARIES})
 
+add_library(low_level_controllers SHARED
+        src/${PROJECT_NAME}/low_level_controllers/auv_controller_base.cpp
+        src/${PROJECT_NAME}/low_level_controllers/controller_base.cpp
+        src/${PROJECT_NAME}/low_level_controllers/merge.cpp
+        src/${PROJECT_NAME}/low_level_controllers/ndof_controller.cpp
+        src/${PROJECT_NAME}/low_level_controllers/pid.cpp
+        src/${PROJECT_NAME}/low_level_controllers/poly.cpp
+        src/${PROJECT_NAME}/low_level_controllers/request.cpp
+        )
 
+add_library(ros_control_base SHARED
+        src/${PROJECT_NAME}/ros_controller/auv_ros_controller.cpp
+        )
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
