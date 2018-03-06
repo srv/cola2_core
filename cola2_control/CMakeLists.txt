@@ -1,31 +1,46 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(cola2_control)
 
+add_compile_options(-std=c++11)
+
+file(GLOB_RECURSE EXTRA_FILES src/*)
+file(GLOB_RECURSE EXTRA_INCLUDES include/${PROJECT_NAME}/*)
+add_custom_target(${PROJECT_NAME}_OTHER_FILES ALL WORKING_DIRECTORY ${PROJECT_SOURCE_DIR} SOURCES ${EXTRA_FILES} ${EXTRA_INCLUDES})
+
+
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
+#find_package(catkin REQUIRED COMPONENTS
+#  cmake_modules
+#  cola2_lib
+#  actionlib
+#  actionlib_msgs
+#  cola2_msgs
+#  diagnostic_msgs
+#  dynamic_reconfigure
+#  roscpp
+#  rosparam
+#  rospy
+#  sensor_msgs
+#  std_msgs
+#  std_srvs
+#  tf
+#  visualization_msgs
+#)
+
 find_package(catkin REQUIRED COMPONENTS
-  actionlib
-  actionlib_msgs
-  auv_msgs
-  cola2_lib
-  cola2_msgs
-  diagnostic_msgs
-  dynamic_reconfigure
-  roscpp
-  rosparam
-  rospy
-  sensor_msgs
-  std_msgs
-  std_srvs
-  tf
-  visualization_msgs
-)
+        cmake_modules
+        cola2_lib
+        roscpp
+        sensor_msgs
+        std_msgs
+        )
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
-find_package(Boost REQUIRED COMPONENTS thread)
+find_package(TinyXML REQUIRED)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -98,9 +113,9 @@ find_package(Boost REQUIRED COMPONENTS thread)
 ##     and list every .cfg file to be processed
 
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
-generate_dynamic_reconfigure_options(
-  cfg/Pilot.cfg
-)
+#generate_dynamic_reconfigure_options(
+#  cfg/Pilot.cfg
+#)
 
 ###################################
 ## catkin specific configuration ##
@@ -111,31 +126,70 @@ generate_dynamic_reconfigure_options(
 ## LIBRARIES: libraries you create in this project that dependent projects also need
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
-catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES cola2_control
-#  CATKIN_DEPENDS actionlib auv_msgs cola2_lib cola2_msgs diagnostic_msgs dynamic_reconfigure roscpp rosparam rospy sensor_msgs std_msgs std_srvs tf visualization_msgs
-#  DEPENDS system_lib
-)
+#catkin_package(
+#        INCLUDE_DIRS include
+#        LIBRARIES cola2_control
+#        CATKIN_DEPENDS
+#        cola2_msgs
+#        diagnostic_msgs
+#        geometry_msgs
+#        nav_msgs
+#        roscpp
+#        sensor_msgs
+#        std_msgs
+#        std_srvs
+#        tf
+#        tf_conversions
+#        visualization_msgs
+#        # DEPENDS Eigen3
+#)
 
+catkin_package(
+        #  INCLUDE_DIRS include
+        #  LIBRARIES nmea_gps
+        CATKIN_DEPENDS cola2_lib roscpp sensor_msgs std_msgs
+        #  DEPENDS system_lib
+)
 ###########
 ## Build ##
 ###########
 # Boost thread
-SET(BOOST_THREAD -lboost_thread)
+#SET(BOOST_THREAD -lboost_thread)
 
 # TinyXML
-SET(LIBS_TINYXML -ltinyxml)
+# SET(LIBS_TINYXML -ltinyxml)
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 # include_directories(include)
-include_directories(include ${catkin_INCLUDE_DIRS})
+include_directories(
+        include
+        ${catkin_INCLUDE_DIRS}
+)
 
 ## Declare a C++ library
-# add_library(cola2_control
-#   src/${PROJECT_NAME}/cola2_control.cpp
-# )
+add_library(controllers SHARED
+        src/${PROJECT_NAME}/controllers/anchor.cpp
+        src/${PROJECT_NAME}/controllers/goto.cpp
+        src/${PROJECT_NAME}/controllers/holonomic_goto.cpp
+        src/${PROJECT_NAME}/controllers/los_cte.cpp)
+target_link_libraries(controllers cola2_lib)
+
+add_library(mission_utils SHARED
+        src/${PROJECT_NAME}/mission_utils/mission_maneuver.cpp
+        src/${PROJECT_NAME}/mission_utils/mission_position.cpp
+        src/${PROJECT_NAME}/mission_utils/mission_tolerance.cpp
+        src/${PROJECT_NAME}/mission_utils/mission_waypoint.cpp
+        src/${PROJECT_NAME}/mission_utils/mission_section.cpp
+        src/${PROJECT_NAME}/mission_utils/mission_park.cpp
+        src/${PROJECT_NAME}/mission_utils/mission_configuration.cpp
+        src/${PROJECT_NAME}/mission_utils/mission_action.cpp
+        src/${PROJECT_NAME}/mission_utils/mission_step.cpp
+        src/${PROJECT_NAME}/mission_utils/mission.cpp
+        )
+target_link_libraries(mission_utils ${TinyXML_LIBRARIES})
+
+
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -154,20 +208,25 @@ include_directories(include ${catkin_INCLUDE_DIRS})
 #   ${catkin_LIBRARIES}
 # )
 
-add_executable(keyboard src/keyboard.cpp)
-target_link_libraries(keyboard ${catkin_LIBRARIES})
-add_dependencies(keyboard cola2_msgs_gencpp)
+add_executable(test_mission_utils src/test_mission_utils.cpp)
+target_link_libraries(test_mission_utils mission_utils)
 
-add_executable(pilot src/pilot.cpp)
-target_link_libraries(pilot ${catkin_LIBRARIES})
-add_dependencies(pilot cola2_msgs_gencpp ${PROJECT_NAME}_gencfg)
+# add_dependencies(test cola2_msgs_gencpp)
 
-if(Boost_FOUND)
-  include_directories(${Boost_INCLUDE_DIRS})
-  add_executable(captain src/captain.cpp)
-  target_link_libraries(captain ${catkin_LIBRARIES} ${LIBS_TINYXML} ${Boost_LIBRARIES})
-  add_dependencies(captain cola2_msgs_gencpp)
-endif()
+#add_executable(keyboard src/keyboard.cpp)
+#target_link_libraries(keyboard ${catkin_LIBRARIES})
+#add_dependencies(keyboard cola2_msgs_gencpp)
+#
+#add_executable(pilot src/pilot.cpp)
+#target_link_libraries(pilot ${catkin_LIBRARIES})
+#add_dependencies(pilot cola2_msgs_gencpp ${PROJECT_NAME}_gencfg)
+#
+#if(Boost_FOUND)
+#  include_directories(${Boost_INCLUDE_DIRS})
+#  add_executable(captain src/captain.cpp)
+#  target_link_libraries(captain ${catkin_LIBRARIES} ${LIBS_TINYXML} ${Boost_LIBRARIES})
+#  add_dependencies(captain cola2_msgs_gencpp)
+#endif()
 
 #############
 ## Install ##
