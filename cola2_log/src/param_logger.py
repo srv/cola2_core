@@ -22,8 +22,8 @@ def callback(event):
     """Callback to collect all parameters."""
     strings = list()
     for name in rospy.get_param_names():
-        if not name.startswith('/robot_description'):
-            if not name.startswith('/roslaunch/uris'):
+        if not 'robot_description' in name:
+            if not 'roslaunch/uris' in name:
                 value = rospy.get_param(name)
                 line = '{:s}={}'.format(name, value)
                 strings.append(line)
@@ -43,10 +43,10 @@ def save_params_callback(req):
         pass
     os.symlink(file_name, params_path + "/latest_params.yaml")
     for name in rospy.get_param_names():
-        if not name.startswith('/robot_description'):
-            if not name.startswith('/roslaunch/uris'):
-                if not name.startswith('/rosbridge_websocket'):
-                    if not name.startswith('/rosapi'):
+        if not 'robot_description' in name:
+            if not 'roslaunch/uris' in name:
+                if not 'rosbridge_websocket' in name:
+                    if not 'rosapi' in name:
                         value = rospy.get_param(name)
                         if isinstance(value, str):
                             line = "{:s}: '{}'\n".format(name, value)
@@ -64,7 +64,8 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         params_path = str(sys.argv[1])
     rospy.loginfo("Save params path: " + params_path)
-    pub = rospy.Publisher('/params_string', String, queue_size=1, latch=True)
+    resolved_name = rospy.get_name()
+    pub = rospy.Publisher(resolved_name + '/params_string', String, queue_size=1, latch=True)
     tim = rospy.Timer(rospy.Duration(120), callback, oneshot=True)
     s = rospy.Service('/save_params_to_file', Empty, save_params_callback)
     rospy.spin()

@@ -49,11 +49,11 @@ class SafeDepthAltitude(object):
 
         # Publisher
         resolved_namespace = rospy.get_namespace()
-        self.pub_body_velocity_req = rospy.Publisher(resolved_namespace + "cola2_control/body_velocity_req",
+        self.pub_body_velocity_req = rospy.Publisher(resolved_namespace + "body_velocity_req",
                                                      BodyVelocityReq, queue_size=2)
 
         # Subscriber
-        rospy.Subscriber(resolved_namespace + "cola2_navigation/nav_sts", NavSts, self.update_nav_sts, queue_size=1)
+        rospy.Subscriber(resolved_namespace + "navigator/navigation", NavSts, self.update_nav_sts, queue_size=1)
 
         # Create dynamic reconfigure service
         self.dynamic_reconfigure_srv = Server(SafeDepthAltitudeConfig, self.dynamic_reconfigure_callback)
@@ -110,10 +110,10 @@ class SafeDepthAltitude(object):
 
     def get_config(self):
         """Get config from ROS param server."""
-        param_dict = {'max_depth': 'safe_depth_altitude/max_depth',
-                      'min_altitude': 'safe_depth_altitude/min_altitude'}
+        param_dict = {'max_depth': 'max_depth',
+                      'min_altitude': 'min_altitude'}
 
-        if not param_loader.get_ros_params(self, param_dict, self.name):
+        if not param_loader.get_ros_params(self, param_dict, rospy.get_name()):
             self.bad_config_timer = rospy.Timer(rospy.Duration(0.4),
                                                 self.bad_config_message)
 

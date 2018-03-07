@@ -45,14 +45,14 @@ class SetPose(object):
         # Get config parameters
         self.get_config()
 
-        resolved_namespace = rospy.get_namespace()
+        namespace = rospy.get_namespace()
 
         # Publisher
-        self.pub_world_waypoint_req = rospy.Publisher(resolved_namespace + "cola2_control/world_waypoint_req",
+        self.pub_world_waypoint_req = rospy.Publisher(namespace + "world_waypoint_req",
                                                       WorldWaypointReq, queue_size = 2)
 
         # Subscriber
-        rospy.Subscriber(resolved_namespace + "cola2_navigation/nav_sts", NavSts, self.update_nav_sts, queue_size = 1)
+        rospy.Subscriber(namespace + "navigator/nav_sts", NavSts, self.update_nav_sts, queue_size = 1)
 
         # Timer
         rospy.Timer(rospy.Duration(0.1), self.set_pose)
@@ -96,10 +96,10 @@ class SetPose(object):
 
     def get_config(self):
         """ Reads configuration from ROSPARAM SERVER """
-        param_dict = {'set_pose_depth': 'safety_set_pose/set_pose_depth','set_pose_axis':
-                      'safety_set_pose/set_pose_axis', 'desired_pose': 'safety_set_pose/desired_pose'}
+        param_dict = {'set_pose_depth': 'set_pose_depth','set_pose_axis':
+                      'set_pose_axis', 'desired_pose': 'desired_pose'}
 
-        if not param_loader.get_ros_params(self, param_dict, self.name):
+        if not param_loader.get_ros_params(self, param_dict, rospy.get_name()):
             self.bad_config_timer = rospy.Timer(rospy.Duration(0.4), self.bad_config_message)
 
 

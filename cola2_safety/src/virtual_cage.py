@@ -51,11 +51,12 @@ class VirtualCage(object):
         self.diagnostic = DiagnosticHelper(self.name, "soft")
 
         # Publisher
-        resolved_namespace = rospy.get_namespace()
-        self.cage_marker_pub = rospy.Publisher(resolved_namespace + "cola2_safety/cage_marker", Marker, queue_size = 2)
+        resolved_name = rospy.get_name()
+        namespace = rospy.get_namespace()
+        self.cage_marker_pub = rospy.Publisher(resolved_name + "/markers/cage", Marker, queue_size = 2)
 
         # Subscriber
-        rospy.Subscriber(resolved_namespace + "cola2_navigation/nav_sts", NavSts, self.update_nav_sts)
+        rospy.Subscriber(namespace + "navigator/navigation", NavSts, self.update_nav_sts)
 
         # Timer
         rospy.Timer(rospy.Duration(1.0), self.check_cage)
@@ -133,11 +134,11 @@ class VirtualCage(object):
 
     def get_config(self):
         """ Read parameters from ROS Param Server."""
-        param_dict = {'north_origin': 'virtual_cage/north_origin', 'east_origin': 'virtual_cage/east_origin',
-                      'north_longitude': 'virtual_cage/north_longitude','east_longitude': 'virtual_cage/east_longitude',
-                      'enabled': 'virtual_cage/enabled'}
+        param_dict = {'north_origin': 'north_origin', 'east_origin': 'east_origin',
+                      'north_longitude': 'north_longitude','east_longitude': 'east_longitude',
+                      'enabled': 'enabled'}
 
-        param_loader.get_ros_params(self, param_dict, self.name)
+        param_loader.get_ros_params(self, param_dict, rospy.get_name())
 
 
 if __name__ == '__main__':
