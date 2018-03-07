@@ -1,30 +1,25 @@
 #!/usr/bin/env python
-# Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+# Copyright (c) 2018 Iqua Robotics SL - All Rights Reserved
 #
 # This file is subject to the terms and conditions defined in file
 # 'LICENSE.txt', which is part of this source code package.
 
 
-
 """
 @@>Node to keep track of the cola2 running time, used by the safety supervisor to check it against the safety timeout.
-It also checks if navigator is publishing data.<@@
+<@@
 """
 
-# ROS imports
-import roslib
 import rospy
-
 from std_srvs.srv import Empty, EmptyResponse
 from diagnostic_msgs.msg import DiagnosticStatus
 from std_msgs.msg import Int32
-
 from cola2_lib.rosutils.diagnostic_helper import DiagnosticHelper
 
 class Watchdog(object):
-    """ This node keeps track of the cola2 running time. Counts the up time since the architecture started (actually
-     since the start of this node) or since the last time reset, which can be done through a provided service.
-     Publishes the current up time together with the value of the safety timeout parameter. """
+    """ This node keeps track of the cola2 running time. Counts the elapsed time since the architecture started
+        (actually since the start of this node) or since the last time reset, which can be done through a provided
+        service. Publishes the current elapsed time. """
 
 
     def __init__(self, name):
@@ -52,7 +47,7 @@ class Watchdog(object):
 
 
     def check_timeout(self, event):
-        """ This is the callback of the main timer """
+        """ Callback of the watchdog timer """
         self.diagnostic.add("elapsed_time", str(rospy.Time.now().to_sec() - self.init_time))
         self.diagnostic.setLevel(DiagnosticStatus.OK)
 
