@@ -8,7 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
   cola2_lib
   cola2_msgs
   diagnostic_msgs
-  sensors_msgs
+  sensor_msgs
   std_msgs
   roscpp
   rospy
