@@ -48,7 +48,7 @@ class SetPose(object):
         namespace = rospy.get_namespace()
 
         # Publisher
-        self.pub_world_waypoint_req = rospy.Publisher(namespace + "world_waypoint_req",
+        self.pub_world_waypoint_req = rospy.Publisher(namespace + "controller/world_waypoint_req",
                                                       WorldWaypointReq, queue_size = 2)
 
         # Subscriber
