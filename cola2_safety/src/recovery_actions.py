@@ -40,13 +40,12 @@ class RecoveryActions(object):
         # Get config
         self.get_config()
 
-        resolved_name = rospy.get_name()
         namespace = rospy.get_namespace()
 
         # Create publisher
-        self.pub_thrusters = rospy.Publisher(resolved_name + "/thrusters_data", Setpoints, queue_size = 2)
+        self.pub_thrusters = rospy.Publisher(self.name + "/thrusters_data", Setpoints, queue_size = 2)
 
-        self.pub_external_ra = rospy.Publisher(resolved_name + "/external_recovery_action",
+        self.pub_external_ra = rospy.Publisher(self.name + "/external_recovery_action",
                                                RecoveryAction, queue_size = 2)
         # Subscriber
         rospy.Subscriber(namespace + "navigator/navigation", NavSts, self.update_nav_sts, queue_size=1)
@@ -64,28 +63,28 @@ class RecoveryActions(object):
         self.captain_clients = True
         try:
             rospy.wait_for_service(namespace + 'pilot/disable_trajectory', 20)
-            self.abort_mission_srv = rospy.ServiceProxy( namespace + 'pilot/disable_trajectory', Empty)
+            self.abort_mission_srv = rospy.ServiceProxy(namespace + 'pilot/disable_trajectory', Empty)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
             rospy.logfatal("%s: disable trajectory service not available!", self.name)
 
         try:
             rospy.wait_for_service(namespace + 'pilot/disable_keep_position', 2)
-            self.abort_keep_pose_srv = rospy.ServiceProxy( namespace + 'pilot/disable_keep_position', Empty)
+            self.abort_keep_pose_srv = rospy.ServiceProxy(namespace + 'pilot/disable_keep_position', Empty)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
             rospy.logfatal("%s: disable keep position service not available!", self.name)
 
         try:
             rospy.wait_for_service(namespace + 'pilot/disable_goto', 2)
-            self.abort_goto_srv = rospy.ServiceProxy( namespace + 'pilot/disable_goto', Empty)
+            self.abort_goto_srv = rospy.ServiceProxy(namespace + 'pilot/disable_goto', Empty)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
             rospy.logfatal("%s: disable goto service not available!", self.name)
 
         try:
             rospy.wait_for_service(namespace + 'pilot/goto', 2)
-            self.goto_srv = rospy.ServiceProxy( namespace + 'pilot/goto', Goto)
+            self.goto_srv = rospy.ServiceProxy(namespace + 'pilot/goto', Goto)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
             rospy.logfatal("%s: goto service not available!", self.name)
@@ -101,7 +100,7 @@ class RecoveryActions(object):
                                                                   self.no_disable_thrusters_message)
 
         # Create service
-        self.recovery_srv = rospy.Service( resolved_name +'/recover', Recovery, self.recovery_action_srv)
+        self.recovery_srv = rospy.Service(self.name +'/recover', Recovery, self.recovery_action_srv)
 
         # Show message
         rospy.loginfo("%s: initialized", self.name)
@@ -240,13 +239,7 @@ class RecoveryActions(object):
                       'emergency_surface_setpoints': 'emergency_surface_setpoints',
                       'controlled_surface_depth': 'controlled_surface_depth'}
 
-        if not param_loader.get_ros_params(self, param_dict, rospy.get_name()):
-            self.bad_config_timer = rospy.Timer(rospy.Duration(0.4), self.bad_config_message)
-
-
-    def bad_config_message(self, event):
-        """ Timer to show an error if loading parameters failed """
-        rospy.logfatal('%s: bad parameters in param server!', self.name)
+        param_loader.get_ros_params(self, param_dict, rospy.get_name())
 
 
     def no_disable_thrusters_message(self, event):
