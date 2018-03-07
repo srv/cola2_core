@@ -161,13 +161,7 @@ class SetZeroVelocity(object):
         param_dict = {'set_zero_velocity_depth': 'set_zero_velocity_depth',
                       'set_zero_velocity_axis': 'set_zero_velocity_axis'}
 
-        if not param_loader.get_ros_params(self, param_dict, rospy.get_name()):
-            self.bad_config_timer = rospy.Timer(rospy.Duration(0.4), self.bad_config_message)
-
-
-    def bad_config_message(self, event):
-        """ Timer to show an error if loading parameters failed """
-        rospy.logerr('%s: bad parameters in param server!', self.name)
+        param_loader.get_ros_params(self, param_dict, rospy.get_name())
 
 
 if __name__ == '__main__':

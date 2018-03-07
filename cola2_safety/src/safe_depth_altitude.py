@@ -113,13 +113,7 @@ class SafeDepthAltitude(object):
         param_dict = {'max_depth': 'max_depth',
                       'min_altitude': 'min_altitude'}
 
-        if not param_loader.get_ros_params(self, param_dict, rospy.get_name()):
-            self.bad_config_timer = rospy.Timer(rospy.Duration(0.4),
-                                                self.bad_config_message)
-
-    def bad_config_message(self, event):
-        """Timer to show an error if loading parameters failed."""
-        rospy.logerr('%s: bad parameters in param server!', self.name)
+        param_loader.get_ros_params(self, param_dict, rospy.get_name())
 
 
 if __name__ == '__main__':

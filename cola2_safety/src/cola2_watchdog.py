@@ -33,11 +33,10 @@ class Watchdog(object):
         self.diagnostic = DiagnosticHelper(self.name, "soft")
 
         # Publisher
-        resolved_name = rospy.get_name()
-        self.pub_elapsed_time = rospy.Publisher(resolved_name + "/elapsed_time", Int32, queue_size = 2)
+        self.pub_elapsed_time = rospy.Publisher(self.name + "/elapsed_time", Int32, queue_size = 2)
 
         # Create reset timeout service
-        self.reset_timeout_srv = rospy.Service(resolved_name + '/reset_timeout', Empty, self.reset_timeout)
+        self.reset_timeout_srv = rospy.Service(self.name + '/reset_timeout', Empty, self.reset_timeout)
 
         # Timer to publish time since init (or last time reset)
         rospy.Timer(rospy.Duration(1.0), self.check_timeout)

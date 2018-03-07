@@ -101,16 +101,16 @@ class SafetySupervisor(object):
         # Init Service Clients
         namespace = rospy.get_namespace()
         try:
-            rospy.wait_for_service(namespace + '/recovery_actions/recover', 20)
-            self.recover_action_srv = rospy.ServiceProxy(namespace + '/recovery_actions/recover', Recovery)
+            rospy.wait_for_service(namespace + 'recovery_actions/recover', 20)
+            self.recover_action_srv = rospy.ServiceProxy(namespace + 'recovery_actions/recover', Recovery)
         except rospy.exceptions.ROSException:
             rospy.logerr('%s, Error creating client to recovery action.', self.name)
             rospy.signal_shutdown('Error creating recover action client')
 
         try:
-            rospy.wait_for_service(namespace + '/cola2_watchdog/reset_timeout', 20)
+            rospy.wait_for_service(namespace + 'cola2_watchdog/reset_timeout', 20)
             self.reset_timeout_srv = rospy.ServiceProxy(
-                        namespace + '/cola2_watchdog/reset_timeout', Empty)
+                        namespace + 'cola2_watchdog/reset_timeout', Empty)
         except rospy.exceptions.ROSException:
             rospy.logerr('%s, Error creating client to reset timeout.', self.name)
             rospy.signal_shutdown('Error creating reset timeout client')

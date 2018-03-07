@@ -51,9 +51,8 @@ class VirtualCage(object):
         self.diagnostic = DiagnosticHelper(self.name, "soft")
 
         # Publisher
-        resolved_name = rospy.get_name()
         namespace = rospy.get_namespace()
-        self.cage_marker_pub = rospy.Publisher(resolved_name + "/markers/cage", Marker, queue_size = 2)
+        self.cage_marker_pub = rospy.Publisher(self.name + "/markers/cage", Marker, queue_size = 2)
 
         # Subscriber
         rospy.Subscriber(namespace + "navigator/navigation", NavSts, self.update_nav_sts)
@@ -61,8 +60,8 @@ class VirtualCage(object):
         # Timer
         rospy.Timer(rospy.Duration(1.0), self.check_cage)
 
-        # Create dynamic reconfigure servoce
-        self.dynamic_reconfigure_srv = Server( VirtualCageInfoConfig, self.dynamic_reconfigure_callback )
+        # Create dynamic reconfigure service
+        self.dynamic_reconfigure_srv = Server(VirtualCageInfoConfig, self.dynamic_reconfigure_callback)
 
 
     def dynamic_reconfigure_callback(self, config, level):
@@ -107,7 +106,6 @@ class VirtualCage(object):
         cage_marker.points.append( Point(self.north_origin, self.east_origin, 0.0) )
         cage_marker.frame_locked = True
 
-
         if self.virtual_cage_enabled and self.navigation_enabled:
             if self.vehicle_position[0] < self.north_origin or self.vehicle_position[0] > self.north_origin + \
                self.north_longitude or self.vehicle_position[1] < self.east_origin or self.vehicle_position[1] > \
@@ -144,7 +142,7 @@ class VirtualCage(object):
 if __name__ == '__main__':
     try:
         rospy.init_node('virtual_cage')
-        V_CAGE = VirtualCage(rospy.get_name())
+        vc = VirtualCage(rospy.get_name())
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
