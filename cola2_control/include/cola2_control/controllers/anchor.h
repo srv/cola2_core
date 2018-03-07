@@ -9,15 +9,14 @@
 #ifndef __CONTROLLER_ANCHOR__
 #define __CONTROLLER_ANCHOR__
 
-
+#include <cola2_control/controllers/types.h>
+#include <cola2_lib/utils/angles.h>
 #include <math.h>
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <vector>
-#include <cola2_control/controllers/types.h>
-#include <cola2_lib/utils/angles.h>
 
 typedef struct
 {

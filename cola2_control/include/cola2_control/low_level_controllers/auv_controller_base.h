@@ -9,7 +9,7 @@
 #ifndef COLA2_LIB_INCLUDE_COLA2_LIB_COLA2_CONTROL_IAUVCONTROLLER_H_
 #define COLA2_LIB_INCLUDE_COLA2_LIB_COLA2_CONTROL_IAUVCONTROLLER_H_
 
-#include <Eigen/Dense>
+#include <eigen3/Eigen/Dense>
 
 #include <algorithm>
 #include <map>

@@ -36,6 +36,7 @@ find_package(catkin REQUIRED COMPONENTS
         sensor_msgs
         std_msgs
         cola2_msgs
+        actionlib
         )
 
 ## System dependencies are found with CMake's conventions
@@ -148,7 +149,7 @@ find_package(TinyXML REQUIRED)
 catkin_package(
         #  INCLUDE_DIRS include
         #  LIBRARIES nmea_gps
-        CATKIN_DEPENDS cola2_lib roscpp sensor_msgs std_msgs cola2_msgs
+        CATKIN_DEPENDS cola2_lib roscpp sensor_msgs std_msgs cola2_msgs actionlib
         #  DEPENDS system_lib
 )
 ###########
@@ -174,7 +175,7 @@ add_library(controllers SHARED
         src/${PROJECT_NAME}/controllers/goto.cpp
         src/${PROJECT_NAME}/controllers/holonomic_goto.cpp
         src/${PROJECT_NAME}/controllers/los_cte.cpp)
-target_link_libraries(controllers cola2_lib)
+target_link_libraries(controllers ${catkin_LIBRARIES})
 
 add_library(mission_utils SHARED
         src/${PROJECT_NAME}/mission_utils/mission_maneuver.cpp
@@ -199,10 +200,12 @@ add_library(low_level_controllers SHARED
         src/${PROJECT_NAME}/low_level_controllers/poly.cpp
         src/${PROJECT_NAME}/low_level_controllers/request.cpp
         )
+target_link_libraries(low_level_controllers ${catkin_LIBRARIES})
 
 add_library(ros_control_base SHARED
         src/${PROJECT_NAME}/ros_controller/auv_ros_controller.cpp
         )
+target_link_libraries(ros_control_base ${catkin_LIBRARIES})
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -221,8 +224,8 @@ add_library(ros_control_base SHARED
 #   ${catkin_LIBRARIES}
 # )
 
-add_executable(test_mission_utils src/test_mission_utils.cpp)
-target_link_libraries(test_mission_utils mission_utils)
+# add_executable(test_mission_utils src/test_mission_utils.cpp)
+# target_link_libraries(test_mission_utils ${catkin_LIBRARIES} mission_utils controllers)
 
 # add_dependencies(test cola2_msgs_gencpp)
 
@@ -230,9 +233,11 @@ target_link_libraries(test_mission_utils mission_utils)
 #target_link_libraries(keyboard ${catkin_LIBRARIES})
 #add_dependencies(keyboard cola2_msgs_gencpp)
 #
-#add_executable(pilot src/pilot.cpp)
-#target_link_libraries(pilot ${catkin_LIBRARIES})
-#add_dependencies(pilot cola2_msgs_gencpp ${PROJECT_NAME}_gencfg)
+
+add_executable(pilot src/pilot.cpp)
+target_link_libraries(pilot ${catkin_LIBRARIES} controllers)
+#add_dependencies(pilot cola2_msgs_gencpp) # ${PROJECT_NAME}_gencfg
+
 #
 #if(Boost_FOUND)
 #  include_directories(${Boost_INCLUDE_DIRS})

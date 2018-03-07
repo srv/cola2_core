@@ -8,15 +8,15 @@
 #ifndef __CONTROLLER_GOTO__
 #define __CONTROLLER_GOTO__
 
-#include <string>
-#include <vector>
-#include <stdexcept>
-#include <iostream>
-#include <math.h>
-#include <algorithm>
 #include <cola2_control/controllers/types.h>
 #include <cola2_lib/utils/angles.h>
 #include <cola2_lib/utils/saturate.h>
+#include <math.h>
+#include <algorithm>
+#include <iostream>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 typedef struct
 {
@@ -31,7 +31,6 @@ typedef struct
  */
 class GotoController
 {
-
 private:
   GotoControllerConfig config_;
 
@@ -52,7 +51,6 @@ public:
    * Set configuration by means of a AnchorControllerConfig struct.
    */
   void setConfig(const GotoControllerConfig&);
-
 };
 
 #endif /* __CONTROLLER_GOTO__ */
