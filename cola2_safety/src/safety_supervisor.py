@@ -1,17 +1,14 @@
 #!/usr/bin/env python
-# Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+# Copyright (c) 2018 Iqua Robotics SL - All Rights Reserved
 #
 # This file is subject to the terms and conditions defined in file
 # 'LICENSE.txt', which is part of this source code package.
 
-"""@@>The diagnostics supervisor is in charge of receiving the aggregated
-diagnostics message and apply a set of rules aimed at detecting errors in
-the system (a sensor not giving data, low battery level, detection from
-water leak sensors, etc.). These rules are based on the configuration values
-set on the cola2_s2/config/safety.yaml file. If any of the rule checks is
-triggered, the diagnostics supervisor calls a recovery action, which acts
-appropriately depending on the type of error.<@@"""
-
+"""@@> The diagnostics supervisor receives the vehicle status message and applies a set of rules aimed at detecting
+    errors in the system (low battery level, detection from water leak sensors, etc.).
+    These rules are based on the configuration values set on the safety.yaml file of the vehicles.
+    If any of the rule checks is triggered, the diagnostics supervisor calls a recovery action,
+    which acts appropriately depending on the type of error.<@@"""
 """
 Created on 02/19/2015
 Modified 11/2016
@@ -20,42 +17,48 @@ Modified 11/2017
 @author: Narcis Palomeras, Tali Hurtos
 """
 
-# ROS imports
 import rospy
 import dynamic_reconfigure.client
-
 from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
-from std_msgs.msg import Int16
 from diagnostic_msgs.msg import DiagnosticStatus
-
 from cola2_msgs.msg import RecoveryAction, VehicleStatus, SafetySupervisorStatus
 from cola2_msgs.srv import Recovery, RecoveryRequest
+from error_code import ErrorCode
+from cola2_lib.rosutils.diagnostic_helper import DiagnosticHelper
+from cola2_lib.rosutils import param_loader
 
-from cola2_lib.diagnostic_helper import DiagnosticHelper
-from cola2_lib import cola2_ros_lib
-from cola2_lib import cola2_lib
-
+# Time during which to show the message for external recovery
 TIME_SHOW_EXTERNAL_RECOVERY = 20
 
-class Cola2Safety(object):
 
+class SafetySupervisor(object):
+    """
+    The diagnostics supervisor receives the vehicle status message and applies a set of rules aimed at detecting
+    errors in the system (low battery level, detection from water leak sensors, etc.).
+    These rules are based on the configuration values set on the safety.yaml file of the vehicles.
+    If any of the rule checks is triggered, the diagnostics supervisor calls a recovery action, which acts
+    appropriately depending on the type of error.
+    It also handles recovery actions called externally (using the recovery_actions/recover service
+    through the CLI or the GUI).
+    """
     def __init__(self, name):
         """ Init the class. """
         self.name = name
 
-        # Vehicle initialized
+        # Flag to know if vehicle is initialized
         self.vehicle_init = False
 
-        # Init error code
+        # Init error code word to 0s
         self.error_code = ['0' for i in range(16)]
 
         # Set up diagnostics
         self.diagnostic = DiagnosticHelper(self.name, "soft")
 
+        # Flags to know if a recovery action is ongoing
         self.is_recovery_enabled = False
         self.is_external_recovery_enabled = False
 
-        # Init recovery action message
+        # Initialize recovery action message
         self.ra_msg = RecoveryAction()
         self.ra_msg.header.stamp = rospy.Time.now()
         self.ra_msg.error_level = RecoveryAction.NONE
@@ -63,7 +66,7 @@ class Cola2Safety(object):
         self.old_level = RecoveryAction.NONE
         self.old_str_err = ""
 
-        # Diagnostic thresholds
+        # Initialize default diagnostic thresholds
         self.min_altitude = 1.5
         self.max_depth = 20.0
         self.max_temperatures_ids = ['batteries', 'pc', 'thrusters']
@@ -75,6 +78,8 @@ class Cola2Safety(object):
         self.min_altitude_update = 2.0
         self.min_gps_update = 2.0
         self.min_dvl_update = 2.0
+        self.min_modem_update = 2.0
+        self.min_nav_update = 2.0
         self.min_range_update = 2.0
         self.min_wifi_update = 20
         self.min_dvl_good_data = 30
@@ -89,70 +94,63 @@ class Cola2Safety(object):
         # Get config parameters
         self.get_config()
 
-        # Create Publishers
-        self.pub_safety_supervisor_state = rospy.Publisher("/cola2_safety/safety_supervisor_status",
-                                              SafetySupervisorStatus,
-                                              queue_size = 2)
+        # Create Publisher
+        self.pub_safety_supervisor_state = rospy.Publisher(rospy.get_name() + '/status',
+                                                           SafetySupervisorStatus, queue_size=2)
 
-        # Init Service Client
+        # Init Service Clients
+        namespace = rospy.get_namespace()
         try:
-            rospy.wait_for_service('/cola2_safety/recovery_action', 20)
-            self.recover_action_srv = rospy.ServiceProxy(
-                        '/cola2_safety/recovery_action', Recovery)
+            rospy.wait_for_service(namespace + '/recovery_actions/recover', 20)
+            self.recover_action_srv = rospy.ServiceProxy(namespace + '/recovery_actions/recover', Recovery)
         except rospy.exceptions.ROSException:
-            rospy.logerr('%s, Error creating client to recovery action.',
-                         self.name)
+            rospy.logerr('%s, Error creating client to recovery action.', self.name)
             rospy.signal_shutdown('Error creating recover action client')
 
         try:
-            rospy.wait_for_service('/cola2_safety/reset_timeout', 20)
+            rospy.wait_for_service(namespace + '/cola2_watchdog/reset_timeout', 20)
             self.reset_timeout_srv = rospy.ServiceProxy(
-                        '/cola2_safety/reset_timeout', Empty)
-
+                        namespace + '/cola2_watchdog/reset_timeout', Empty)
         except rospy.exceptions.ROSException:
-            rospy.logerr('%s, Error creating client to reset timeout.',
-                         self.name)
+            rospy.logerr('%s, Error creating client to reset timeout.', self.name)
             rospy.signal_shutdown('Error creating reset timeout client')
 
-
         # Subscriber
-        rospy.Subscriber("/cola2_safety/vehicle_status",
+        rospy.Subscriber(namespace + "vehicle_status",
                          VehicleStatus,
                          self.check_vehicle_status,
                          queue_size=1)
 
         # To handle recovery actions that have not been called from safety_supervisor
-        rospy.Subscriber("/cola2_safety/external_recovery_action",
+        rospy.Subscriber(namespace + "recovery_action/external_recovery_action",
                          RecoveryAction,
                          self.external_recovery_action,
                          queue_size=1)
 
-        # Create service
-        self.reload_params_srv = rospy.Service('/cola2_safety/reload_safety_params',
+        # Create service to reload safety parameters
+        self.reload_params_srv = rospy.Service(rospy.get_name() + '/reload_safety_params',
                                                Empty,
                                                self.reload_params_srv)
         rospy.loginfo('%s: initialized', self.name)
-
 
     def reload_params_srv(self, req):
         """ Callback of reload params service """
         rospy.loginfo('%s: received reload params service', self.name)
         self.get_config()
-        self.reset_timeout_srv(EmptyRequest())
         return EmptyResponse()
 
     def compute_error_byte(self, current_step):
-        """ Update ERROR CODE with the captain status information. """
-
+        """ Update error code with the current step information. """
         current_step = bin(current_step % 256)
-        # delete previous bits
+        # Delete previous bits
         for b in range(8):
-            self.error_code[cola2_lib.ErrorCode.CURRENT_WAYPOINT_BASE - b] = '0'
+            self.error_code[ErrorCode.CURRENT_WAYPOINT_BASE - b] = '0'
         # Fill current step
         for b in range(len(current_step) - 2):
-            self.error_code[cola2_lib.ErrorCode.CURRENT_WAYPOINT_BASE - b] = current_step[-(1 + b)]
+            self.error_code[ErrorCode.CURRENT_WAYPOINT_BASE - b] = current_step[-(1 + b)]
 
     def external_recovery_action(self, recovery_action):
+        """ Callback for external recovery action subscriber """
         rospy.loginfo("%s: external recovery action received", self.name)
         self.ra_msg = recovery_action
         self.old_level = recovery_action.error_level
@@ -160,30 +158,29 @@ class Cola2Safety(object):
         self.is_external_recovery_enabled = True
 
     def check_vehicle_status(self, vehicle_status):
-        """ Check all the diagnostics to see if any of the following rules
-            is true. When a rule is accomplished call the appropriated
-            recovery action. """
-
+        """
+        Check vehicle status fields to see if any of the following rules is true.
+        When a rule is triggered call the appropriated recovery action.
+        """
+        # Flag to keep track if any recovery action is triggered
         self.is_recovery_enabled = False
 
         # Rule: Init vehicle
         if vehicle_status.vehicle_initialized:
             self.vehicle_init = True
-            self.error_code[cola2_lib.ErrorCode.INIT] = '1'
+            self.error_code[ErrorCode.INIT] = '1'
 
         # Rule: Battery Level
         battery_charge = vehicle_status.battery_charge
         battery_voltage = vehicle_status.battery_voltage
         if battery_charge < self.min_battery_charge or battery_voltage < self.min_battery_voltage:
-            self.error_code[cola2_lib.ErrorCode.BAT_ERROR] = '1'
-            self.error_code[cola2_lib.ErrorCode.BAT_WARNING] = '0'
-            self.call_recovery_action("Battery Level below threshold!",
-                                      RecoveryAction.ABORT_AND_SURFACE)
+            self.error_code[ErrorCode.BAT_ERROR] = '1'
+            self.error_code[ErrorCode.BAT_WARNING] = '0'
+            self.call_recovery_action("Battery Level below threshold!", RecoveryAction.ABORT_AND_SURFACE)
         elif battery_charge < 1.5*self.min_battery_charge:
-            self.error_code[cola2_lib.ErrorCode.BAT_ERROR] = '0'
-            self.error_code[cola2_lib.ErrorCode.BAT_WARNING] = '1'
-            self.call_recovery_action("Battery Level Low",
-                                      RecoveryAction.INFORMATIVE)
+            self.error_code[ErrorCode.BAT_ERROR] = '0'
+            self.error_code[ErrorCode.BAT_WARNING] = '1'
+            self.call_recovery_action("Battery Level Low", RecoveryAction.INFORMATIVE)
         else:
             self.diagnostic.add('battery_charge', str(battery_charge))
             rospy.loginfo("%s: Battery charge %s", self.name, str(battery_charge))
@@ -193,9 +190,8 @@ class Cola2Safety(object):
         self.diagnostic.add('last_imu_data', str(last_imu))
         if last_imu > self.min_imu_update:
             rospy.logerr("%s: No IMU data since %s", self.name, str(last_imu))
-            self.error_code[cola2_lib.ErrorCode.NAV_STS_ERROR] = '1'
-            self.call_recovery_action("No IMU data!",
-                                      RecoveryAction.ABORT_AND_SURFACE)
+            self.error_code[ErrorCode.NAV_STS_ERROR] = '1'
+            self.call_recovery_action("No IMU data!", RecoveryAction.ABORT_AND_SURFACE)
         else:
             rospy.loginfo("%s: Last IMU data %s", self.name, str(last_imu))
 
@@ -203,9 +199,8 @@ class Cola2Safety(object):
         last_depth = vehicle_status.depth_data_age
         self.diagnostic.add('last_depth_data', str(last_depth))
         if last_depth > self.min_depth_update:
-            self.error_code[cola2_lib.ErrorCode.NAV_STS_ERROR] = '1'
-            self.call_recovery_action("No Depth data!",
-                                      RecoveryAction.EMERGENCY_SURFACE)
+            self.error_code[ErrorCode.NAV_STS_ERROR] = '1'
+            self.call_recovery_action("No Depth data!", RecoveryAction.EMERGENCY_SURFACE)
         else:
             rospy.loginfo("%s: Last DEPTH data %s", self.name, str(last_depth))
 
@@ -213,10 +208,9 @@ class Cola2Safety(object):
         last_altitude = vehicle_status.altitude_data_age
         self.diagnostic.add('last_altitude_data', str(last_altitude))
         if last_altitude > self.min_altitude_update:
-            rospy.logerr("%s: last_altiude %s/%s", self.name, str(last_altitude), str(self.min_altitude_update) )
-            self.error_code[cola2_lib.ErrorCode.NAV_STS_ERROR] = '1'
-            self.call_recovery_action("No Altitude data!",
-                                      RecoveryAction.ABORT_AND_SURFACE)
+            rospy.logerr("%s: last_altiude %s/%s", self.name, str(last_altitude), str(self.min_altitude_update))
+            self.error_code[ErrorCode.NAV_STS_ERROR] = '1'
+            self.call_recovery_action("No Altitude data!", RecoveryAction.ABORT_AND_SURFACE)
         else:
             rospy.loginfo("%s: Last ALTITUDE data %s", self.name, str(last_altitude))
 
@@ -224,9 +218,8 @@ class Cola2Safety(object):
         last_dvl = vehicle_status.dvl_data_age
         self.diagnostic.add('last_dvl_data', str(last_dvl))
         if last_dvl > self.min_dvl_update:
-            self.error_code[cola2_lib.ErrorCode.NAV_STS_ERROR] = '1'
-            self.call_recovery_action("No DVL data!",
-                                      RecoveryAction.ABORT_AND_SURFACE)
+            self.error_code[ErrorCode.NAV_STS_ERROR] = '1'
+            self.call_recovery_action("No DVL data!", RecoveryAction.ABORT_AND_SURFACE)
         else:
             rospy.loginfo("%s: Last DVL data %s", self.name, str(last_dvl))
 
@@ -234,9 +227,8 @@ class Cola2Safety(object):
         last_gps = vehicle_status.gps_data_age
         self.diagnostic.add('last_gps_data', str(last_gps))
         if last_gps > self.min_gps_update:
-            self.error_code[cola2_lib.ErrorCode.NAV_STS_WARNING] = '1'
-            self.call_recovery_action("No GPS data!",
-                                      RecoveryAction.INFORMATIVE)
+            self.error_code[ErrorCode.NAV_STS_WARNING] = '1'
+            self.call_recovery_action("No GPS data!", RecoveryAction.INFORMATIVE)
         else:
             rospy.loginfo("%s: Last GPS data %s", self.name, str(last_gps))
 
@@ -244,9 +236,8 @@ class Cola2Safety(object):
         last_nav = vehicle_status.navigation_data_age
         self.diagnostic.add('last_nav_data', str(last_nav))
         if last_nav > self.min_nav_update:
-            self.error_code[cola2_lib.ErrorCode.NAV_STS_ERROR] = '1'
-            self.call_recovery_action("No Navigation data!",
-                                      RecoveryAction.EMERGENCY_SURFACE)
+            self.error_code[ErrorCode.NAV_STS_ERROR] = '1'
+            self.call_recovery_action("No Navigation data!", RecoveryAction.EMERGENCY_SURFACE)
         else:
             rospy.loginfo("%s: Last Nav data %s", self.name, str(last_nav))
 
@@ -255,9 +246,8 @@ class Cola2Safety(object):
         if not vehicle_status.mission_active:
             self.diagnostic.add('last_ack', str(last_ack))
             if last_ack > self.min_wifi_update:
-                self.error_code[cola2_lib.ErrorCode.INTERNAL_SENSORS_WARNING] = '0'
-                self.call_recovery_action("No WiFi data!",
-                                          RecoveryAction.ABORT_AND_SURFACE)
+                self.error_code[ErrorCode.INTERNAL_SENSORS_WARNING] = '0'
+                self.call_recovery_action("No WiFi data!", RecoveryAction.ABORT_AND_SURFACE)
             else:
                 rospy.loginfo("%s: Last WIFI data %s", self.name, str(last_ack))
         else:
@@ -268,9 +258,8 @@ class Cola2Safety(object):
         last_modem = vehicle_status.modem_data_age
         self.diagnostic.add('last_modem_data', str(last_modem))
         if last_modem > self.min_modem_update:
-            self.error_code[cola2_lib.ErrorCode.INTERNAL_SENSORS_WARNING] = '0'
-            self.call_recovery_action("No Modem data!",
-                                      RecoveryAction.ABORT_AND_SURFACE)
+            self.error_code[ErrorCode.INTERNAL_SENSORS_WARNING] = '0'
+            self.call_recovery_action("No Modem data!", RecoveryAction.ABORT_AND_SURFACE)
         else:
             rospy.loginfo("%s: Last Modem data %s", self.name, str(last_modem))
 
@@ -278,18 +267,16 @@ class Cola2Safety(object):
         last_good_dvl_data = vehicle_status.dvl_valid_data_age
         self.diagnostic.add('last_dvl_good_data', str(last_good_dvl_data))
         if last_good_dvl_data > self.min_dvl_good_data:
-            self.error_code[cola2_lib.ErrorCode.INTERNAL_SENSORS_WARNING] = '0'
-            self.call_recovery_action("No DVL good data!",
-                                      RecoveryAction.ABORT_AND_SURFACE)
+            self.error_code[ErrorCode.INTERNAL_SENSORS_WARNING] = '0'
+            self.call_recovery_action("No DVL good data!", RecoveryAction.ABORT_AND_SURFACE)
         else:
             rospy.loginfo("%s: No DVL good data %s", self.name, str(last_good_dvl_data))
 
         # Rule: Water Leak
         if vehicle_status.water_detected:
             self.diagnostic.add('water_detected', 'True')
-            self.error_code[cola2_lib.ErrorCode.INTERNAL_SENSORS_ERROR] = '1'
-            self.call_recovery_action("Water Inside!",
-                                      RecoveryAction.ABORT_AND_SURFACE)
+            self.error_code[ErrorCode.INTERNAL_SENSORS_ERROR] = '1'
+            self.call_recovery_action("Water Inside!", RecoveryAction.ABORT_AND_SURFACE)
         else:
             rospy.loginfo("%s: no water", self.name)
             self.diagnostic.add('water_detected', 'False')
@@ -299,7 +286,7 @@ class Cola2Safety(object):
         if temperatures:
             for t in range(0, len(temperatures)):
                 if temperatures[t] > self.max_temperatures_values[t]:
-                    self.error_code[cola2_lib.ErrorCode.INTERNAL_SENSORS_ERROR] = '1'
+                    self.error_code[ErrorCode.INTERNAL_SENSORS_ERROR] = '1'
                     self.call_recovery_action(self.max_temperatures_ids[0] + " high temperature",
                                               RecoveryAction.ABORT_AND_SURFACE)
                 else:
@@ -310,19 +297,20 @@ class Cola2Safety(object):
         up_time = vehicle_status.up_time
         self.diagnostic.add('up_time', str(up_time))
         if float(up_time) > self.timeout and self.timeout_reset < 0:
-            # self.error_code[cola2_lib.ErrorCode.INTERNAL_SENSORS_ERROR] = '1'
-            self.call_recovery_action("Absolute Timeout reached!",
-                                      RecoveryAction.ABORT_AND_SURFACE)
+            # self.error_code[ErrorCode.INTERNAL_SENSORS_ERROR] = '1'
+            self.call_recovery_action("Absolute Timeout reached!", RecoveryAction.ABORT_AND_SURFACE)
 
         else:
             rospy.loginfo("%s: up_time (%s) < timeout (%s)", self.name, up_time, self.timeout)
             self.timeout_reset = self.timeout_reset - 1
 
+        # Update error_byte with the current step information
         self.compute_error_byte(vehicle_status.current_step)
 
+        # If there is an enabled external recovery action (not triggered by the safety supervisor), show it
         if self.is_external_recovery_enabled:
             self.is_recovery_enabled = True
-            #init timer to show the message for some seconds
+            # init timer to show the message for some seconds
             rospy.Timer(rospy.Duration(TIME_SHOW_EXTERNAL_RECOVERY), self.timer_callback, oneshot=True)
 
         if not self.is_recovery_enabled:
@@ -332,7 +320,6 @@ class Cola2Safety(object):
             self.old_str_err = self.ra_msg.error_string
             self.ra_msg.error_level = RecoveryAction.NONE
             self.ra_msg.error_string = ""
-
 
         # Publish Safety Supervisor Status
         sss_msg = SafetySupervisorStatus()
@@ -344,11 +331,11 @@ class Cola2Safety(object):
         self.pub_safety_supervisor_state.publish(sss_msg)
 
     def timer_callback(self, event):
-        # reset state so that external recovery is not shown anymore
+        """ Resets state so that external recovery is not shown anymore """
         self.is_external_recovery_enabled = False
 
     def get_config(self):
-        """ Read parameters from ROS Param Server."""
+        """ Read parameters from ROS Param Server """
 
         param_dict = {'min_altitude': 'safe_depth_altitude/min_altitude',
                       'max_depth': 'safe_depth_altitude/max_depth',
@@ -371,23 +358,20 @@ class Cola2Safety(object):
                       'max_temperatures_ids': 'safety/max_temperatures_ids',
                       'max_temperatures_values': 'safety/max_temperatures_values'}
 
-        cola2_ros_lib.getRosParams(self, param_dict, self.name)
+        param_loader.get_ros_params(self, param_dict, self.name)
 
-        # Define min altitude and max depth
+        # Dynamic reconfigure for defining min altitude and max depth
         try:
-            client2 = dynamic_reconfigure.client.Client("safe_depth_altitude",
-                                                        timeout=10)
+            client2 = dynamic_reconfigure.client.Client("safe_depth_altitude", timeout=10)
             client2.update_configuration({"min_altitude": self.min_altitude,
                                           "max_depth": self.max_depth})
 
         except rospy.exceptions.ROSException:
-            rospy.logerr('%s, Error modifying safe_depth_altitude params.',
-                         self.name)
+            rospy.logerr('%s, Error modifying safe_depth_altitude params.', self.name)
 
-        # Define virtual cage limits
+        # Dynamic reconfigure for defining virtual cage limits
         try:
-            client3 = dynamic_reconfigure.client.Client("virtual_cage",
-                                                        timeout=10)
+            client3 = dynamic_reconfigure.client.Client("virtual_cage", timeout=10)
             client3.update_configuration({"north_origin": self.working_area_north_origin,
                                           "east_origin": self.working_area_east_origin,
                                           "north_longitude": self.working_area_north_length,
@@ -397,17 +381,16 @@ class Cola2Safety(object):
             rospy.logerr('%s, Error modifying virtual_cage params.',
                          self.name)
 
-    def call_recovery_action(self,
-                             str_err="Error!",
-                             level=RecoveryAction.INFORMATIVE):
-
+    def call_recovery_action(self, str_err="Error!", level=RecoveryAction.INFORMATIVE):
+        """
+        If the vehicle is initialized, calls the recovery action service with the corresponding level and message.
+        """
         self.is_recovery_enabled = True
-        print '--> recovery action!!: ', self.vehicle_init
         self.diagnostic.setLevel(DiagnosticStatus.ERROR, str_err)
 
         if self.vehicle_init:
             # If the same recovery action has been called again do not change the recovery_action timestamp
-            if (level != self.old_level or str_err != self.old_str_err):
+            if level != self.old_level or str_err != self.old_str_err:
                 self.ra_msg.header.stamp = rospy.Time.now()
                 self.ra_msg.error_level = level
                 self.ra_msg.error_string = str_err
@@ -425,26 +408,10 @@ class Cola2Safety(object):
         rospy.sleep(5.0)
 
 
-def __getDiagnostic__(status, name, key='none', default=0.0):
-    if status.name == name:
-        if key != 'none':
-            return __getValue__(status.values, key, default)
-        else:
-            return True
-    return False
-
-
-def __getValue__(values, key, default):
-    for pair in values:
-        if pair.key == key:
-            return pair.value
-    return default
-
-
 if __name__ == '__main__':
     try:
         rospy.init_node('safety_supervisor')
-        C2S = Cola2Safety(rospy.get_name())
+        SS = SafetySupervisor(rospy.get_name())
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
