@@ -49,11 +49,11 @@ class SafeDepthAltitude(object):
 
         # Publisher
         resolved_namespace = rospy.get_namespace()
-        self.pub_body_velocity_req = rospy.Publisher(resolved_namespace + "cola2_control/body_velocity_req",
+        self.pub_body_velocity_req = rospy.Publisher(resolved_namespace + "body_velocity_req",
                                                      BodyVelocityReq, queue_size=2)
 
         # Subscriber
-        rospy.Subscriber(resolved_namespace + "cola2_navigation/nav_sts", NavSts, self.update_nav_sts, queue_size=1)
+        rospy.Subscriber(resolved_namespace + "navigator/navigation", NavSts, self.update_nav_sts, queue_size=1)
 
         # Create dynamic reconfigure service
         self.dynamic_reconfigure_srv = Server(SafeDepthAltitudeConfig, self.dynamic_reconfigure_callback)

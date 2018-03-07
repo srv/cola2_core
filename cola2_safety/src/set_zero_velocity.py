@@ -54,20 +54,16 @@ class SetZeroVelocity(object):
         # Get config parameters
         self.get_config()
 
-        resolved_namespace = rospy.get_namespace()
+        namespace = rospy.get_namespace()
 
         # Publisher
-        self.pub_body_velocity_req = rospy.Publisher( resolved_namespace + "cola2_control/body_velocity_req",
-                                                     BodyVelocityReq, queue_size = 10)
+        self.pub_body_velocity_req = rospy.Publisher( namespace + "body_velocity_req", BodyVelocityReq, queue_size = 10)
 
         # Subscriber
-        rospy.Subscriber(resolved_namespace + "cola2_navigation/nav_sts", NavSts, self.update_nav_sts, queue_size = 1)
-        rospy.Subscriber(resolved_namespace + "cola2_control/world_waypoint_req", WorldWaypointReq, self.update_req,
-                         queue_size = 1)
-        rospy.Subscriber(resolved_namespace + "cola2_control/body_velocity_req", BodyVelocityReq, self.update_req,
-                         queue_size = 1)
-        rospy.Subscriber(resolved_namespace + "cola2_control/body_force_req", BodyForceReq, self.update_req,
-                         queue_size = 1)
+        rospy.Subscriber(namespace + "navigator/navigation", NavSts, self.update_nav_sts, queue_size = 1)
+        rospy.Subscriber(namespace + "world_waypoint_req", WorldWaypointReq, self.update_req, queue_size = 1)
+        rospy.Subscriber(namespace + "body_velocity_req", BodyVelocityReq, self.update_req, queue_size = 1)
+        rospy.Subscriber(namespace + "body_force_req", BodyForceReq, self.update_req, queue_size = 1)
 
         # Timer
         rospy.Timer(rospy.Duration(0.1), self.set_zero_velocity)

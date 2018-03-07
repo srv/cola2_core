@@ -19,7 +19,7 @@ from std_srvs.srv import Empty, EmptyResponse
 from diagnostic_msgs.msg import DiagnosticStatus
 
 from cola2_msgs.msg import NavSts
-from cola2_msgs.msg import TotalTime
+from cola2_msgs.msg import ElapsedTime
 
 from cola2_lib.rosutils.diagnostic_helper import DiagnosticHelper
 
@@ -43,11 +43,12 @@ class UpTime(object):
         self.diagnostic = DiagnosticHelper(self.name, "soft")
 
         # Publisher
-        resolved_namespace = rospy.get_namespace()
-        self.pub_total_time = rospy.Publisher(resolved_namespace + "cola2_safety/total_time", TotalTime, queue_size = 2)
+        resolved_name = rospy.get_name()
+        namespace = rospy.get_namespace()
+        self.pub_total_time = rospy.Publisher(resolved_name + "/elapsed_time", ElapsedTime, queue_size = 2)
 
         # Create reset timeout service
-        self.reset_timeout_srv = rospy.Service(resolved_namespace + 'cola2_safety/reset_timeout', Empty, self.reset_timeout)
+        self.reset_timeout_srv = rospy.Service(resolved_name + '/reset_timeout', Empty, self.reset_timeout)
 
         # Timer to publish time since init (or last time reset)
         rospy.Timer(rospy.Duration(1.0), self.check_timeout)
@@ -59,7 +60,7 @@ class UpTime(object):
         self.nav = NavSts()
         self.init_navigator_check = False
         self.last_navigator_callback = rospy.Time.now().to_sec()
-        rospy.Subscriber(resolved_namespace + "cola2_navigation/nav_sts", NavSts, self.update_nav_sts, queue_size = 1)
+        rospy.Subscriber(namespace + "navigation", NavSts, self.update_nav_sts, queue_size = 1)
 
         # Show message
         rospy.loginfo("%s: initialized", self.name)
@@ -75,9 +76,9 @@ class UpTime(object):
 
         self.diagnostic.setLevel(DiagnosticStatus.OK)
 
-        # Publish total time
-        msg = TotalTime()
-        msg.total_time = int(rospy.Time.now().to_sec() - self.init_time)
+        # Publish elapsed time
+        msg = ElapsedTime()
+        msg.elapsed_time = int(rospy.Time.now().to_sec() - self.init_time)
         # publish also the value of the safety timeout parameter
         msg.timeout = self.timeout
         self.pub_total_time.publish(msg)
@@ -104,7 +105,7 @@ class UpTime(object):
 
 if __name__ == '__main__':
     try:
-        rospy.init_node('timeout')
+        rospy.init_node('cola2_timer')
         UP_TIME = UpTime(rospy.get_name())
         rospy.spin()
     except rospy.ROSInterruptException:

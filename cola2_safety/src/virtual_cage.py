@@ -51,11 +51,12 @@ class VirtualCage(object):
         self.diagnostic = DiagnosticHelper(self.name, "soft")
 
         # Publisher
-        resolved_namespace = rospy.get_namespace()
-        self.cage_marker_pub = rospy.Publisher(resolved_namespace + "cola2_safety/cage_marker", Marker, queue_size = 2)
+        resolved_name = rospy.get_name()
+        namespace = rospy.get_namespace()
+        self.cage_marker_pub = rospy.Publisher(resolved_name + "/markers/cage", Marker, queue_size = 2)
 
         # Subscriber
-        rospy.Subscriber(resolved_namespace + "cola2_navigation/nav_sts", NavSts, self.update_nav_sts)
+        rospy.Subscriber(namespace + "navigator/navigation", NavSts, self.update_nav_sts)
 
         # Timer
         rospy.Timer(rospy.Duration(1.0), self.check_cage)

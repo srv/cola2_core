@@ -45,14 +45,14 @@ class SetPose(object):
         # Get config parameters
         self.get_config()
 
-        resolved_namespace = rospy.get_namespace()
+        namespace = rospy.get_namespace()
 
         # Publisher
-        self.pub_world_waypoint_req = rospy.Publisher(resolved_namespace + "cola2_control/world_waypoint_req",
+        self.pub_world_waypoint_req = rospy.Publisher(namespace + "world_waypoint_req",
                                                       WorldWaypointReq, queue_size = 2)
 
         # Subscriber
-        rospy.Subscriber(resolved_namespace + "cola2_navigation/nav_sts", NavSts, self.update_nav_sts, queue_size = 1)
+        rospy.Subscriber(namespace + "navigator/nav_sts", NavSts, self.update_nav_sts, queue_size = 1)
 
         # Timer
         rospy.Timer(rospy.Duration(0.1), self.set_pose)
