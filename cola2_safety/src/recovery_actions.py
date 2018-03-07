@@ -41,7 +41,7 @@ class RecoveryActions(object):
         self.get_config()
 
         resolved_name = rospy.get_name()
-        resolved_namespace = rospy.get_namespace()
+        namespace = rospy.get_namespace()
 
         # Create publisher
         self.pub_thrusters = rospy.Publisher(resolved_name + "/thrusters_data", Setpoints, queue_size = 2)
@@ -49,43 +49,43 @@ class RecoveryActions(object):
         self.pub_external_ra = rospy.Publisher(resolved_name + "/external_recovery_action",
                                                RecoveryAction, queue_size = 2)
         # Subscriber
-        rospy.Subscriber(resolved_namespace + "navigator/navigation", NavSts, self.update_nav_sts, queue_size=1)
+        rospy.Subscriber(namespace + "navigator/navigation", NavSts, self.update_nav_sts, queue_size=1)
 
         # Init service clients
         rospy.loginfo("%s: waiting for services", self.name)
 
         try:
-            rospy.wait_for_service(resolved_namespace + 'controller/set_joystick_axes_to_velocity', 20)
-            self.set_joy_to_vel_srv = rospy.ServiceProxy(resolved_namespace + 'controller/set_joystick_axes_to_velocity', Empty)
+            rospy.wait_for_service(namespace + 'teleoperation/set_joystick_axes_to_velocity', 20)
+            self.set_joy_to_vel_srv = rospy.ServiceProxy(namespace + 'teleopeartion/set_joystick_axes_to_velocity', Empty)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
             rospy.logfatal("%s: set joystick axes to velocity service is not available!", self.name)
 
         self.captain_clients = True
         try:
-            rospy.wait_for_service(resolved_namespace + 'controller/disable_trajectory', 20)
-            self.abort_mission_srv = rospy.ServiceProxy( resolved_namespace + 'controller/disable_trajectory', Empty)
+            rospy.wait_for_service(namespace + 'pilot/disable_trajectory', 20)
+            self.abort_mission_srv = rospy.ServiceProxy( namespace + 'pilot/disable_trajectory', Empty)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
             rospy.logfatal("%s: disable trajectory service not available!", self.name)
 
         try:
-            rospy.wait_for_service(resolved_namespace + 'controller/disable_keep_position', 2)
-            self.abort_keep_pose_srv = rospy.ServiceProxy( resolved_namespace + 'controller/disable_keep_position', Empty)
+            rospy.wait_for_service(namespace + 'pilot/disable_keep_position', 2)
+            self.abort_keep_pose_srv = rospy.ServiceProxy( namespace + 'pilot/disable_keep_position', Empty)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
             rospy.logfatal("%s: disable keep position service not available!", self.name)
 
         try:
-            rospy.wait_for_service(resolved_namespace + 'controller/disable_goto', 2)
-            self.abort_goto_srv = rospy.ServiceProxy( resolved_namespace + 'controller/disable_goto', Empty)
+            rospy.wait_for_service(namespace + 'pilot/disable_goto', 2)
+            self.abort_goto_srv = rospy.ServiceProxy( namespace + 'pilot/disable_goto', Empty)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
             rospy.logfatal("%s: disable goto service not available!", self.name)
 
         try:
-            rospy.wait_for_service(resolved_namespace + 'cola2_control/goto', 2)
-            self.goto_srv = rospy.ServiceProxy( resolved_namespace + 'cola2_control/goto', Goto)
+            rospy.wait_for_service(namespace + 'pilot/goto', 2)
+            self.goto_srv = rospy.ServiceProxy( namespace + 'pilot/goto', Goto)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
             rospy.logfatal("%s: goto service not available!", self.name)
@@ -94,14 +94,14 @@ class RecoveryActions(object):
             self.no_captain_clients_timer = rospy.Timer(rospy.Duration(0.4), self.no_captain_clients_message)
 
         try:
-            rospy.wait_for_service(resolved_namespace + 'cola2_control/disable_thrusters', 20)
-            self.abort_thrusters_srv = rospy.ServiceProxy( resolved_namespace + 'cola2_control/disable_thrusters', Empty)
+            rospy.wait_for_service(namespace + 'pilot/disable_thrusters', 20)
+            self.abort_thrusters_srv = rospy.ServiceProxy( namespace + 'pilot/disable_thrusters', Empty)
         except rospy.exceptions.ROSException:
             self.no_disable_thrusters_service_timer = rospy.Timer(rospy.Duration(0.4),
                                                                   self.no_disable_thrusters_message)
 
         # Create service
-        self.recovery_srv = rospy.Service( resolved_namespace +'cola2_safety/recover', Recovery, self.recovery_action_srv)
+        self.recovery_srv = rospy.Service( resolved_name +'/recover', Recovery, self.recovery_action_srv)
 
         # Show message
         rospy.loginfo("%s: initialized", self.name)
