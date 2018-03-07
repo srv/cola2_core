@@ -157,10 +157,10 @@ class SetZeroVelocity(object):
 
     def get_config(self):
         """ Reads configuration from ROSPARAM SERVER """
-        param_dict = {'set_zero_velocity_depth': 'safety_set_zero_velocity/set_zero_velocity_depth',
-                      'set_zero_velocity_axis': 'safety_set_zero_velocity/set_zero_velocity_axis'}
+        param_dict = {'set_zero_velocity_depth': 'set_zero_velocity_depth',
+                      'set_zero_velocity_axis': 'set_zero_velocity_axis'}
 
-        if not param_loader.get_ros_params(self, param_dict, self.name):
+        if not param_loader.get_ros_params(self, param_dict, rospy.get_name()):
             self.bad_config_timer = rospy.Timer(rospy.Duration(0.4), self.bad_config_message)
 
 

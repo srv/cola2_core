@@ -110,10 +110,10 @@ class SafeDepthAltitude(object):
 
     def get_config(self):
         """Get config from ROS param server."""
-        param_dict = {'max_depth': 'safe_depth_altitude/max_depth',
-                      'min_altitude': 'safe_depth_altitude/min_altitude'}
+        param_dict = {'max_depth': 'max_depth',
+                      'min_altitude': 'min_altitude'}
 
-        if not param_loader.get_ros_params(self, param_dict, self.name):
+        if not param_loader.get_ros_params(self, param_dict, rospy.get_name()):
             self.bad_config_timer = rospy.Timer(rospy.Duration(0.4),
                                                 self.bad_config_message)
 

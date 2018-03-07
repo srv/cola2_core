@@ -9,13 +9,10 @@
 Copyright (c) 2014, 'CIRS - Universitat de Girona'
 All rights reserved.
 
-Software is provided WITHOUT WARRANTY and software authors and license owner
-'CIRS - Universitat de Girona' cannot be held liable for any damages. You may
-use and modify this software for PRIVATE USE. REDISTRIBUTION in source and
-binary forms, with or without modification, are FORBIDDEN. You may NOT use the
-names, logos, or trademarks of contributors.
-"""
-
+Software is provided WITHOUT WARRANTY and software authors and license owner 'CIRS - Universitat de Girona' cannot be
+held liable for any damages. You may use and modify this software for PRIVATE USE. REDISTRIBUTION in source and
+binary forms, with or without modification, are FORBIDDEN. You may NOT use the names, logos, or trademarks of
+contributors. """
 
 """@@>Computer logger is used to record valuable data from the vehicle computer.<@@"""
 
@@ -25,9 +22,10 @@ import rospy
 import subprocess
 import sys
 import psutil
-from cola2_lib.diagnostic_helper import DiagnosticHelper
+from cola2_lib.rosutils.diagnostic_helper import DiagnosticHelper
 from diagnostic_msgs.msg import DiagnosticStatus
-from cola2_msgs.msg import ComputerData
+from sensor_msgs.msg import Temperature
+from std_msgs.msg import Float32
 
 
 class ComputerLogger(object):
@@ -42,10 +40,10 @@ class ComputerLogger(object):
         self.diagnostic = DiagnosticHelper(self.name, "soft")
 
         # Publisher
-        self.pub_computer_data = rospy.Publisher(
-             "/cola2_safety/computer_logger",
-             ComputerData,
-             queue_size = 2)
+        resolved_name = rospy.get_name()
+        self.pub_temp = rospy.Publisher(resolved_name + "/temperature", Temperature, queue_size = 2)
+        self.pub_ram = rospy.Publisher(resolved_name + "/ram_usage", Float32, queue_size = 2)
+        self.pub_cpu = rospy.Publisher(resolved_name + "/cpu_usage", Float32, queue_size = 2)
 
         # Start timer
         rospy.Timer(rospy.Duration(5.0), self.iterate)
@@ -58,9 +56,7 @@ class ComputerLogger(object):
         """ Callback from the main timer """
         try:
             # Execute sensors command and parse output
-            p = subprocess.Popen(['sensors'],
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE)
+            p = subprocess.Popen(['sensors'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
             out, err = p.communicate()
             splitted = out.split("\n")
@@ -93,12 +89,18 @@ class ComputerLogger(object):
             self.diagnostic.add("cpu_temperature", str(max_core_temp))
             self.diagnostic.setLevel(DiagnosticStatus.OK)
 
-            msg = ComputerData()
+            msg = Temperature()
             msg.header.stamp = rospy.Time.now()
-            msg.cpu_temp = max_core_temp
-            msg.cpu_usage = cpu_usage
-            msg.ram_usage = ram_usage
-            self.pub_computer_data.publish(msg)
+            msg.temperature = max_core_temp
+            msg.variance = 0 # 0 is interpreted as unknown
+            self.pub_temp.publish(msg)
+
+            msg = Float32()
+            msg.data=cpu_usage
+            self.pub_cpu.publish(msg)
+
+            msg.data=ram_usage
+            self.pub_ram.publish(msg)
 
         except:
             rospy.logwarn("%s: unable to get data: %s", self.name, sys.exc_info()[0])

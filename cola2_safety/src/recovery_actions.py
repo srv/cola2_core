@@ -236,11 +236,11 @@ class RecoveryActions(object):
 
     def get_config(self):
         """ Get config from param server """
-        param_dict = {'frame_id': 'recovery_actions/frame_id',
-                      'emergency_surface_setpoints': 'recovery_actions/emergency_surface_setpoints',
-                      'controlled_surface_depth': 'recovery_actions/controlled_surface_depth'}
+        param_dict = {'frame_id': 'frame_id',
+                      'emergency_surface_setpoints': 'emergency_surface_setpoints',
+                      'controlled_surface_depth': 'controlled_surface_depth'}
 
-        if not param_loader.get_ros_params(self, param_dict, self.name):
+        if not param_loader.get_ros_params(self, param_dict, rospy.get_name()):
             self.bad_config_timer = rospy.Timer(rospy.Duration(0.4), self.bad_config_message)
 
 

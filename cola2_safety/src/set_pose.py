@@ -96,10 +96,10 @@ class SetPose(object):
 
     def get_config(self):
         """ Reads configuration from ROSPARAM SERVER """
-        param_dict = {'set_pose_depth': 'safety_set_pose/set_pose_depth','set_pose_axis':
-                      'safety_set_pose/set_pose_axis', 'desired_pose': 'safety_set_pose/desired_pose'}
+        param_dict = {'set_pose_depth': 'set_pose_depth','set_pose_axis':
+                      'set_pose_axis', 'desired_pose': 'desired_pose'}
 
-        if not param_loader.get_ros_params(self, param_dict, self.name):
+        if not param_loader.get_ros_params(self, param_dict, rospy.get_name()):
             self.bad_config_timer = rospy.Timer(rospy.Duration(0.4), self.bad_config_message)
 
 

@@ -134,11 +134,11 @@ class VirtualCage(object):
 
     def get_config(self):
         """ Read parameters from ROS Param Server."""
-        param_dict = {'north_origin': 'virtual_cage/north_origin', 'east_origin': 'virtual_cage/east_origin',
-                      'north_longitude': 'virtual_cage/north_longitude','east_longitude': 'virtual_cage/east_longitude',
-                      'enabled': 'virtual_cage/enabled'}
+        param_dict = {'north_origin': 'north_origin', 'east_origin': 'east_origin',
+                      'north_longitude': 'north_longitude','east_longitude': 'east_longitude',
+                      'enabled': 'enabled'}
 
-        param_loader.get_ros_params(self, param_dict, self.name)
+        param_loader.get_ros_params(self, param_dict, rospy.get_name())
 
 
 if __name__ == '__main__':
