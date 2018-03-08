@@ -30,19 +30,22 @@ public:
 
   MissionPark(MissionPosition position_, unsigned int time_, MissionTolerance tolerance_);
 
-  friend std::ostream& operator<<(std::ostream& stream, const MissionPark& p)
-  {
-    stream << "Park -> " << p.getPosition() << " for " << p.getTime() << "s";
-  }
+//  friend std::ostream& operator<<(std::ostream& stream, const MissionPark& p)
+//  {
+//    stream << "Park -> " << p.getPosition() << " for " << p.getTime() << "s";
+//  }
 
   MissionPosition getPosition() const;
-  unsigned int getTime() const;
-  MissionTolerance getTolerance() const;
-  void setPosition(const MissionPosition position);
-  void setTime(const unsigned int time);
-  void setTolerance(const MissionTolerance tolerance);
 
-  void show();
+  unsigned int getTime() const;
+
+  MissionTolerance getTolerance() const;
+
+  void setPosition(const MissionPosition position);
+
+  void setTime(const unsigned int time);
+
+  void setTolerance(const MissionTolerance tolerance);
 
   double x();
 

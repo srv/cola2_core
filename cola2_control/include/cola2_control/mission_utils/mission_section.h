@@ -31,21 +31,26 @@ public:
   MissionSection(MissionPosition initial_position_, MissionPosition final_position_, double speed_,
                  MissionTolerance tolerance_);
 
-  friend std::ostream& operator<<(std::ostream& stream, const MissionSection& s)
-  {
-    stream << "Section -> " << s.getInitialPosition() << " to " << s.getFinalPosition();
-  }
+//  friend std::ostream& operator<<(std::ostream& stream, const MissionSection& s)
+//  {
+//    stream << "Section -> " << s.getInitialPosition() << " to " << s.getFinalPosition();
+//  }
 
   MissionPosition getInitialPosition() const;
-  MissionPosition getFinalPosition() const;
-  double getSpeed() const;
-  MissionTolerance getTolerance() const;
-  void setInitialPosition(const MissionPosition position);
-  void setFinalPosition(const MissionPosition position);
-  void setSpeed(const double speed);
-  void setTolerance(const MissionTolerance tolerance);
 
-  void show();
+  MissionPosition getFinalPosition() const;
+
+  double getSpeed() const;
+
+  MissionTolerance getTolerance() const;
+
+  void setInitialPosition(const MissionPosition position);
+
+  void setFinalPosition(const MissionPosition position);
+
+  void setSpeed(const double speed);
+
+  void setTolerance(const MissionTolerance tolerance);
 
   double x();
 

@@ -31,10 +31,6 @@ public:
     stream << "configuration -> " << conf.getKey() << ": " << conf.getValue();
   }
 
-  void extraMethod();
-
-  void show();
-
   std::string  getKey() const;
 
   std::string  getValue() const;

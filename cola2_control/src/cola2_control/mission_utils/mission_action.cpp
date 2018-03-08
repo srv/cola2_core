@@ -19,11 +19,6 @@ MissionAction::~MissionAction()
 {
 }
 
-void MissionAction::show()
-{
-  std::cout << *this;
-}
-
 std::string MissionAction::getActionId() const
 {
   return action_id_;

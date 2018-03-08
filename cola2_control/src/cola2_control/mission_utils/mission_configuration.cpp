@@ -16,11 +16,6 @@ MissionConfiguration::~MissionConfiguration()
 {
 }
 
-void MissionConfiguration::show()
-{
-  std::cout << *this;
-}
-
 std::string  MissionConfiguration::getKey() const
 {
   return key_;
