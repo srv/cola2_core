@@ -33,21 +33,17 @@ class Keyboard
 {
 private:
   // Node handle
-  ros::NodeHandle n;
+  ros::NodeHandle n_;
 
   // Number of buttons
-  int NBUTTONS;
+  int NBUTTONS_;
 
   // Read keyboard thread
-  boost::mutex _setpoints_mutex;
-  boost::shared_ptr<boost::thread> reading_thread;
-  bool shutdownThread;
+  boost::shared_ptr<boost::thread> reading_thread_;
+  bool shutdownThread_;
 
   // Publisher
-  ros::Publisher pub;
-
-  // Subscriber
-  ros::Subscriber sub_ok;
+  ros::Publisher pub_;
 
 public:
   Keyboard()
@@ -63,15 +59,15 @@ public:
   void init()
   {
     // Number of buttons
-    NBUTTONS = 19;
+    NBUTTONS_ = 19;
 
     // Publishers
 
-    pub = n.advertise<sensor_msgs::Joy>("/keyboard", 1);
+    pub_ = n_.advertise<sensor_msgs::Joy>("/keyboard", 1);
 
     // Init thread
-    shutdownThread = false;
-    reading_thread = boost::shared_ptr<boost::thread>(new boost::thread(&Keyboard::readKeyboardHits, this));
+    shutdownThread_ = false;
+    reading_thread_ = boost::shared_ptr<boost::thread>(new boost::thread(&Keyboard::readKeyboardHits, this));
 
     ROS_INFO("/keyboard: initialized");
   }
@@ -96,7 +92,7 @@ public:
 
     // Initialize buttons
     std::vector<int> buttons;
-    for (int iter = 0; iter != NBUTTONS; iter++)
+    for (int iter = 0; iter != NBUTTONS_; iter++)
     {
       buttons.push_back(0);
     }
@@ -149,7 +145,7 @@ public:
     while (!keyboard_requested_shutdown)
     {
       // Set vector to non-pressed
-      for (int iter = 0; iter != NBUTTONS; iter++)
+      for (int iter = 0; iter != NBUTTONS_; iter++)
       {
         buttons[iter] = 0;
       }
@@ -252,19 +248,19 @@ public:
       sensor_msgs::Joy msg;
       msg.header.stamp = ros::Time::now();
       msg.header.frame_id = "keyboard";
-      msg.buttons.resize(NBUTTONS);
-      for (int iter = 0; iter != NBUTTONS; iter++)
+      msg.buttons.resize(NBUTTONS_);
+      for (int iter = 0; iter != NBUTTONS_; iter++)
       {
         msg.buttons[iter] = buttons[iter];
       }
-      pub.publish(msg);
+      pub_.publish(msg);
       msg.header.stamp = ros::Time::now();
-      msg.buttons.resize(NBUTTONS);
-      for (int iter = 0; iter != NBUTTONS; iter++)
+      msg.buttons.resize(NBUTTONS_);
+      for (int iter = 0; iter != NBUTTONS_; iter++)
       {
         msg.buttons[iter] = 0;
       }
-      pub.publish(msg);  // Everything to 0
+      pub_.publish(msg);  // Everything to 0
                          // ros::Duration(0.1).sleep();
     }
 

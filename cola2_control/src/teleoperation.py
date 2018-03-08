@@ -47,7 +47,7 @@ class Teleoperation(object):
         namespace = rospy.get_namespace()
 
         # Set up diagnostics
-        self.diagnostic = DiagnosticHelper(self.name, "soft")
+        self.diagnostic = DiagnosticHelper('teleoperation', "soft")
 
         # Some vars
         self.map_ack_init = False
@@ -313,8 +313,17 @@ class Teleoperation(object):
                       'robot_name': '/navigator/robot_frame_id'}
 
         if not param_loader.get_ros_params(self, param_dict, self.name):
-            rospy.logfatal("%s: shutdown due to invalid config parameters!", self.name)
-            exit(0)  # TODO: find a better way
+            rospy.logwarn("%s: Invalid configuration parameters! Default parameters set.", self.name)
+            # set default values
+            self.base_pose = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+            self.max_pos = [0.0, 0.0, 0.0, 3.14159265359, 1.0, 3.14159265359]
+            self.min_pos = [0.0, 0.0, -2.0, -3.14159265359, -1.0, -3.14159265359]
+            self.max_vel = [0.1, 0.0, 0.1, 0.0, 0.0, 0.1]
+            self.min_vel = [-0.1, 0.0, -0.1, 0.0, 0.0, -0.1]
+            self.pose_controlled_axis = [False, False, False, False, False, False]
+            self.actualize_base_pose = True
+            self.robot_name = rospy.get_namespace()
+
 
     def set_max_joy_vel(self, req):
         """ Change max/min joy velocity."""
