@@ -149,10 +149,10 @@ find_package(Boost REQUIRED)
 #)
 
 catkin_package(
-        #  INCLUDE_DIRS include
-        #  LIBRARIES nmea_gps
+        INCLUDE_DIRS include
+        LIBRARIES controllers mission_utils low_level_controller ros_control_base
         CATKIN_DEPENDS actionlib cola2_lib cola2_msgs roscpp sensor_msgs std_msgs
-        #  DEPENDS system_lib
+        DEPENDS TinyXML Boost
 )
 ###########
 ## Build ##
