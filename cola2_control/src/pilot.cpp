@@ -374,7 +374,7 @@ void Pilot::sectionServerCallback(const cola2_msgs::WorldSectionGoalConstPtr& da
 void Pilot::publishGoal(const double x, const double y, const double z)
 {
   geometry_msgs::PointStamped goal;
-  goal.header.frame_id = "world";
+  goal.header.frame_id = "ned";
   goal.header.stamp = ros::Time::now();
   goal.point.x = x;
   goal.point.y = y;

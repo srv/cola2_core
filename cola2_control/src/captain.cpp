@@ -158,7 +158,7 @@ Captain::Captain()
   , is_mission_paused_(false)
   , spinner_(2)
   , is_keep_pose_enabled_(false)
-  , diagnostic_(nh_, ros::this_node::getName(), "soft")
+  , diagnostic_(nh_, cola2::rosutils::getUnresolvedNodeName(), "soft")
 {
   // Get config
   getConfig();
@@ -639,8 +639,7 @@ nav_msgs::Path Captain::createPathFromMission(Mission mission)
   {
     geometry_msgs::PoseStamped pose;
     pose.header.frame_id = path.header.frame_id;
-    ned.geodetic2Ned(mission.getStep(i)->getManeuverPtr()->x(), mission.getStep(i)->getManeuverPtr()->y(), 0.0, x, y,
-                     z);
+    ned.geodetic2Ned(mission.getStep(i)->getManeuverPtr()->x(), mission.getStep(i)->getManeuverPtr()->y(), 0.0, x, y, z);
     pose.pose.position.x = x;
     pose.pose.position.y = y;
     pose.pose.position.z = mission.getStep(i)->getManeuverPtr()->z();
