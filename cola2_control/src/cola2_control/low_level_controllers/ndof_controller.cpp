@@ -12,7 +12,7 @@ NDofController::NDofController(const unsigned int n_dof) : n_dof_(n_dof)
 {
 }
 
-void NDofController::addController(IController* controller)
+void NDofController::addController(std::shared_ptr<IController> controller)
 {
   assert(controllers_.size() < n_dof_);
   controllers_.push_back(controller);
