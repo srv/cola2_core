@@ -18,10 +18,10 @@ IAUVROSController::IAUVROSController(const std::string name, const std::string f
 {
 }
 
-void IAUVROSController::initBase(std::unique_ptr<IAUVController> auv_controller_ptr, double period)
+void IAUVROSController::initBase(std::shared_ptr<IAUVController> auv_controller_ptr, double period)
 {
   // Init pointer to AUV controller
-  auv_controller_ = std::move(auv_controller_ptr);
+  auv_controller_ = auv_controller_ptr;
 
   // Save controller frequency
   frequency_ = 1.0/period;

@@ -13,20 +13,21 @@
 #include <map>
 #include <string>
 #include <vector>
-
+#include <memory>
 #include <cola2_control/low_level_controllers/controller_base.h>
 #include <cola2_control/low_level_controllers/request.h>
+#include <boost/thread/csbl/memory/unique_ptr.hpp>
 
 class NDofController
 {
 private:
-  std::vector<IController*> controllers_;
+  std::vector< std::shared_ptr<IController> > controllers_;
   unsigned int n_dof_;
 
 public:
   NDofController(const unsigned int n_dof = 6);
 
-  void addController(IController* controller);
+  void addController(std::shared_ptr<IController> controller);
 
   void setControllerParams(std::vector<std::map<std::string, double> > params);
 

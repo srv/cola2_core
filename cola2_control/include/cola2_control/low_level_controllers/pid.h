@@ -15,7 +15,7 @@
 #include <cola2_control/low_level_controllers/controller_base.h>
 #include <cola2_lib/utils/saturate.h>
 
-class Pid : public IController
+class PID : public IController
 {
 private:
   double kp_;
@@ -33,7 +33,7 @@ private:
   double edotk_old_;
 
 public:
-  Pid(std::string name);
+  PID(std::string name);
 
   void reset();
 

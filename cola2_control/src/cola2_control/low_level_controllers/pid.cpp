@@ -8,7 +8,7 @@
 
 #include <cola2_control/low_level_controllers/pid.h>
 
-Pid::Pid(std::string name)
+PID::PID(std::string name)
   : IController(name)
   , kp_(0)
   , ti_(0)
@@ -24,13 +24,13 @@ Pid::Pid(std::string name)
 {
 }
 
-void Pid::reset()
+void PID::reset()
 {
   eik_old_ = 0.0;
   time_old_ = 0;
 }
 
-double Pid::compute(double time_in_sec, double setpoint, double feedback)
+double PID::compute(double time_in_sec, double setpoint, double feedback)
 {
   // std::cout << "Compute " << _name << ", time: " << time_in_sec << ", setpoint: " << setpoint << ", feedback: "
   // << feedback << std::endl;
@@ -125,7 +125,7 @@ double Pid::compute(double time_in_sec, double setpoint, double feedback)
   return cola2::utils::saturate(tau, 1.0);
 }
 
-bool Pid::setParameters(std::map<std::string, double> params)
+bool PID::setParameters(std::map<std::string, double> params)
 {
   std::cout << "Set params for " << name_ << " as: " << params["kp"] << ", " << params["ti"] << ", " << params["td"]
             << ", " << params["derivative_term_from_feedback"] << "\n";

@@ -158,3 +158,43 @@ bool IAUVController::isFinAllocatorEnable() const
 {
   return is_fin_allocator_enable_;
 }
+
+bool IAUVController::getIsPoseControllerEnable() const
+{
+  return is_pose_controller_enable_;
+}
+
+bool IAUVController::getIsVelocityControllerEnable() const
+{
+  return is_velocity_controller_enable_;
+}
+
+bool IAUVController::getIsThrusterAllocatorEnable() const
+{
+  return is_thruster_allocator_enable_;
+}
+
+bool IAUVController::getIsFinAllocatorEnable() const
+{
+  return is_fin_allocator_enable_;
+}
+
+void IAUVController::setIsPoseControllerEnable(const bool& value)
+{
+  is_pose_controller_enable_ = value;
+}
+
+void IAUVController::setIsVelocityControllerEnable(const bool& value)
+{
+  is_velocity_controller_enable_ = value;
+}
+
+void IAUVController::setIsThrusterAllocatorEnable(const bool& value)
+{
+  is_thruster_allocator_enable_ = value;
+}
+
+void IAUVController::setIsFinAllocatorEnable(const bool& value)
+{
+  is_fin_allocator_enable_ = value;
+}

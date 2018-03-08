@@ -89,7 +89,7 @@ private:
   ros::ServiceServer disable_fin_allocator_srv_;
 
   // AUV controller ptr.
-  std::unique_ptr<IAUVController> auv_controller_;
+  std::shared_ptr<IAUVController> auv_controller_;
 
   // Estimated total altitude
   double last_altitude_;
@@ -99,7 +99,7 @@ private:
  public:
   IAUVROSController(const std::string name, const std::string frame_id);
 
-  void initBase(std::unique_ptr<IAUVController> auv_controller_ptr, double period);
+  void initBase(std::shared_ptr<IAUVController> auv_controller_ptr, double period);
 
   bool enablePoseController(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
 

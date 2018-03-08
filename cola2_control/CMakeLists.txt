@@ -150,7 +150,7 @@ catkin_python_setup()
 
 catkin_package(
         INCLUDE_DIRS include
-        LIBRARIES controllers mission_utils low_level_controller ros_control_base
+        LIBRARIES controllers mission_utils low_level_controllers ros_control_base
         CATKIN_DEPENDS actionlib cola2_lib cola2_msgs roscpp sensor_msgs std_msgs
         DEPENDS TinyXML Boost
 )
@@ -238,12 +238,12 @@ target_link_libraries(keyboard ${catkin_LIBRARIES})
 
 add_executable(pilot src/pilot.cpp)
 target_link_libraries(pilot ${catkin_LIBRARIES} controllers)
-# add_dependencies(pilot cola2_msgs_gencpp) # ${PROJECT_NAME}_gencfg
+add_dependencies(pilot cola2_msgs_gencpp) # ${PROJECT_NAME}_gencfg
 
 #include_directories(${Boost_INCLUDE_DIRS})
 add_executable(captain src/captain.cpp)
 target_link_libraries(captain ${catkin_LIBRARIES} ${Boost_LIBRARIES} mission_utils)
-# add_dependencies(captain cola2_msgs_gencpp)
+add_dependencies(captain cola2_msgs_gencpp)
 #endif()
 
 #############

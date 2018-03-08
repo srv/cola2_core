@@ -103,6 +103,22 @@ public:
 
   bool isFinAllocatorEnable() const;
 
+  bool getIsPoseControllerEnable() const;
+
+  bool getIsVelocityControllerEnable() const;
+
+  bool getIsThrusterAllocatorEnable() const;
+
+  bool getIsFinAllocatorEnable() const;
+
+  void setIsPoseControllerEnable(const bool& value);
+
+  void setIsVelocityControllerEnable(const bool& value);
+
+  void setIsThrusterAllocatorEnable(const bool& value);
+
+  void setIsFinAllocatorEnable(const bool& value);
+
   virtual void iteration(double current_time) = 0;
 
   virtual void reset() = 0;
