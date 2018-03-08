@@ -80,12 +80,12 @@ class Teleoperation(object):
             queue_size=2)
 
         # Create subscribers
-        rospy.Subscriber("input_to_teleoperation/ack",
+        rospy.Subscriber(namespace+"input_to_teleoperation/ack",
                          String,
                          self.ack_callback,
                          queue_size=1)
 
-        rospy.Subscriber("input_to_teleoperation/output",
+        rospy.Subscriber(namespace+"input_to_teleoperation/output",
                          Joy,
                          self.output_callback,
                          queue_size=1)
@@ -303,26 +303,25 @@ class Teleoperation(object):
 
     def get_config(self):
         """ Get config from param server """
-        param_dict = {'max_pos': 'teleoperation/max_pos',
-                      'min_pos': 'teleoperation/min_pos',
-                      'max_vel': 'teleoperation/max_vel',
-                      'min_vel': 'teleoperation/min_vel',
-                      'pose_controlled_axis': 'teleoperation/pose_controlled_axis',
-                      'base_pose': 'teleoperation/base_pose',
-                      'actualize_base_pose': 'teleoperation/actualize_base_pose',
-                      'robot_name': '/navigator/robot_frame_id'}
+        param_dict = {'max_pos': ('max_pos',
+                                  [0.0, 0.0, 0.0, 3.14159265359, 1.0, 3.14159265359]),
+                      'min_pos': ('min_pos',
+                                  [0.0, 0.0, -2.0, -3.14159265359, -1.0, -3.14159265359]),
+                      'max_vel': ('max_vel',
+                                  [0.1, 0.0, 0.1, 0.0, 0.0, 0.1]),
+                      'min_vel': ('min_vel',
+                                  [-0.1, 0.0, -0.1, 0.0, 0.0, -0.1]),
+                      'pose_controlled_axis': ('pose_controlled_axis',
+                                               [False, False, False, False, False, False]),
+                      'base_pose': ('base_pose',
+                                    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+                      'actualize_base_pose': ('actualize_base_pose',
+                                              True),
+                      'robot_name': (rospy.get_namespace()+'navigator/robot_frame_id',
+                                     rospy.get_namespace())}
 
-        if not param_loader.get_ros_params(self, param_dict, self.name):
-            rospy.logwarn("%s: Invalid configuration parameters! Default parameters set.", self.name)
-            # set default values
-            self.base_pose = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-            self.max_pos = [0.0, 0.0, 0.0, 3.14159265359, 1.0, 3.14159265359]
-            self.min_pos = [0.0, 0.0, -2.0, -3.14159265359, -1.0, -3.14159265359]
-            self.max_vel = [0.1, 0.0, 0.1, 0.0, 0.0, 0.1]
-            self.min_vel = [-0.1, 0.0, -0.1, 0.0, 0.0, -0.1]
-            self.pose_controlled_axis = [False, False, False, False, False, False]
-            self.actualize_base_pose = True
-            self.robot_name = rospy.get_namespace()
+        param_loader.get_ros_params(self, param_dict)
+
 
 
     def set_max_joy_vel(self, req):

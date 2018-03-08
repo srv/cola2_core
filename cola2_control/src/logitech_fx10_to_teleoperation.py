@@ -6,7 +6,7 @@
 
 
 import rospy
-from cola2_control.JoystickBase import JoystickBase
+from joystickbase import JoystickBase
 
 
 class LogitechFX10(JoystickBase):
