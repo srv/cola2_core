@@ -66,29 +66,6 @@ class SafetySupervisor(object):
         self.old_level = RecoveryAction.NONE
         self.old_str_err = ""
 
-        # Initialize default diagnostic thresholds
-        self.min_altitude = 1.5
-        self.max_depth = 20.0
-        self.max_temperatures_ids = ['batteries', 'pc', 'thrusters']
-        self.max_temperatures_values = [55.0, 80.0, 95.0]
-        self.min_battery_charge = 15.0
-        self.min_battery_voltage = 25.0
-        self.min_imu_update = 2.0
-        self.min_depth_update = 2.0
-        self.min_altitude_update = 2.0
-        self.min_gps_update = 2.0
-        self.min_dvl_update = 2.0
-        self.min_modem_update = 2.0
-        self.min_nav_update = 2.0
-        self.min_range_update = 2.0
-        self.min_wifi_update = 20
-        self.min_dvl_good_data = 30
-        self.water_leaks = True
-        self.working_area_north_origin = -50.0
-        self.working_area_east_origin = -50.0
-        self.working_area_north_length = 100.0
-        self.working_area_east_length = 100.0
-        self.timeout = 600
         self.timeout_reset = 10
 
         # Get config parameters
@@ -183,7 +160,6 @@ class SafetySupervisor(object):
             self.call_recovery_action("Battery Level Low", RecoveryAction.INFORMATIVE)
         else:
             self.diagnostic.add('battery_charge', str(battery_charge))
-            rospy.loginfo("%s: Battery charge %s", self.name, str(battery_charge))
 
         # Rule: No IMU data
         last_imu = vehicle_status.imu_data_age
@@ -192,8 +168,6 @@ class SafetySupervisor(object):
             rospy.logerr("%s: No IMU data since %s", self.name, str(last_imu))
             self.error_code[ErrorCode.NAV_STS_ERROR] = '1'
             self.call_recovery_action("No IMU data!", RecoveryAction.ABORT_AND_SURFACE)
-        else:
-            rospy.loginfo("%s: Last IMU data %s", self.name, str(last_imu))
 
         # Rule: No Depth data
         last_depth = vehicle_status.depth_data_age
@@ -201,8 +175,6 @@ class SafetySupervisor(object):
         if last_depth > self.min_depth_update:
             self.error_code[ErrorCode.NAV_STS_ERROR] = '1'
             self.call_recovery_action("No Depth data!", RecoveryAction.EMERGENCY_SURFACE)
-        else:
-            rospy.loginfo("%s: Last DEPTH data %s", self.name, str(last_depth))
 
         # Rule: No Altitude data
         last_altitude = vehicle_status.altitude_data_age
@@ -211,8 +183,6 @@ class SafetySupervisor(object):
             rospy.logerr("%s: last_altiude %s/%s", self.name, str(last_altitude), str(self.min_altitude_update))
             self.error_code[ErrorCode.NAV_STS_ERROR] = '1'
             self.call_recovery_action("No Altitude data!", RecoveryAction.ABORT_AND_SURFACE)
-        else:
-            rospy.loginfo("%s: Last ALTITUDE data %s", self.name, str(last_altitude))
 
         # Rule: No DVL data
         last_dvl = vehicle_status.dvl_data_age
@@ -220,8 +190,6 @@ class SafetySupervisor(object):
         if last_dvl > self.min_dvl_update:
             self.error_code[ErrorCode.NAV_STS_ERROR] = '1'
             self.call_recovery_action("No DVL data!", RecoveryAction.ABORT_AND_SURFACE)
-        else:
-            rospy.loginfo("%s: Last DVL data %s", self.name, str(last_dvl))
 
         # Rule: No GPS data
         last_gps = vehicle_status.gps_data_age
@@ -229,8 +197,6 @@ class SafetySupervisor(object):
         if last_gps > self.min_gps_update:
             self.error_code[ErrorCode.NAV_STS_WARNING] = '1'
             self.call_recovery_action("No GPS data!", RecoveryAction.INFORMATIVE)
-        else:
-            rospy.loginfo("%s: Last GPS data %s", self.name, str(last_gps))
 
         # Rule: No Navigation data
         last_nav = vehicle_status.navigation_data_age
@@ -238,8 +204,6 @@ class SafetySupervisor(object):
         if last_nav > self.min_nav_update:
             self.error_code[ErrorCode.NAV_STS_ERROR] = '1'
             self.call_recovery_action("No Navigation data!", RecoveryAction.EMERGENCY_SURFACE)
-        else:
-            rospy.loginfo("%s: Last Nav data %s", self.name, str(last_nav))
 
         # Rule: No WIFI data and not in a mission
         last_ack = vehicle_status.wifi_data_age
@@ -248,8 +212,6 @@ class SafetySupervisor(object):
             if last_ack > self.min_wifi_update:
                 self.error_code[ErrorCode.INTERNAL_SENSORS_WARNING] = '0'
                 self.call_recovery_action("No WiFi data!", RecoveryAction.ABORT_AND_SURFACE)
-            else:
-                rospy.loginfo("%s: Last WIFI data %s", self.name, str(last_ack))
         else:
             rospy.loginfo("%s: A mission is active. WiFi timeout disabled.", self.name)
             self.diagnostic.add('last_ack', 'Mission active')
@@ -260,8 +222,6 @@ class SafetySupervisor(object):
         if last_modem > self.min_modem_update:
             self.error_code[ErrorCode.INTERNAL_SENSORS_WARNING] = '0'
             self.call_recovery_action("No Modem data!", RecoveryAction.ABORT_AND_SURFACE)
-        else:
-            rospy.loginfo("%s: Last Modem data %s", self.name, str(last_modem))
 
         # Rule: No DVL good data
         last_good_dvl_data = vehicle_status.dvl_valid_data_age
@@ -269,8 +229,6 @@ class SafetySupervisor(object):
         if last_good_dvl_data > self.min_dvl_good_data:
             self.error_code[ErrorCode.INTERNAL_SENSORS_WARNING] = '0'
             self.call_recovery_action("No DVL good data!", RecoveryAction.ABORT_AND_SURFACE)
-        else:
-            rospy.loginfo("%s: No DVL good data %s", self.name, str(last_good_dvl_data))
 
         # Rule: Water Leak
         if vehicle_status.water_detected:
@@ -278,11 +236,10 @@ class SafetySupervisor(object):
             self.error_code[ErrorCode.INTERNAL_SENSORS_ERROR] = '1'
             self.call_recovery_action("Water Inside!", RecoveryAction.ABORT_AND_SURFACE)
         else:
-            rospy.loginfo("%s: no water", self.name)
             self.diagnostic.add('water_detected', 'False')
 
         # Rule: High Temperature
-        temperatures = vehicle_status.internal_temperature
+        temperatures = vehicle_status.temperature
         if temperatures:
             for t in range(0, len(temperatures)):
                 if temperatures[t] > self.max_temperatures_values[t]:
@@ -291,17 +248,14 @@ class SafetySupervisor(object):
                                               RecoveryAction.ABORT_AND_SURFACE)
                 else:
                     self.diagnostic.add('vehicle_temperature', 'Ok')
-                    rospy.loginfo("%s: Vehicle temperature Ok", self.name)
 
-        # Rule: Absolute timeout
-        up_time = vehicle_status.up_time
-        self.diagnostic.add('up_time', str(up_time))
-        if float(up_time) > self.timeout and self.timeout_reset < 0:
-            # self.error_code[ErrorCode.INTERNAL_SENSORS_ERROR] = '1'
-            self.call_recovery_action("Absolute Timeout reached!", RecoveryAction.ABORT_AND_SURFACE)
-
+        # Rule: Watchdog
+        elapsed_time = vehicle_status.elapsed_time
+        self.diagnostic.add('elapsed_time', str(elapsed_time))
+        if float(elapsed_time) > self.timeout and self.timeout_reset < 0:
+            self.error_code[ErrorCode.WATCHDOG_TIMER] = '1'
+            self.call_recovery_action("Watchdog timeout reached!", RecoveryAction.ABORT_AND_SURFACE)
         else:
-            rospy.loginfo("%s: up_time (%s) < timeout (%s)", self.name, up_time, self.timeout)
             self.timeout_reset = self.timeout_reset - 1
 
         # Update error_byte with the current step information
@@ -337,28 +291,29 @@ class SafetySupervisor(object):
     def get_config(self):
         """ Read parameters from ROS Param Server """
 
-        param_dict = {'min_altitude': 'safe_depth_altitude/min_altitude',
-                      'max_depth': 'safe_depth_altitude/max_depth',
-                      'min_battery_charge': 'safety/min_battery_charge',
-                      'min_battery_voltage': 'safety/min_battery_voltage',
-                      'min_imu_update': 'safety/min_imu_update',
-                      'min_depth_update': 'safety/min_depth_update',
-                      'min_altitude_update': 'safety/min_altitude_update',
-                      'min_gps_update': 'safety/min_gps_update',
-                      'min_dvl_update': 'safety/min_dvl_update',
-                      'min_nav_update': 'safety/min_nav_update',
-                      'min_wifi_update': 'safety/min_wifi_update',
-                      'working_area_north_origin': 'virtual_cage/north_origin',
-                      'working_area_east_origin': 'virtual_cage/east_origin',
-                      'working_area_north_length': 'virtual_cage/north_longitude',
-                      'working_area_east_length': 'virtual_cage/east_longitude',
-                      'timeout': 'safety/timeout',
-                      'min_modem_update': 'safety/min_modem_update',
-                      'min_dvl_good_data': 'safety/min_dvl_good_data',
-                      'max_temperatures_ids': 'safety/max_temperatures_ids',
-                      'max_temperatures_values': 'safety/max_temperatures_values'}
+        param_dict = {'min_altitude': ('safe_depth_altitude/min_altitude', 1.5),
+                      'max_depth': ('safe_depth_altitude/max_depth', 20.0),
+                      'min_battery_charge': ('safety/min_battery_charge', 15.0),
+                      'min_battery_voltage': ('safety/min_battery_voltage', 25.0),
+                      'min_imu_update': ('safety/min_imu_update', 2.0),
+                      'min_depth_update': ('safety/min_depth_update', 2.0),
+                      'min_altitude_update': ('safety/min_altitude_update', 2.0),
+                      'min_gps_update': ('safety/min_gps_update', 2.0),
+                      'min_dvl_update': ('safety/min_dvl_update', 2.0),
+                      'min_nav_update': ('safety/min_nav_update', 2.0),
+                      'min_wifi_update': ('safety/min_wifi_update', 2.0),
+                      'working_area_north_origin': ('virtual_cage/north_origin', -50.0),
+                      'working_area_east_origin': ('virtual_cage/east_origin', -50.0),
+                      'working_area_north_length': ('virtual_cage/north_longitude', 100.0),
+                      'working_area_east_length': ('virtual_cage/east_longitude', 100.0),
+                      'timeout': ('safety/timeout', 3600),
+                      'min_modem_update': ('safety/min_modem_update', 2.0),
+                      'min_dvl_good_data': ('safety/min_dvl_good_data', 30),
+                      'max_temperatures_ids': ('safety/max_temperatures_ids', ['batteries', 'cpu', 'thrusters']),
+                      'max_temperatures_values': ('safety/max_temperatures_values', [55.0, 80.0, 95.0])}
 
-        param_loader.get_ros_params(self, param_dict, self.name)
+        param_loader.get_ros_params(self, param_dict)
+
 
         # Dynamic reconfigure for defining min altitude and max depth
         try:
