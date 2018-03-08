@@ -236,12 +236,12 @@ target_link_libraries(keyboard ${catkin_LIBRARIES})
 #add_dependencies(keyboard cola2_msgs_gencpp)
 #
 
-add_executable(pilot src/pilot.cpp)
+add_executable(pilot src/pilot_node.cpp)
 target_link_libraries(pilot ${catkin_LIBRARIES} controllers)
 add_dependencies(pilot cola2_msgs_gencpp) # ${PROJECT_NAME}_gencfg
 
 #include_directories(${Boost_INCLUDE_DIRS})
-add_executable(captain src/captain.cpp)
+add_executable(captain src/captain_node.cpp)
 target_link_libraries(captain ${catkin_LIBRARIES} ${Boost_LIBRARIES} mission_utils)
 add_dependencies(captain cola2_msgs_gencpp)
 #endif()
