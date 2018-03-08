@@ -1,21 +1,10 @@
 #!/usr/bin/env python
-# Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+# Copyright (c) 2018 Iqua Robotics SL - All Rights Reserved
 #
 # This file is subject to the terms and conditions defined in file
 # 'LICENSE.txt', which is part of this source code package.
 
-
-"""
-Copyright (c) 2014, 'CIRS - Universitat de Girona'
-All rights reserved.
-
-Software is provided WITHOUT WARRANTY and software authors and license owner 'CIRS - Universitat de Girona' cannot be
-held liable for any damages. You may use and modify this software for PRIVATE USE. REDISTRIBUTION in source and
-binary forms, with or without modification, are FORBIDDEN. You may NOT use the names, logos, or trademarks of
-contributors. """
-
-"""@@>Computer logger is used to record valuable data from the vehicle computer.<@@"""
-
+"""@@>Publishes CPU and RAM usage data and temperature from the vehicle computer.<@@"""
 
 # ROS imports
 import rospy
@@ -29,7 +18,7 @@ from std_msgs.msg import Float32
 
 
 class ComputerLogger(object):
-    """ This node is used to log some computer data """
+    """Publishes CPU and RAM usage data and temperature from the vehicle computer."""
 
     def __init__(self, name):
         """ Constructor """
@@ -46,11 +35,10 @@ class ComputerLogger(object):
         self.pub_cpu = rospy.Publisher(resolved_name + "/cpu_usage", Float32, queue_size = 2)
 
         # Start timer
-        rospy.Timer(rospy.Duration(5.0), self.iterate)
+        rospy.Timer(rospy.Duration(5), self.iterate)
 
         # Show message
         rospy.loginfo("%s: initialized", self.name)
-
 
     def iterate(self, event):
         """ Callback from the main timer """
@@ -61,19 +49,10 @@ class ComputerLogger(object):
             out, err = p.communicate()
             splitted = out.split("\n")
 
-            cpu_temp = -99
-            fan_rpm = -99
             max_core_temp = -99
 
+            # Get max core temperature
             for line in splitted:
-                #if "CPU Temperature:" in line:
-                #    end = line.index("(") - 6
-                #    start = end - 6
-                #    cpu_temp = float(line[start:end])
-                #if "CPU FAN Speed:" in line:
-                #    end = line.index("(") - 5
-                #    start = end - 6
-                #    fan_rpm = float(line[start:end])
                 if "Core" in line:
                     end = line.index("(") - 6
                     start = end - 6
@@ -81,10 +60,9 @@ class ComputerLogger(object):
                     if temp > max_core_temp:
                         max_core_temp = temp
 
-
             # Use psutil to get cpu and ram usage
             cpu_usage = psutil.cpu_percent()
-            ram_usage = ram = psutil.virtual_memory().percent
+            ram_usage = psutil.virtual_memory().percent
 
             self.diagnostic.add("cpu_temperature", str(max_core_temp))
             self.diagnostic.setLevel(DiagnosticStatus.OK)
@@ -92,14 +70,14 @@ class ComputerLogger(object):
             msg = Temperature()
             msg.header.stamp = rospy.Time.now()
             msg.temperature = max_core_temp
-            msg.variance = 0 # 0 is interpreted as unknown
+            msg.variance = 0  # unknown
             self.pub_temp.publish(msg)
 
             msg = Float32()
-            msg.data=cpu_usage
+            msg.data = cpu_usage
             self.pub_cpu.publish(msg)
 
-            msg.data=ram_usage
+            msg.data = ram_usage
             self.pub_ram.publish(msg)
 
         except:

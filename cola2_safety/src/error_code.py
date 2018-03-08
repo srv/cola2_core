@@ -13,7 +13,7 @@ class ErrorCode:
     """
     Definitions of each bit number (will be 1 if the error or warning is present)
     """
-    INIT = 15
+    WATCHDOG_TIMER = 15
     BAT_WARNING = 14
     BAT_ERROR = 13
     NAV_STS_WARNING = 12
@@ -32,7 +32,7 @@ class ErrorCode:
         """
         error_code_string = format(error_code, '016b')
 
-        init = (error_code_string[ErrorCode.INIT] == '1')
+        watchdog_timer = (error_code_string[ErrorCode.WATCHDOG_TIMER] == '1')
         bat_warning = (error_code_string[ErrorCode.BAT_WARNING] == '1')
         bat_error = (error_code_string[ErrorCode.BAT_ERROR] == '1')
         nav_sts_warning = (error_code_string[ErrorCode.NAV_STS_WARNING] == '1')
@@ -42,7 +42,7 @@ class ErrorCode:
         dvl_bottom_fail = (error_code_string[ErrorCode.DVL_BOTTOM_FAIL] == '1')
         current_waypoint = int(error_code_string[0:ErrorCode.CURRENT_WAYPOINT_BASE + 1], 2)
 
-        return {'init': init,
+        return {'watchdog_timer': watchdog_timer,
         		'bat_warning': bat_warning,
         		'bat_error': bat_error,
         		'nav_sts_warning': nav_sts_warning,
