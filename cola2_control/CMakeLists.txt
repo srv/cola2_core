@@ -30,19 +30,21 @@ add_custom_target(${PROJECT_NAME}_OTHER_FILES ALL WORKING_DIRECTORY ${PROJECT_SO
 #)
 
 find_package(catkin REQUIRED COMPONENTS
+        actionlib
         cmake_modules
         cola2_lib
+        cola2_msgs
         roscpp
         sensor_msgs
         std_msgs
-        cola2_msgs
-        actionlib
         )
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
 find_package(TinyXML REQUIRED)
+find_package(Boost REQUIRED)
+
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -149,7 +151,7 @@ find_package(TinyXML REQUIRED)
 catkin_package(
         #  INCLUDE_DIRS include
         #  LIBRARIES nmea_gps
-        CATKIN_DEPENDS cola2_lib roscpp sensor_msgs std_msgs cola2_msgs actionlib
+        CATKIN_DEPENDS actionlib cola2_lib cola2_msgs roscpp sensor_msgs std_msgs
         #  DEPENDS system_lib
 )
 ###########
@@ -224,8 +226,8 @@ target_link_libraries(ros_control_base ${catkin_LIBRARIES})
 #   ${catkin_LIBRARIES}
 # )
 
-# add_executable(test_mission_utils src/test_mission_utils.cpp)
-# target_link_libraries(test_mission_utils ${catkin_LIBRARIES} mission_utils controllers)
+add_executable(test_mission_utils src/test_mission_utils.cpp)
+target_link_libraries(test_mission_utils ${catkin_LIBRARIES} mission_utils controllers)
 
 # add_dependencies(test cola2_msgs_gencpp)
 
@@ -236,14 +238,12 @@ target_link_libraries(ros_control_base ${catkin_LIBRARIES})
 
 add_executable(pilot src/pilot.cpp)
 target_link_libraries(pilot ${catkin_LIBRARIES} controllers)
-#add_dependencies(pilot cola2_msgs_gencpp) # ${PROJECT_NAME}_gencfg
+# add_dependencies(pilot cola2_msgs_gencpp) # ${PROJECT_NAME}_gencfg
 
-#
-#if(Boost_FOUND)
-#  include_directories(${Boost_INCLUDE_DIRS})
-#  add_executable(captain src/captain.cpp)
-#  target_link_libraries(captain ${catkin_LIBRARIES} ${LIBS_TINYXML} ${Boost_LIBRARIES})
-#  add_dependencies(captain cola2_msgs_gencpp)
+#include_directories(${Boost_INCLUDE_DIRS})
+add_executable(captain src/captain.cpp)
+target_link_libraries(captain ${catkin_LIBRARIES} ${Boost_LIBRARIES} mission_utils)
+# add_dependencies(captain cola2_msgs_gencpp)
 #endif()
 
 #############

@@ -37,20 +37,21 @@
   <!--   <test_depend>gtest</test_depend> -->
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>actionlib</build_depend>
+  <build_depend>cmake_modules</build_depend>
   <!--build_depend>actionlib_msgs</build_depend-->
   <build_depend>cola2_lib</build_depend>
   <build_depend>cola2_msgs</build_depend>
-  <build_depend>diagnostic_msgs</build_depend>
-  <build_depend>dynamic_reconfigure</build_depend>
+  <!--build_depend>diagnostic_msgs</build_depend-->
+  <!--build_depend>dynamic_reconfigure</build_depend-->
   <build_depend>roscpp</build_depend>
-  <build_depend>rosparam</build_depend>
-  <build_depend>rospy</build_depend>
+  <!--build_depend>rosparam</build_depend-->
+  <!--build_depend>rospy</build_depend-->
   <build_depend>sensor_msgs</build_depend>
   <build_depend>cola2_msgs</build_depend>
-  <build_depend>std_srvs</build_depend>
+  <!--build_depend>std_srvs</build_depend-->
   <build_depend>std_msgs</build_depend>
-  <build_depend>tf</build_depend>
-  <build_depend>visualization_msgs</build_depend>
+  <!--build_depend>tf</build_depend-->
+  <!--build_depend>visualization_msgs</build_depend-->
   <run_depend>actionlib</run_depend>
   <!--run_depend>actionlib_msgs</run_depend-->
   <run_depend>cola2_lib</run_depend>
