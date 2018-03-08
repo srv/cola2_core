@@ -74,7 +74,6 @@ add_library(cola2_nav
    src/${PROJECT_NAME}/ekf_base_landmarks.cpp
    src/${PROJECT_NAME}/ekf_base_landmarks_ros.cpp
    src/${PROJECT_NAME}/ekf_position_velocity_landmarks.cpp
-   src/${PROJECT_NAME}/transform_handler.cpp
    src/${PROJECT_NAME}/transformations.cpp
 )
 target_link_libraries(cola2_nav ${catkin_LIBRARIES})

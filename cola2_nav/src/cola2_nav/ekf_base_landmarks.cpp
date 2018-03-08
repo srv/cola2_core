@@ -49,9 +49,21 @@ Eigen::Matrix6d EKFBaseLandmarks::getLandmarkUncertainty(const unsigned int& pos
   return P_.block<LANDMARK_SIZE, LANDMARK_SIZE>(i, i);
 }
 
-double EKFBaseLandmarks::getLandmarkLastUpdate(unsigned int landmark_position) const
+double EKFBaseLandmarks::getLandmarkLastUpdate(const std::string& id) const
 {
-  return landmark_last_update_.at(landmark_position);
+  try
+  {
+    return landmark_last_update_.at(id);
+  }
+  catch (std::out_of_range)
+  {
+    return -1.0;
+  }
+}
+
+void EKFBaseLandmarks::setLandmarkLastUpdate(const std::string& id, const double time)
+{
+  landmark_last_update_[id] = time;
 }
 
 void EKFBaseLandmarks::resetLandmarks()
@@ -64,7 +76,7 @@ void EKFBaseLandmarks::resetLandmarks()
   candidate_landmarks_.clear();
   // Remove from state
   x_ = x_.head(state_vector_size_);
-  P_ = P_.block(0, 0, state_vector_size_, state_vector_size_);
+  P_ = P_.topLeftCorner(state_vector_size_, state_vector_size_);
   // Show
   showStateVector();
 }
@@ -87,8 +99,8 @@ void EKFBaseLandmarks::addLandmark(const Eigen::VectorXd& landmark, const Eigen:
   const Eigen::Matrix3d m1 =
       getRotation() * landmark_cov.block(0, 0, 3, 3) * getRotation().transpose() + getPositionUncertainty();
   const Eigen::Matrix3d m2 = getRotation() * landmark_cov.block(3, 3, 3, 3) * getRotation().transpose();
-  P.block(position, position, 3, 3) = m1;  // TODO: check!!!
-  P.block(position + 3, position + 3, 3, 3) = m2;
+  P.block<3, 3>(position, position) = m1;  // TODO: check!!!
+  P.block<3, 3>(position + 3, position + 3) = m2;
   // Show
   std::cout << "Old P:\n" << P_ << "\n\n";
   std::cout << "New P:\n" << P << "\n\n";

@@ -28,10 +28,10 @@ constexpr int LANDMARK_CANDIDATES_MIN = 4;
 class EKFBaseLandmarks : public EKFBase
 {
 private:
-  unsigned int number_of_landmarks_ = 0;                 // number of landmarks in state vector
-  std::map<std::string, unsigned int> id2position_;      // from message id to position in state vector
-  std::map<unsigned int, std::string> position2id_;      // from position in state vector to message id
-  std::map<unsigned int, double> landmark_last_update_;  // save last time a landmark was seen
+  unsigned int number_of_landmarks_ = 0;                // number of landmarks in state vector
+  std::map<std::string, unsigned int> id2position_;     // from message id to position in state vector
+  std::map<unsigned int, std::string> position2id_;     // from position in state vector to message id
+  std::map<std::string, double> landmark_last_update_;  // save last time a landmark was seen
   std::map<std::string, std::vector<Eigen::VectorXd>> candidate_landmarks_;  // candidates observed
 
 public:
@@ -56,7 +56,8 @@ public:
   Eigen::Vector3d getLandmarkPositionVector(const unsigned int& position) const;
   Eigen::Quaterniond getLandmarkOrientationQuaternion(const unsigned int& position) const;
   Eigen::Matrix6d getLandmarkUncertainty(const unsigned int& position) const;
-  double getLandmarkLastUpdate(unsigned int landmark_position) const;
+  double getLandmarkLastUpdate(const std::string& id) const;
+  void setLandmarkLastUpdate(const std::string& id, const double time);
 
   // *****************************************
   // Modify landmarks

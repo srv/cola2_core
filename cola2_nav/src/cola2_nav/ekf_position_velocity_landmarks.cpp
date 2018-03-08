@@ -224,7 +224,6 @@ bool EKFPositionVelocityLandmarks::updateLandmarkMeasure(const double t, const E
   const Eigen::Matrix6d V = Eigen::MatrixXd::Identity(6, 6);
 
   // Do the update
-  // TODO: landmark_last_update_[position] = time;
   return applyUpdate(normalizeInnovationLandmark(z - H * P_), R, H, V, 25.0);
 }
 

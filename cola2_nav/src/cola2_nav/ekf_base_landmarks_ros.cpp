@@ -7,6 +7,9 @@
 
 #include "cola2_nav/ekf_base_landmarks_ros.h"
 
+// *****************************************
+// Constructor and destructor
+// *****************************************
 EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size)
   : EKFBaseLandmarks(state_vector_size)
   , ned_(0.0, 0.0, 0.0)
@@ -37,6 +40,7 @@ EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size)
 
   // Init services
   // clang-format off
+  srv_reload_params_ = nh_.advertiseService("reload_params", &EKFBaseLandmarksROS::srvResetNavigation, this);
   srv_reset_navigation_ = nh_.advertiseService("reset_navigation", &EKFBaseLandmarksROS::srvResetNavigation, this);
   srv_reset_landmarks_ = nh_.advertiseService("reset_landmarks", &EKFBaseLandmarksROS::srvResetLandmarks, this);
   srv_set_depth_sensor_offset_ = nh_.advertiseService("set_depth_sensor_offset", &EKFBaseLandmarksROS::srvSetDepthSensorOffset, this);
@@ -148,10 +152,10 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
   config_.declination_ = cola2::utils::degreesToRadians(declination_deg);
   cola2::rosutils::getParam("navigator/water_density", config_.water_density_, 1030.0);
   // Covariances
+  cola2::rosutils::getParamVector("navigator/initial_state_covariance", config_.initial_state_covariance_);
   cola2::rosutils::getParamVector("navigator/prediction_model_covariance", config_.prediction_model_covariance_);
   cola2::rosutils::getParamVector("navigator/force_model_covariance", config_.force_model_covariance_);
   cola2::rosutils::getParamVector("navigator/force_model_scale", config_.force_model_scale_);
-  cola2::rosutils::getParamVector("navigator/initial_state_covariance", config_.initial_state_covariance_);
 
   // Show
   if (show)
@@ -170,8 +174,36 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
     ROS_INFO("     depth sensor offset: %.3f\n", config_.depth_sensor_offset_);
     ROS_INFO(" declination deg: %.3f", declination_deg);
     ROS_INFO("dvl max velocity: %.3f", config_.dvl_max_v_);
-    ROS_INFO("   water density: %.3f", config_.water_density_);
-    // TODO: finish with vectors
+    ROS_INFO("   water density: %.3f\n", config_.water_density_);
+    // vectors
+    std::stringstream ss;
+    ss << "   initial state covariance: ";
+    for (const double v : config_.initial_state_covariance_)
+    {
+      ss << v << ' ';
+    }
+    ROS_INFO_STREAM(ss.str());
+    ss.str(std::string());  // empty it
+    ss << "prediction model covariance: ";
+    for (const double v : config_.prediction_model_covariance_)
+    {
+      ss << v << ' ';
+    }
+    ROS_INFO_STREAM(ss.str());
+    ss.str(std::string());
+    ss << "     force model covariance: ";
+    for (const double v : config_.force_model_covariance_)
+    {
+      ss << v << ' ';
+    }
+    ROS_INFO_STREAM(ss.str());
+    ss.str(std::string());
+    ss << "          force model scale: ";
+    for (const double v : config_.force_model_scale_)
+    {
+      ss << v << ' ';
+    }
+    ROS_INFO_STREAM(ss.str());
   }
 }
 
@@ -395,9 +427,11 @@ void EKFBaseLandmarksROS::updatePositionUSBLMsg(const geometry_msgs::PoseWithCov
 void EKFBaseLandmarksROS::updatePositionDepthMsg(const sensor_msgs::FluidPressure& msg)
 {
   // Valid measurement
-  const double meters = msg.fluid_pressure / config_.water_density_ / 9.81;
+  const double meters = msg.fluid_pressure / config_.water_density_ / 9.81;  // pascals to meters
   if (meters > 0.0)
   {
+    // Save pressure message for setDepthSensorOffset
+    pressure_meters_ = meters;
     // Diagnostics
     diag_help_.increaseFrequencyCounter();
     // Construct measurement
@@ -424,7 +458,8 @@ void EKFBaseLandmarksROS::updatePositionDepthMsg(const sensor_msgs::FluidPressur
 void EKFBaseLandmarksROS::updateVelocityDVLMsg(const cola2_msgs::DVL& msg)
 {
   // Valid measurement
-  if (msg.velocity_covariance[0] > 0.0)
+  if ((msg.velocity_covariance[0] > 0.0) && (std::abs(msg.velocity.x) < config_.dvl_max_v_) &&
+      (std::abs(msg.velocity.y) < config_.dvl_max_v_) && (std::abs(msg.velocity.z) < config_.dvl_max_v_))
   {
     // Diagnostics
     diag_help_.increaseFrequencyCounter();
@@ -438,7 +473,6 @@ void EKFBaseLandmarksROS::updateVelocityDVLMsg(const cola2_msgs::DVL& msg)
         cov(i, j) = msg.velocity_covariance[static_cast<size_t>(i * 3 + j)];
       }
     }
-    // TODO: where is the altitude?
     // Transform to vehicle frame
     Eigen::Affine3d trans;
     if (!tf_handler_.getTransform(msg.header.frame_id, trans))
@@ -463,6 +497,9 @@ void EKFBaseLandmarksROS::updateIMUMsg(const sensor_msgs::Imu& msg)
   diag_help_.increaseFrequencyCounter();
   // Construct measurement
   Eigen::Quaterniond ori(msg.orientation.w, msg.orientation.x, msg.orientation.y, msg.orientation.z);
+  Eigen::Vector3d rpy = cola2::utils::quaternion2euler(ori);
+  rpy(2) = cola2::utils::wrapAngle(rpy(2) + config_.declination_);  // add declination
+  ori = cola2::utils::euler2quaternion(rpy);
   Eigen::Vector3d ang_vel(msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z);
   Eigen::Matrix3d rpy_cov;
   Eigen::Matrix3d ang_vel_cov;
@@ -482,7 +519,7 @@ void EKFBaseLandmarksROS::updateIMUMsg(const sensor_msgs::Imu& msg)
   }
   Eigen::Quaterniond quat(trans.rotation());
   ori = transforms::orientation(ori, quat);
-  Eigen::Vector3d rpy = cola2::utils::quaternion2euler(ori);
+  rpy = cola2::utils::quaternion2euler(ori);
   ang_vel = transforms::angularVelocity(ang_vel, quat);
   // Predict and update
   if (!init_ekf_ || makePrediction(msg.header.stamp.toSec()))
@@ -557,7 +594,8 @@ void EKFBaseLandmarksROS::updateLandmarkMsg(const cola2_msgs::Detection& msg)
       else
       {
         // It was already mapped TODO: check world vs relative measures frames
-        updateLandmarkMeasure(msg.header.stamp.toSec(), lpos, wrpy, msg.id, cov);  // TODO: save last update time
+        updateLandmarkMeasure(msg.header.stamp.toSec(), lpos, wrpy, msg.id, cov);
+        setLandmarkLastUpdate(msg.id, msg.header.stamp.toSec());
         publishNavigationAndLandmarks(msg.header.stamp);
       }
     }  // end prediction
@@ -593,11 +631,9 @@ void EKFBaseLandmarksROS::updateRangeMsg(const cola2_msgs::RangeDetection& msg)
       H(0, index) = -H(0, 0);
       H(0, index + 1) = -H(0, 1);
       H(0, index + 2) = -H(0, 2);
-      // TODO: Save last update time for this landmark
-      //      _landmark_last_update[_mapped_lamdmarks[landmark_id]] = time_stamp;
-
       // Update and publish
       applyUpdate(inno, cov, H, Eigen::MatrixXd::Identity(1, 1), 25.0);
+      setLandmarkLastUpdate(msg.id, msg.header.stamp.toSec());
       publishRangeMarker(msg.id, msg.range, msg.sigma);
     }
   }
@@ -632,15 +668,7 @@ void EKFBaseLandmarksROS::updateBodyForceReqMsg(const cola2_msgs::BodyForceReq& 
     cov(0, 0) = config_.force_model_covariance_[0];
     cov(1, 1) = config_.force_model_covariance_[1];
     cov(2, 2) = config_.force_model_covariance_[2];
-    // Transform to vehicle frame
-    // TODO: Warning! This transformation is hard coded!
-    Eigen::Quaterniond rot =
-        cola2::utils::euler2quaternion(cola2::utils::degreesToRadians(180.0), cola2::utils::degreesToRadians(0.0),
-                                       cola2::utils::degreesToRadians(-45.0));
-    // TODO: Warning! The coriolis velocity is set to zero!
-    Eigen::Vector3d trans(0.0, 0.0, 0.0);
-    Eigen::Vector3d rate(0.0, 0.0, 0.0);
-    velocity = transforms::linearVelocity(velocity, rate, rot, trans);  // TODO: transform cov
+    // Transform to vehicle frame => Velocities already in vehicle frame
     // Predict and update
     if (makePrediction(msg.header.stamp.toSec()))
     {
@@ -653,6 +681,44 @@ void EKFBaseLandmarksROS::updateBodyForceReqMsg(const cola2_msgs::BodyForceReq& 
 void EKFBaseLandmarksROS::updateSoundVelocityMsg(const std_msgs::Float32& msg)
 {
   sound_velocity_ = static_cast<double>(msg.data);
+}
+
+void EKFBaseLandmarksROS::updateAltitudeMsg(const sensor_msgs::Range& msg)
+{
+  // Delare window
+  static std::vector<double> window;
+  // Check valid
+  if (msg.range > 0.0f)
+  {
+    // Transform measure TODO: transform [range defined on x] use rotation sensor and rotation vehicle
+    // TODO: what if different sensors? they contradict?
+    // TODO: take always the smaller? windows by frame?
+    double range = static_cast<double>(msg.range);
+    // Check window
+    if (window.size() >= ALTITUDE_WINDOW_SIZE)
+    {
+      // Mean
+      double mean = std::accumulate(window.begin(), window.end(), 0.0) / static_cast<double>(window.size());
+      // Std
+      std::vector<double> diff(window.size());
+      std::transform(window.begin(), window.end(), diff.begin(), [mean](double x) { return x - mean; });
+      double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
+      double stdev = std::sqrt(sq_sum / static_cast<double>(window.size()));
+      // Check inside
+      if ((mean - 1.5 * stdev <= range) && (range <= mean + 1.5 * stdev))
+      {
+        altitude_ = range;
+        publishNavigationAndLandmarks(msg.header.stamp);
+      }
+    }
+    // Add measure to window and check size
+    window.push_back(range);
+    if (window.size() > ALTITUDE_WINDOW_SIZE)
+    {
+      long diff = static_cast<long>(window.size() - ALTITUDE_WINDOW_SIZE);
+      window = std::vector<double>(window.begin() + diff, window.end());
+    }
+  }
 }
 
 void EKFBaseLandmarksROS::publishNavigationAndLandmarks(const ros::Time& stamp)
@@ -790,7 +856,7 @@ void EKFBaseLandmarksROS::publishNavigationAndLandmarks(const ros::Time& stamp)
       // Custom message
       cola2_msgs::Landmark landmark;
       landmark.landmark_id = getLandmarkId(l);
-      landmark.last_update.fromSec(getLandmarkLastUpdate(l));
+      landmark.last_update.fromSec(getLandmarkLastUpdate(getLandmarkId(l)));
       landmark.pose.pose.position.x = xyz(0);
       landmark.pose.pose.position.y = xyz(1);
       landmark.pose.pose.position.z = xyz(2);

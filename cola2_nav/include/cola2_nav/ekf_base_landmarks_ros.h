@@ -8,45 +8,47 @@
 #ifndef COLA2_NAV_EKF_BASE_LANDMARKS_ROS_H_
 #define COLA2_NAV_EKF_BASE_LANDMARKS_ROS_H_
 
-// messages
-#include <cola2_msgs/BodyForceReq.h>
-#include <cola2_msgs/DVL.h>
-#include <cola2_msgs/Detection.h>
-#include <cola2_msgs/Map.h>
-#include <cola2_msgs/NavSts.h>
-#include <cola2_msgs/RangeDetection.h>
-#include <diagnostic_msgs/DiagnosticStatus.h>
-#include <geometry_msgs/PoseStamped.h>                // gps_ned, usbl_ned
-#include <geometry_msgs/PoseWithCovarianceStamped.h>  // usbl_update
-#include <nav_msgs/Odometry.h>
-#include <sensor_msgs/FluidPressure.h>
-#include <sensor_msgs/Imu.h>
-#include <sensor_msgs/NavSatFix.h>
-#include <sensor_msgs/Range.h>
-#include <sensor_msgs/Temperature.h>
-#include <std_msgs/Float32.h>  // sound velocity
-#include <visualization_msgs/Marker.h>
-#include <visualization_msgs/MarkerArray.h>
+// messages subscribed
+#include <cola2_msgs/BodyForceReq.h>                  // force velocity model
+#include <cola2_msgs/DVL.h>                           // dvl
+#include <cola2_msgs/Detection.h>                     // landmark detection
+#include <cola2_msgs/RangeDetection.h>                // range detection
+#include <geometry_msgs/PoseWithCovarianceStamped.h>  // usbl
+#include <sensor_msgs/FluidPressure.h>                // depth
+#include <sensor_msgs/Imu.h>                          // imu
+#include <sensor_msgs/NavSatFix.h>                    // gps
+#include <sensor_msgs/Range.h>                        // altitude
+#include <std_msgs/Float32.h>                         // sound velocity
+// messages published
+#include <cola2_msgs/Map.h>                    // custom landmarks
+#include <cola2_msgs/NavSts.h>                 // custom navigation
+#include <diagnostic_msgs/DiagnosticStatus.h>  // diagnostics
+#include <geometry_msgs/PoseStamped.h>         // gps_ned, usbl_ned
+#include <nav_msgs/Odometry.h>                 // odometry
+#include <visualization_msgs/Marker.h>         // landmark visualization
+#include <visualization_msgs/MarkerArray.h>    // landmark visualization
 // services
 #include <std_srvs/Empty.h>
 // all
 #include <cola2_lib/rosutils/diagnostic_helper.h>
 #include <cola2_lib/rosutils/param_loader.h>
 #include <cola2_lib/rosutils/this_node.h>
+#include <cola2_lib/rosutils/transform_handler.h>
 #include <cola2_lib/utils/ned.h>
 #include <ros/ros.h>
 #include <tf/transform_broadcaster.h>
 #include <Eigen/Dense>
+#include <algorithm>
 #include <string>
 #include <vector>
 #include "./ekf_base_landmarks.h"
-#include "./transform_handler.h"
 #include "./transformations.h"
 
 namespace
 {
 constexpr double TIME_BETWEEN_PUBLISHING = 1.0 / 20.0;  //!< minimum time between publishNavigationAndLandmarks()
 constexpr double USBL_KEEP_TIME = 10.0;                 //!< seconds to keep position history for delayed USBLs
+constexpr size_t ALTITUDE_WINDOW_SIZE = 4;              //!< altitude window to check for valid measurements
 }
 
 /**
@@ -57,11 +59,11 @@ class EKFBaseLandmarksROS : public EKFBaseLandmarks
 {
 private:
   // ROS transforms and frames
-  TransformHandler tf_handler_;            //!< provide tfs
-  tf::TransformBroadcaster tf_broadcast_;  //!< to publish world->vehicle
-  std::string ns_;                         //!< namespace we are in
-  std::string frame_world_ = "ned";        //!< frame where AUV is located
-  std::string frame_vehicle_;              //!< frame of the vehicle (ns/base_link)
+  cola2::rosutils::TransformHandler tf_handler_;  //!< provide tfs
+  tf::TransformBroadcaster tf_broadcast_;         //!< to publish world->vehicle
+  std::string ns_;                                //!< namespace we are in
+  std::string frame_world_ = "ned";               //!< frame where AUV is located
+  std::string frame_vehicle_;                     //!< frame of the vehicle (ns/base_link)
 
   // ROS Publishers
   ros::Publisher pub_odom_;          //!< odometry message
@@ -74,11 +76,10 @@ private:
   ros::Publisher pub_altitude_;      //!< altitude from the seafloor
   double last_publication_time_ = 0.0;
   // ROS Services
-  ros::ServiceServer srv_reset_navigation_;
-  ros::ServiceServer srv_reset_landmarks_;
-  ros::ServiceServer srv_set_depth_sensor_offset_;
-
-  Eigen::Quaterniond auv_imu_rotation_;  // TODO: is it used?
+  ros::ServiceServer srv_reload_params_;            //!< same as reset navigation
+  ros::ServiceServer srv_reset_navigation_;         //!< realoads params and sets the filter to initial state
+  ros::ServiceServer srv_reset_landmarks_;          //!< deteletes all landmarks from filter
+  ros::ServiceServer srv_set_depth_sensor_offset_;  //!< compute the depth sensor offset
 
   // Status
   double pressure_meters_ = 0.0;    //!< last measured pressure
@@ -148,10 +149,11 @@ protected:
     double dvl_max_v_;
     double water_density_;
     // Covariances
+    std::vector<double> initial_state_covariance_;
     std::vector<double> prediction_model_covariance_;
     std::vector<double> force_model_covariance_;
     std::vector<double> force_model_scale_;
-    std::vector<double> initial_state_covariance_;
+    // TODO: enable/disable dvl_bottom dvl_water force_model
   };
   Config config_;  //!< config loaded by getConfig()
 
@@ -183,6 +185,7 @@ public:
   // Others
   void updateBodyForceReqMsg(const cola2_msgs::BodyForceReq& msg);
   void updateSoundVelocityMsg(const std_msgs::Float32& msg);
+  void updateAltitudeMsg(const sensor_msgs::Range& msg);
 
   // *****************************************
   // Publishers
