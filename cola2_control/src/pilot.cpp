@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+ * Copyright (c) 2018 Iqua Robotics SL - All Rights Reserved
  *
  * This file is subject to the terms and conditions defined in file
  * 'LICENSE.txt', which is part of this source code package.
@@ -32,7 +32,7 @@ setpoints to the position and velocity controllers.<@@*/
 #include <dynamic_reconfigure/server.h>
 //#include <cola2_control/PilotConfig.h>
 #include <geometry_msgs/PointStamped.h>
-#include <cola2_lib/rosutils/get_namespace.h>
+#include <cola2_lib/rosutils/this_node.h>
 
 const unsigned int SECTION_MODE = 0;
 const unsigned int WAYPOINT_MODE = 1;
