@@ -14,11 +14,9 @@
 #include <actionlib/client/terminal_state.h>
 #include <cola2_control/controllers/types.h>
 #include <cola2_control/mission_utils/mission.h>
-#include <cola2_control/mission_utils/mission_maneuver.h>
-
 #include <cola2_lib/rosutils/diagnostic_helper.h>
-#include <cola2_lib/rosutils/get_namespace.h>
 #include <cola2_lib/rosutils/param_loader.h>
+#include <cola2_lib/rosutils/this_node.h>
 #include <cola2_lib/utils/ned.h>
 #include <cola2_msgs/Action.h>
 #include <cola2_msgs/CaptainStatus.h>
@@ -94,7 +92,6 @@ private:
 
   // Actionlib client
   boost::shared_ptr<actionlib::SimpleActionClient<cola2_msgs::WorldSectionAction> > section_client_;
-
   boost::shared_ptr<actionlib::SimpleActionClient<cola2_msgs::WorldWaypointAction> > waypoint_client_;
 
   // Thread method to wait for Goto
@@ -186,14 +183,14 @@ Captain::Captain()
   // clang-format off
   enable_goto_srv_ = nh_.advertiseService("enable_goto", &Captain::enableGoto, this);
   disable_goto_srv_ = nh_.advertiseService("disable_goto", &Captain::disableGoto, this);
-  enable_default_mission_non_block_srv_ = nh_.advertiseService("enable_default_mission_non_block", &Captain::enableDefaultMissionNonBlock, this);
-  disable_mission_srv_ = nh_.advertiseService("disable_mission", &Captain::disableMission, this);
   enable_keep_position_holonomic_srv_ = nh_.advertiseService("enable_keep_position_holonomic", &Captain::enableKeepPositionHolonomic, this);
   enable_keep_position_non_holonomic_srv_ = nh_.advertiseService("enable_keep_position_non_holonomic", &Captain::enableKeepPositionNonHolonomic, this);
   disable_keep_position_srv_ = nh_.advertiseService("disable_keep_position", &Captain::disableKeepPosition, this);
   enable_mission_srv_ = nh_.advertiseService("enable_mission", &Captain::enableMission, this);
+  enable_default_mission_non_block_srv_ = nh_.advertiseService("enable_default_mission_non_block", &Captain::enableDefaultMissionNonBlock, this);
   pause_mission_srv_ = nh_.advertiseService("pause_mission", &Captain::pauseMission, this);
   resume_mission_srv_ = nh_.advertiseService("resume_mission", &Captain::resumeMission, this);
+  disable_mission_srv_ = nh_.advertiseService("disable_mission", &Captain::disableMission, this);
   enable_external_mission_srv_ = nh_.advertiseService("enable_external_mission", &Captain::enableExternalMission, this);
   disable_external_mission_srv_ = nh_.advertiseService("disable_external_mission", &Captain::disableExternalMission, this);
 
@@ -437,12 +434,16 @@ bool Captain::enableGoto(cola2_msgs::Goto::Request& req, cola2_msgs::Goto::Respo
 
     if (waypoint.altitude_mode)
     {
-      ROS_INFO_STREAM("Send WorldWaypointRequest at " << waypoint.position.north << ", " << waypoint.position.east << ", " << waypoint.altitude << " altitude. Timeout = " << waypoint.timeout << "\n");
+      ROS_INFO_STREAM("Send WorldWaypointRequest at " << waypoint.position.north << ", " << waypoint.position.east
+                                                      << ", " << waypoint.altitude
+                                                      << " altitude. Timeout = " << waypoint.timeout << "\n");
       captain_status_.altitude_mode = true;
     }
     else
     {
-      ROS_INFO_STREAM("Send WorldWaypointRequest at " << waypoint.position.north << ", " << waypoint.position.east << ", " << waypoint.position.depth << " depth. Timeout = " << waypoint.timeout << "\n");
+      ROS_INFO_STREAM("Send WorldWaypointRequest at " << waypoint.position.north << ", " << waypoint.position.east
+                                                      << ", " << waypoint.position.depth
+                                                      << " depth. Timeout = " << waypoint.timeout << "\n");
       captain_status_.altitude_mode = false;
     }
 
@@ -638,10 +639,8 @@ nav_msgs::Path Captain::createPathFromMission(Mission mission)
   {
     geometry_msgs::PoseStamped pose;
     pose.header.frame_id = path.header.frame_id;
-    ned.geodetic2Ned(mission.getStep(i)->getManeuverPtr()->x(),
-                     mission.getStep(i)->getManeuverPtr()->y(),
-                     0.0,
-                     x, y, z);
+    ned.geodetic2Ned(mission.getStep(i)->getManeuverPtr()->x(), mission.getStep(i)->getManeuverPtr()->y(), 0.0, x, y,
+                     z);
     pose.pose.position.x = x;
     pose.pose.position.y = y;
     pose.pose.position.z = mission.getStep(i)->getManeuverPtr()->z();

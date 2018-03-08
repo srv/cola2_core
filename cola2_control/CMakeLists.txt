@@ -226,13 +226,13 @@ target_link_libraries(ros_control_base ${catkin_LIBRARIES})
 #   ${catkin_LIBRARIES}
 # )
 
-add_executable(test_mission_utils src/test_mission_utils.cpp)
-target_link_libraries(test_mission_utils ${catkin_LIBRARIES} mission_utils controllers)
+#add_executable(test_mission_utils src/test_mission_utils.cpp)
+#target_link_libraries(test_mission_utils ${catkin_LIBRARIES} mission_utils controllers)
 
 # add_dependencies(test cola2_msgs_gencpp)
 
-#add_executable(keyboard src/keyboard.cpp)
-#target_link_libraries(keyboard ${catkin_LIBRARIES})
+add_executable(keyboard src/keyboard.cpp)
+target_link_libraries(keyboard ${catkin_LIBRARIES})
 #add_dependencies(keyboard cola2_msgs_gencpp)
 #
 
