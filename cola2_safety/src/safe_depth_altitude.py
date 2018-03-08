@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+# Copyright (c) 2018 Iqua Robotics SL - All Rights Reserved
 #
 # This file is subject to the terms and conditions defined in file
 # 'LICENSE.txt', which is part of this source code package.
@@ -40,8 +40,6 @@ class SafeDepthAltitude(object):
         self.name = name
 
         # Get config parameters
-        self.max_depth = 1.0
-        self.min_altitude = 5.0
         self.get_config()
 
         # Set up diagnostics
@@ -110,10 +108,10 @@ class SafeDepthAltitude(object):
 
     def get_config(self):
         """Get config from ROS param server."""
-        param_dict = {'max_depth': 'max_depth',
-                      'min_altitude': 'min_altitude'}
+        param_dict = {'max_depth': ('max_depth', 1.0),
+                      'min_altitude': ('min_altitude', 5.0)}
 
-        param_loader.get_ros_params(self, param_dict, rospy.get_name())
+        param_loader.get_ros_params(self, param_dict)
 
 
 if __name__ == '__main__':

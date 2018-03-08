@@ -96,10 +96,11 @@ class SetPose(object):
 
     def get_config(self):
         """ Reads configuration from ROS Param Server """
-        param_dict = {'set_pose_depth': 'set_pose_depth','set_pose_axis':
-                      'set_pose_axis', 'desired_pose': 'desired_pose'}
+        param_dict = {'set_pose_depth': ('set_pose_depth', [0.0, 0.0, 0.0, 0.0, -0.06, 0.0]),
+                      'set_pose_axis': ('set_pose_axis', [[True, True, True, True, False, True]]),
+                      'desired_pose': ('desired_pose', 1.2)}
 
-        param_loader.get_ros_params(self, param_dict, rospy.get_name())
+        param_loader.get_ros_params(self, param_dict)
 
 
 if __name__ == '__main__':

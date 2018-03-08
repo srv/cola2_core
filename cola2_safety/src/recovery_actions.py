@@ -1,9 +1,8 @@
 #!/usr/bin/env python
-# Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+# Copyright (c) 2018 Iqua Robotics SL - All Rights Reserved
 #
 # This file is subject to the terms and conditions defined in file
 # 'LICENSE.txt', which is part of this source code package.
-
 
 
 """
@@ -16,15 +15,11 @@ Modified 11/2015
 @author: narcis palomeras
 """
 
-# ROS imports
-import roslib
 import rospy
-
 from std_srvs.srv import Empty, EmptyRequest
 from cola2_msgs.srv import Goto, GotoRequest
 from cola2_msgs.srv import Recovery, RecoveryRequest, RecoveryResponse
 from cola2_msgs.msg import Setpoints, RecoveryAction, NavSts
-
 from cola2_lib.rosutils import param_loader
 
 
@@ -107,7 +102,7 @@ class RecoveryActions(object):
 
     def update_nav_sts(self, nav):
         """Navigation callback. It saves yaw."""
-        self.last_yaw=nav.orientation.yaw
+        self.last_yaw = nav.orientation.yaw
 
     def recovery_action_srv(self, req):
         """ Callback of recovery action service """
@@ -194,8 +189,8 @@ class RecoveryActions(object):
 
         try:
             goto = GotoRequest()
-            goto.priority= GoalDescriptor.PRIORITY_SAFETY_HIGH
-            goto.altitude= self.controlled_surface_depth
+            goto.priority = GoalDescriptor.PRIORITY_SAFETY_HIGH
+            goto.altitude = self.controlled_surface_depth
             goto.altitude_mode = False
             goto.blocking = False
             goto.keep_position = False
@@ -235,11 +230,11 @@ class RecoveryActions(object):
 
     def get_config(self):
         """ Get config from param server """
-        param_dict = {'frame_id': 'frame_id',
-                      'emergency_surface_setpoints': 'emergency_surface_setpoints',
-                      'controlled_surface_depth': 'controlled_surface_depth'}
+        param_dict = {'frame_id': ('frame_id', "girona500"),
+                      'emergency_surface_setpoints': ('emergency_surface_setpoints', [0.0, 0.0, 0.75, 0.75, 0.0]),
+                      'controlled_surface_depth': ('controlled_surface_depth', 0.0)}
 
-        param_loader.get_ros_params(self, param_dict, rospy.get_name())
+        param_loader.get_ros_params(self, param_dict)
 
 
     def no_disable_thrusters_message(self, event):

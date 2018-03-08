@@ -1,12 +1,11 @@
 #!/usr/bin/env python
-# Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+# Copyright (c) 2018 Iqua Robotics SL - All Rights Reserved
 #
 # This file is subject to the terms and conditions defined in file
 # 'LICENSE.txt', which is part of this source code package.
 
 
-
-"""@@>This node prevents an AUV to move beyond some given virtual limits.<@@"""
+"""@@>This node checks if the vehicle moves beyond some given virtual limits defined in NED coordinates<@@"""
 
 """
 Created on 02/13/2014
@@ -31,7 +30,9 @@ from cola2_lib.rosutils import param_loader
 from cola2_lib.rosutils.diagnostic_helper import DiagnosticHelper
 
 class VirtualCage(object):
-
+    """
+    This node checks if the vehicle moves beyond some given virtual limits defined in NED coordinates
+    """
 
     def __init__(self, name):
         """ Init the class. """
@@ -115,9 +116,9 @@ class VirtualCage(object):
                 cage_marker.color.g = 0.0
                 cage_marker.color.b = 0.0
                 cage_marker.color.a = 1.0
-                self.diagnostic.setLevel(DiagnosticStatus.WARN, 'Vehicle out of virtual cage')
+                self.diagnostic.set_level(DiagnosticStatus.WARN, 'Vehicle out of virtual cage')
             else:
-                self.diagnostic.setLevel(DiagnosticStatus.OK)
+                self.diagnostic.set_level(DiagnosticStatus.OK)
 
             self.cage_marker_pub.publish(cage_marker)
 
@@ -132,11 +133,13 @@ class VirtualCage(object):
 
     def get_config(self):
         """ Read parameters from ROS Param Server."""
-        param_dict = {'north_origin': 'north_origin', 'east_origin': 'east_origin',
-                      'north_longitude': 'north_longitude','east_longitude': 'east_longitude',
-                      'enabled': 'enabled'}
+        param_dict = {'north_origin': ('north_origin', -500.0),
+                      'east_origin': ('east_origin', -500.0),
+                      'north_longitude': ('north_longitude', 1000.0),
+                      'east_longitude': ('east_longitude', 1000.0),
+                      'enabled': ('enabled', False)}
 
-        param_loader.get_ros_params(self, param_dict, rospy.get_name())
+        param_loader.get_ros_params(self, param_dict)
 
 
 if __name__ == '__main__':
