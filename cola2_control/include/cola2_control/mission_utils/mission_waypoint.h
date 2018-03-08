@@ -31,20 +31,22 @@ public:
 
   MissionWaypoint(MissionPosition position_, double speed_, MissionTolerance tolerance_);
 
-  friend std::ostream& operator<<(std::ostream& stream, const MissionWaypoint& wp)
-  {
-    stream << "Waypoint -> " << wp.getPosition() << " at " << wp.getSpeed() << "m/s with tolerance " << wp.getTolerance();
-  }
+//  friend std::ostream& operator<<(std::ostream& stream, const MissionWaypoint& wp)
+//  {
+//    stream << "Waypoint -> " << wp.getPosition() << " at " << wp.getSpeed() << "m/s with tolerance " << wp.getTolerance();
+//  }
 
   MissionPosition getPosition() const;
+
   double getSpeed() const;
+
   MissionTolerance getTolerance() const;
+
   void setPosition(const MissionPosition position);
+
   void setSpeed(const double speed);
+
   void setTolerance(const MissionTolerance tolerance);
-
-
-  void show();
 
   double x();
 

@@ -17,11 +17,6 @@ MissionPark::MissionPark(MissionPosition position, unsigned int time, MissionTol
 {
 }
 
-void MissionPark::show()
-{
-  std::cout << *this;
-}
-
 double MissionPark::x()
 {
   return position_.getLatitude();

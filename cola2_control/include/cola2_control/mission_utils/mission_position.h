@@ -31,7 +31,6 @@ public:
 
   friend std::ostream& operator<<(std::ostream& stream, const MissionPosition& pos)
   {
-//    stream << "lo que sea...";
     stream << "[" << pos.getLatitude() << ", " << pos.getLongitude() << ", " << pos.getZ();
     if (pos.getAltitudeMode())
       stream << " (altitude)]";
@@ -40,14 +39,20 @@ public:
   }
 
   double getLatitude() const;
-  double getLongitude() const;
-  double getZ() const;
-  double getAltitudeMode() const;
-  void setLatitude(const double latitude);
-  void setLongitude(const double longitude);
-  void setZ(const double z);
-  void setAltitudeMode(const bool altitude_mode);
 
+  double getLongitude() const;
+
+  double getZ() const;
+
+  double getAltitudeMode() const;
+
+  void setLatitude(const double latitude);
+
+  void setLongitude(const double longitude);
+
+  void setZ(const double z);
+
+  void setAltitudeMode(const bool altitude_mode);
 };
 
 #endif //COLA2_CONTROL_MISSION_POSITION_H

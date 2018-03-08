@@ -12,19 +12,6 @@ MissionStep::~MissionStep()
 {
 }
 
-void MissionStep::show()
-{
-  std::cout << "Maneuver:\n";
-  maneuver_->show();
-  std::cout << std::endl;
-  std::cout << "List of actions:\n";
-  for (std::vector<MissionAction>::iterator action = actions_.begin(); action != actions_.end(); ++action)
-  {
-    action->show();
-    std::cout << std::endl;
-  }
-}
-
 MissionManeuver* MissionStep::getManeuverPtr() const
 {
   return maneuver_;

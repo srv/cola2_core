@@ -27,13 +27,6 @@ public:
 
   ~MissionStep();
 
-  friend std::ostream& operator<<(std::ostream& stream, const MissionStep& ms)
-  {
-    stream << "????\n";
-  }
-
-  void show();
-
   MissionManeuver* getManeuverPtr() const;
 
   std::vector<MissionAction> getActions() const;

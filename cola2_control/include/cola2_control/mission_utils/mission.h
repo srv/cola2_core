@@ -37,8 +37,6 @@ public:
 
   unsigned int size();
 
-  void show();
-
   std::string to_string(const double value) const;
 
   void addStep(MissionStep* step);

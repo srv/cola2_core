@@ -22,11 +22,6 @@ MissionSection::~MissionSection()
 {
 }
 
-void MissionSection::show()
-{
-  std::cout << *this;
-}
-
 MissionPosition MissionSection::getInitialPosition() const
 {
   return initial_position_;

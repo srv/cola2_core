@@ -16,9 +16,3 @@ unsigned int MissionManeuver::getManeuverType()
 {
   return maneuver_type_;
 }
-
-
-void MissionManeuver::show()
-{
-
-}

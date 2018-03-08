@@ -28,20 +28,18 @@ public:
   MissionManeuver(const unsigned int type);
   ~MissionManeuver();
 
-  friend std::ostream& operator<<(std::ostream& stream, const MissionManeuver& mm)
-  {
-    stream << mm;
-  }
-
-  void show();
+//  friend std::ostream& operator<<(std::ostream& stream, const MissionManeuver& mm)
+//  {
+//    stream << mm;
+//  }
 
   unsigned int getManeuverType();
 
-  double x();
+  virtual double x() = 0;
 
-  double y();
+  virtual double y() = 0;
 
-  double z();
+  virtual double z() = 0;
 };
 
 #endif //COLA2_CONTROL_MISSION_MANEUVER_H

@@ -23,18 +23,6 @@ unsigned int Mission::size()
   return mission_.size();
 }
 
-void Mission::show()
-{
-  std::cout << "Mission steps: " << mission_.size() << std::endl;
-  std::cout << "----------------------" << std::endl;
-  for (unsigned int i = 0; i < mission_.size(); i++)
-  {
-    std::cout << "Step: " << mission_.at(i)->getStepId() << std::endl;
-    mission_.at(i)->show();
-    std::cout << std::endl << "----------------------" << std::endl;
-  }
-}
-
 std::string Mission::to_string(const double value) const
 {
   std::ostringstream sstream;
@@ -516,7 +504,6 @@ int Mission::writeMissionStep(TiXmlElement* mission, const MissionStep& step)
     TiXmlElement* action_list = new TiXmlElement("actions_list");
     for (std::vector<MissionAction>::iterator action = actions.begin(); action != actions.end(); ++action)
     {
-      action->show();
       writeAction(action_list, *action);
     }
     mission_step->LinkEndChild(action_list);

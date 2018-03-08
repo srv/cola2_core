@@ -17,11 +17,6 @@ MissionWaypoint::MissionWaypoint(MissionPosition position, double speed, Mission
 {
 }
 
-void MissionWaypoint::show()
-{
-  std::cout << *this;
-}
-
 double MissionWaypoint::x()
 {
   return position_.getLatitude();
