@@ -80,12 +80,12 @@ class Teleoperation(object):
             queue_size=2)
 
         # Create subscribers
-        rospy.Subscriber("input_to_teleoperation/ack",
+        rospy.Subscriber(namespace+"input_to_teleoperation/ack",
                          String,
                          self.ack_callback,
                          queue_size=1)
 
-        rospy.Subscriber("input_to_teleoperation/output",
+        rospy.Subscriber(namespace+"input_to_teleoperation/output",
                          Joy,
                          self.output_callback,
                          queue_size=1)
