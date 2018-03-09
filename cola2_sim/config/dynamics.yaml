@@ -1,7 +1,7 @@
 # WARNING!!!
 # The thrusters allocation matrix "b" is defined in the code. It can not be changed using parameters.
 
-dynamics/use_force_topic: false
+dynamics/use_force_topic: true
 #
 dynamics/number_of_thrusters: 5
 dynamics/number_of_fins: 0

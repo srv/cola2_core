@@ -31,7 +31,6 @@ from cola2_msgs.msg import BodyForceReq
 from cola2_sim.srv import SimulatedCurrents
 
 # More imports
-import PyKDL
 import math
 import numpy as np
 
@@ -165,9 +164,12 @@ class Dynamics:
                     e_vc[i] = self.current_max[i]
                 if e_vc[i] < self.current_min[i]:
                     e_vc[i] = self.current_min[i]
-            t = PyKDL.Vector(e_vc[0], e_vc[1], e_vc[2])
-            O = PyKDL.Rotation.RPY(self.p[3], self.p[4], self.p[5])
-            currents = O.Inverse() * t
+            # t = PyKDL.Vector(e_vc[0], e_vc[1], e_vc[2])
+            t = np.array([[e_vc[0], e_vc[1], e_vc[2]]]).T
+            # O = PyKDL.Rotation.RPY(self.p[3], self.p[4], self.p[5])
+            O = tf.transformations.euler_matrix(self.p[3], self.p[4], self.p[5])
+            # currents = O.Inverse() * t
+            currents = O.T.dot(t)
             return np.array([currents[0], currents[1], currents[2], 0, 0, 0])
         else:
             return np.array([0, 0, 0, 0, 0, 0])
@@ -430,7 +432,7 @@ class Dynamics:
         """ Publish odometry message """
         odom = Odometry()
         odom.header.stamp = rospy.Time.now()
-        odom.header.frame_id = self.namespace + "ned"
+        odom.header.frame_id = "ned"
         odom.child_frame_id = self.namespace + "dynamics"
 
         odom.pose.pose.position.x = self.p[0]
@@ -455,7 +457,7 @@ class Dynamics:
         # Broadcast transform
         br = tf.TransformBroadcaster()
         br.sendTransform((self.p[0], self.p[1], self.p[2]), orientation,
-                         odom.header.stamp, odom.header.frame_id, odom.child_frame_id)
+                         odom.header.stamp, odom.child_frame_id, odom.header.frame_id)
 
     def get_config(self):
         """ Get config from config file """
