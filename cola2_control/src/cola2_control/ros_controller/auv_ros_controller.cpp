@@ -160,15 +160,15 @@ void IAUVROSController::checkDiagnostics(const ros::TimerEvent& event)
 
   if (!auv_controller_->isPoseControllerEnable())
   {
-    diagnostic_.setLevel(diagnostic_msgs::DiagnosticStatus::WARN, "pose controller disabled");
+    diagnostic_.setLevel(diagnostic_msgs::DiagnosticStatus::WARN, "pose_controller_disabled");
   }
   if (!auv_controller_->isVelocityControllerEnable())
   {
-    diagnostic_.setLevel(diagnostic_msgs::DiagnosticStatus::WARN, "velocity controller disabled");
+    diagnostic_.setLevel(diagnostic_msgs::DiagnosticStatus::WARN, "velocity_controller_disabled");
   }
   if (!auv_controller_->isThrusterAllocatorEnable())
   {
-    diagnostic_.setLevel(diagnostic_msgs::DiagnosticStatus::WARN, "thruster allocator disabled");
+    diagnostic_.setLevel(diagnostic_msgs::DiagnosticStatus::WARN, "thruster_allocator_disabled");
   }
 }
 
