@@ -509,7 +509,7 @@ void EKFBaseLandmarksROS::updateIMUMsg(const sensor_msgs::Imu& msg)
   // Construct measurement
   Eigen::Quaterniond ori(msg.orientation.w, msg.orientation.x, msg.orientation.y, msg.orientation.z);
   Eigen::Vector3d rpy = cola2::utils::quaternion2euler(ori);
-  rpy(2) = cola2::utils::wrapAngle(rpy(2) + config_.declination_);  // add declination
+  rpy(2) = cola2::utils::wrapAngle(rpy(2) - config_.declination_);  // add declination
   ori = cola2::utils::euler2quaternion(rpy);
   Eigen::Vector3d ang_vel(msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z);
   Eigen::Matrix3d rpy_cov;
@@ -529,9 +529,9 @@ void EKFBaseLandmarksROS::updateIMUMsg(const sensor_msgs::Imu& msg)
     return;  // not possible to transform
   }
   Eigen::Quaterniond quat(trans.rotation());
-  ori = transforms::orientation(ori, quat);
+  ori = transforms::orientation(ori, quat);  // transform orientation
   rpy = cola2::utils::quaternion2euler(ori);
-  ang_vel = transforms::angularVelocity(ang_vel, quat);
+  ang_vel = transforms::angularVelocity(ang_vel, quat);  // transform angular velocity
   // Predict and update
   if (!init_ekf_ || makePrediction(msg.header.stamp.toSec()))
   {

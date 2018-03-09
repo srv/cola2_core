@@ -153,6 +153,7 @@ bool EKFPositionVelocityLandmarks::updateOrientation(const double t, const Eigen
       ROS_INFO_ONCE("ekf init");
     }
     rpy_ = rpy;
+    rpy_cov_ = cov;
     init_imu_ = true;
     ROS_INFO_ONCE("imu init");
     return true;
