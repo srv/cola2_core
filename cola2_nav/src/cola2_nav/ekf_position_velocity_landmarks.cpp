@@ -136,7 +136,7 @@ bool EKFPositionVelocityLandmarks::updatePositionZ(const double t, const Eigen::
   Eigen::Vector1d h = x_.segment<1>(2);                // h(x)
   Eigen::MatrixXd H = Eigen::MatrixXd::Zero(1, size);  // H = dh(x) / dx
   H(0, 2) = 1;
-  return applyUpdate(pose_z - h, H, cov, Eigen::Matrix1d::Identity(), 1.0);
+  return applyUpdate(pose_z - h, H, cov, Eigen::Matrix1d::Identity(), 30.0);
 }
 bool EKFPositionVelocityLandmarks::updateOrientation(const double t, const Eigen::Vector3d& rpy,
                                                      const Eigen::Matrix3d& cov)
