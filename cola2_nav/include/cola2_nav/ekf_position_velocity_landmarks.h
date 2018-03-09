@@ -22,10 +22,10 @@ class EKFPositionVelocityLandmarks : public EKFBaseLandmarksROS
 {
 private:
   // Auxiliary states not in the state vector x
-  Eigen::Vector3d rpy_;
-  Eigen::Vector3d ang_vel_;
-  Eigen::Matrix3d rpy_cov_;
-  Eigen::Matrix3d ang_vel_cov_;
+  Eigen::Vector3d rpy_ = Eigen::Vector3d::Zero();
+  Eigen::Vector3d ang_vel_ = Eigen::Vector3d::Zero();
+  Eigen::Matrix3d rpy_cov_ = 0.1 * Eigen::Matrix3d::Identity();
+  Eigen::Matrix3d ang_vel_cov_ = 0.1 * Eigen::Matrix3d::Identity();
 
 protected:
   // *****************************************
