@@ -75,7 +75,7 @@ class SafeDepthAltitude(object):
         if (nav.altitude > 0 and nav.altitude < self.min_altitude and nav.position.depth > 0.5) or \
             nav.position.depth > self.max_depth:
             # Show message
-            self.diagnostic.setLevel(DiagnosticStatus.WARN, 'Invalid depth/altitude! Moving vehicle up.')
+            self.diagnostic.set_level(DiagnosticStatus.WARN, 'Invalid depth/altitude! Moving vehicle up.')
             if (nav.altitude > 0 and nav.altitude < self.min_altitude and nav.position.depth > 0.5):
                 rospy.logwarn("%s: invalid altitude: %s",
                               self.name, nav.altitude)
@@ -104,7 +104,7 @@ class SafeDepthAltitude(object):
             bvr.header.stamp = rospy.Time.now()
             self.pub_body_velocity_req.publish(bvr)
         else:
-            self.diagnostic.setLevel(DiagnosticStatus.OK)
+            self.diagnostic.set_level(DiagnosticStatus.OK)
 
     def get_config(self):
         """Get config from ROS param server."""
