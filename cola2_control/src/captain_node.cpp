@@ -37,6 +37,7 @@
 #include <boost/thread.hpp>
 #include <string>
 #include <vector>
+#include <ros/package.h>
 
 typedef struct
 {
@@ -280,18 +281,31 @@ void Captain::getConfig()
 
   // clang-format off
   cola2::rosutils::getParam(cola2::rosutils::getNamespace() + "/controller/max_velocity_z", heave, 0.1);
-  cola2::rosutils::getParam(cola2::rosutils::getNamespace() + "/pilot/goto_max_surge", surge, 0.1);
-  cola2::rosutils::getParam(cola2::rosutils::getNamespace() + "/pilot/los_cte_max_surge_velocity", surge_los, 0.1);
+  cola2::rosutils::getParam(cola2::rosutils::getNamespace() + "/pilot/goto/max_surge", surge, 0.1);
+  cola2::rosutils::getParam(cola2::rosutils::getNamespace() + "/pilot/los_cte/max_surge_velocity", surge_los, 0.1);
   // clang-format on
 
   min_goto_vel_ = std::min(heave, surge);
   min_loscte_vel_ = std::min(heave, surge_los);
 
   // Get path were missions are stored
-  if (!cola2::rosutils::getParam(cola2::rosutils::getNamespace() + "/captain/mission_path", config_.mission_path))
+  std::string package;
+  if (!cola2::rosutils::getParam("~vehicle_config_launch_mission_package", package))
   {
-    ROS_ASSERT_MSG(false, "Missions path not found in param server. Set as ./");
-    config_.mission_path = ".";
+    ROS_FATAL_STREAM("Package vehicle_config_launch_mission not defined!");
+  }
+  else
+  {
+    std::string path = ros::package::getPath(package);
+    if (path != "")
+    {
+      config_.mission_path = path + "/missions";
+      ROS_INFO_STREAM("Mission path: " << config_.mission_path);
+    }
+    else
+    {
+      ROS_FATAL_STREAM("Error defining mission path!");
+    }
   }
 }
 

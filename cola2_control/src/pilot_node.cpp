@@ -526,25 +526,24 @@ void Pilot::getConfig()
   // Load config from param server
   // LOS-CTE controller
   // clang-format off
-  cola2::rosutils::getParam("~los_cte_delta", config_.los_cte_config.delta, 5.0);
-  cola2::rosutils::getParam("~los_cte_distance_to_max_velocity", config_.los_cte_config.distance_to_max_velocity,                           5.0);
-  cola2::rosutils::getParam("~los_cte_max_surge_velocity", config_.los_cte_config.max_surge_velocity, 0.5);
-  cola2::rosutils::getParam("~los_cte_min_surge_velocity", config_.los_cte_config.min_surge_velocity, 0.2);
-  cola2::rosutils::getParam("~los_cte_min_velocity_ratio", config_.los_cte_config.min_velocity_ratio, 0.1);
-  cola2::rosutils::getParam("~los_cte_heave_in_3D", config_.los_cte_config.heave_in_3D, false);
+  cola2::rosutils::getParam("~los_cte/delta", config_.los_cte_config.delta, 5.0);
+  cola2::rosutils::getParam("~los_cte/distance_to_max_velocity", config_.los_cte_config.distance_to_max_velocity,                           5.0);
+  cola2::rosutils::getParam("~los_cte/max_surge_velocity", config_.los_cte_config.max_surge_velocity, 0.5);
+  cola2::rosutils::getParam("~los_cte/min_surge_velocity", config_.los_cte_config.min_surge_velocity, 0.2);
+  cola2::rosutils::getParam("~los_cte/min_velocity_ratio", config_.los_cte_config.min_velocity_ratio, 0.1);
 
   // GOTO controller
-  cola2::rosutils::getParam("~goto_max_angle_error", config_.goto_config.max_angle_error, 0.3);
-  cola2::rosutils::getParam("~goto_max_surge", config_.goto_config.max_surge, 0.5);
-  cola2::rosutils::getParam("~goto_surge_proportional_gain", config_.goto_config.surge_proportional_gain, 0.25);
+  cola2::rosutils::getParam("~goto/max_angle_error", config_.goto_config.max_angle_error, 0.3);
+  cola2::rosutils::getParam("~goto/max_surge", config_.goto_config.max_surge, 0.5);
+  cola2::rosutils::getParam("~goto/surge_proportional_gain", config_.goto_config.surge_proportional_gain, 0.25);
 
   // ANCHOR controller
-  cola2::rosutils::getParam("~anchor_kp", config_.anchor_config.kp, 0.1);
-  cola2::rosutils::getParam("~anchor_radius", config_.anchor_config.radius, 1.0);
-  cola2::rosutils::getParam("~anchor_min_surge", config_.anchor_config.min_surge, -0.1);
-  cola2::rosutils::getParam("~anchor_max_surge", config_.anchor_config.max_surge, 0.3);
-  cola2::rosutils::getParam("~anchor_safety_distance", config_.anchor_config.safety_distance, 50.0);
-  cola2::rosutils::getParam("~anchor_max_angle_error", config_.anchor_config.max_angle_error, 0.5);
+  cola2::rosutils::getParam("~anchor/kp", config_.anchor_config.kp, 0.1);
+  cola2::rosutils::getParam("~anchor/radius", config_.anchor_config.radius, 1.0);
+  cola2::rosutils::getParam("~anchor/min_surge", config_.anchor_config.min_surge, -0.1);
+  cola2::rosutils::getParam("~anchor/max_surge", config_.anchor_config.max_surge, 0.3);
+  cola2::rosutils::getParam("~anchor/safety_distance", config_.anchor_config.safety_distance, 50.0);
+  cola2::rosutils::getParam("~anchor/max_angle_error", config_.anchor_config.max_angle_error, 0.5);
   // clang-format on
 }
 

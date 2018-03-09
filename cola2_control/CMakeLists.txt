@@ -35,6 +35,7 @@ find_package(catkin REQUIRED COMPONENTS
         cola2_lib
         cola2_msgs
         roscpp
+        roslib
         sensor_msgs
         std_msgs
         )
@@ -151,7 +152,7 @@ catkin_python_setup()
 catkin_package(
         INCLUDE_DIRS include
         LIBRARIES controllers mission_utils low_level_controllers ros_control_base
-        CATKIN_DEPENDS actionlib cola2_lib cola2_msgs roscpp sensor_msgs std_msgs
+        CATKIN_DEPENDS actionlib cola2_lib cola2_msgs roscpp roslib sensor_msgs std_msgs
         DEPENDS TinyXML Boost
 )
 ###########
