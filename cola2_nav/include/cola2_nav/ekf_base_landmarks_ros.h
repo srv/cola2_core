@@ -169,6 +169,10 @@ public:
    *  \brief Destructor.
    */
   virtual ~EKFBaseLandmarksROS() = default;
+  /**
+   *  \brief Get namespace.
+   */
+  std::string getNamespace() const;
 
   // *****************************************
   // Updates from ROS messages

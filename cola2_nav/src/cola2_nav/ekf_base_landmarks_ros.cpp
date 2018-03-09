@@ -66,6 +66,11 @@ EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size)
   }
 }
 
+std::string EKFBaseLandmarksROS::getNamespace() const
+{
+  return ns_;
+}
+
 void EKFBaseLandmarksROS::resetFilter()
 {
   // Reset flags
@@ -219,24 +224,28 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
   if (now - last_imu_time_ > 1.0)
   {
     is_nav_data_ok = false;
+    ROS_WARN("IMU too old");
   }
   // Check DVL data
   diag_help_.add("last_dvl_data", std::to_string(now - last_dvl_time_));
   if (now - last_dvl_time_ > 2.0)
   {
     is_nav_data_ok = false;
+    ROS_WARN("DVL too old");
   }
   // Check altitude data
   diag_help_.add("last_altitude_data", std::to_string(now - last_altitude_time_));
   if (now - last_altitude_time_ > 5.0)
   {
     is_nav_data_ok = false;
+    ROS_WARN("Altitude too old");
   }
   // Check depth data
   diag_help_.add("last_depth_data", std::to_string(now - last_depth_time_));
   if (now - last_depth_time_ > 2.0)
   {
     is_nav_data_ok = false;
+    ROS_WARN("Depth too old");
   }
   // Check gps data
   if (config_.use_gps_data_)
@@ -245,6 +254,7 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
     if (now - last_gps_time_ > 3.0)
     {
       is_nav_data_ok = false;
+      ROS_WARN("GPS too old");
     }
   }
   // *****************************************
@@ -255,12 +265,13 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
   if (diag_help_.getCurrentFreq() < 25)
   {
     is_nav_data_ok = false;
+    ROS_FATAL("Diagnostics frequency too low");
   }
   // If filter or NED not initialized set to Warning
   if (!init_ekf_ || !init_ned_)
   {
     is_nav_data_ok = false;
-    ROS_FATAL_STREAM("EKF or NED not yet init");
+    ROS_FATAL("EKF or NED not yet init");
   }
   // If all nav data is ok set navigator to Ok
   if (is_nav_data_ok && !ned_error_)
@@ -708,6 +719,7 @@ void EKFBaseLandmarksROS::updateAltitudeMsg(const sensor_msgs::Range& msg)
       if ((mean - 1.5 * stdev <= range) && (range <= mean + 1.5 * stdev))
       {
         altitude_ = range;
+        last_altitude_time_ = msg.header.stamp.toSec();
         publishNavigationAndLandmarks(msg.header.stamp);
       }
     }

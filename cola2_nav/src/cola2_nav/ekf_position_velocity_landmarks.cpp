@@ -106,6 +106,7 @@ bool EKFPositionVelocityLandmarks::updatePositionXY(const double t, const Eigen:
   {
     x_.head(2) = pose_xy;
     init_gps_ = true;
+    ROS_INFO_ONCE("gps init");
     return true;
   }
   // Update
@@ -127,6 +128,7 @@ bool EKFPositionVelocityLandmarks::updatePositionZ(const double t, const Eigen::
   {
     x_(2) = pose_z(0);
     init_depth_ = true;
+    ROS_INFO_ONCE("depth init");
     return true;
   }
   // Update
@@ -148,9 +150,11 @@ bool EKFPositionVelocityLandmarks::updateOrientation(const double t, const Eigen
     if ((!config_.use_gps_data_ || init_gps_) && (init_depth_) && (init_dvl_))
     {
       init_ekf_ = true;
+      ROS_INFO_ONCE("ekf init");
     }
     rpy_ = rpy;
     init_imu_ = true;
+    ROS_INFO_ONCE("imu init");
     return true;
   }
   // Update (used as true reading)
@@ -174,6 +178,7 @@ bool EKFPositionVelocityLandmarks::updateVelocity(const double t, const Eigen::V
     {
       x_.segment<3>(3) = vel;
       init_dvl_ = true;
+      ROS_INFO_ONCE("dvl init");
     }
     return true;
   }
