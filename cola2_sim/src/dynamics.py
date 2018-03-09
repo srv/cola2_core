@@ -59,9 +59,9 @@ class Dynamics:
         self.pub_odom = rospy.Publisher(self.name + "/odometry", Odometry, queue_size=2)
 
         # Create subscribers
-        rospy.Subscriber(self.namespace + "controller/thrusters_setpoint", Setpoints, self.update_thrusters,
+        rospy.Subscriber(self.namespace + "controller/thrusters_data", Setpoints, self.update_thrusters,
                          queue_size=1)
-        rospy.Subscriber(self.namespace + "merged_body_force_req", BodyForceReq, self.update_force, queue_size=1)
+        rospy.Subscriber(self.namespace + "controller/merged_body_force_req", BodyForceReq, self.update_force, queue_size=1)
 
         self.current_srv = rospy.Service(self.name + 'current_simulation', SimulatedCurrents, self.current_simulation_srv)
 
