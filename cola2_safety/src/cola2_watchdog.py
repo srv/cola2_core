@@ -48,7 +48,7 @@ class Watchdog(object):
     def check_timeout(self, event):
         """ Callback of the watchdog timer """
         self.diagnostic.add("elapsed_time", str(rospy.Time.now().to_sec() - self.init_time))
-        self.diagnostic.setLevel(DiagnosticStatus.OK)
+        self.diagnostic.set_level(DiagnosticStatus.OK)
 
         # Publish elapsed time
         msg = Int32()

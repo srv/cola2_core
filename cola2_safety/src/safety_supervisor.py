@@ -268,7 +268,7 @@ class SafetySupervisor(object):
             rospy.Timer(rospy.Duration(TIME_SHOW_EXTERNAL_RECOVERY), self.timer_callback, oneshot=True)
 
         if not self.is_recovery_enabled:
-            self.diagnostic.setLevel(DiagnosticStatus.OK)
+            self.diagnostic.set_level(DiagnosticStatus.OK)
             self.ra_msg.header.stamp = rospy.Time.now()
             self.old_level = self.ra_msg.error_level
             self.old_str_err = self.ra_msg.error_string
@@ -341,7 +341,7 @@ class SafetySupervisor(object):
         If the vehicle is initialized, calls the recovery action service with the corresponding level and message.
         """
         self.is_recovery_enabled = True
-        self.diagnostic.setLevel(DiagnosticStatus.ERROR, str_err)
+        self.diagnostic.set_level(DiagnosticStatus.ERROR, str_err)
 
         if self.vehicle_init:
             # If the same recovery action has been called again do not change the recovery_action timestamp
