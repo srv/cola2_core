@@ -170,6 +170,9 @@ void IAUVROSController::checkDiagnostics(const ros::TimerEvent& event)
   {
     diagnostic_.setLevel(diagnostic_msgs::DiagnosticStatus::WARN, "thruster allocator disabled");
   }
+  diagnostic_.add("pose_controller_enabled", auv_controller_->isPoseControllerEnable());
+  diagnostic_.add("velocity_controller_enabled", auv_controller_->isVelocityControllerEnable());
+  diagnostic_.add("thruster_allocator_enabled", auv_controller_->isThrusterAllocatorEnable());
 }
 
 void IAUVROSController::timerCallback(const ros::TimerEvent& event)

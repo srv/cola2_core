@@ -45,6 +45,9 @@ typedef struct
   std::string mission_path;
 } CaptainConfig;
 
+/**
+ * Captain class. It can execute maneuvers like goto and keep position as well as missions.
+ */
 class Captain
 {
 private:
@@ -97,57 +100,164 @@ private:
 
   // Thread method to wait for Goto
   boost::thread thread_waypoint_;
+  /**
+   * Blocks the execution thread until the waypoint finalizes
+   */
   void waitWaypoint();
 
   std::string section_server_name_;
 
   // Methods
+  /**
+   * Checks if there is another action (waypoint or section) under execution
+   * @return true if no other action under execution
+   */
   bool checkNoRequestRunning();
 
+  /**
+   * Load params from ROS param server.
+   */
   void getConfig();
 
+  /**
+   * Given a mission builds a nav_msgs::Path to represent it in RViz.
+   * @param mission
+   * @return mission path
+   */
   nav_msgs::Path createPathFromMission(const Mission mission);
 
+  /**
+   * Computes distance from current position to given x, y, z, altitude, altitude_moe
+   * @return distance
+   */
   double distanceTo(const double, const double, const double, const double, const bool);
 
   // ... services callbacks
+  /**
+   * Enable Goto maneuver
+   * @return nothing
+   */
   bool enableGoto(cola2_msgs::Goto::Request&, cola2_msgs::Goto::Response&);
 
+  /**
+   * Disable Goto maneuver
+   * @return nothing
+   */
   bool disableGoto(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 
+  /**
+   * Enable mission with name 'last_mission.xml' and returns immediately
+   * @return true if default mission is valid
+   */
   bool enableDefaultMissionNonBlock(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 
+  /**
+   * Disable mission under execution
+   * @return true id a mission is enabled
+   */
   bool disableMission(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 
+  /**
+   * Enable keep position for surge, sway, heave and yaw DoFs
+   * @return true if it can be enabled
+   */
   bool enableKeepPositionHolonomic(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 
+  /**
+   * Enable keep position for surge, heave, and yaw DoFs
+   * @return true if it can be enabled
+   */
   bool enableKeepPositionNonHolonomic(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 
+  /**
+   * Disable keep position
+   * @return true if a keep position is enabled
+   */
   bool disableKeepPosition(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
 
+  /**
+   * Callback to NAME_SPACE/navigator/navigation topic
+   * @param msg
+   */
   void updateNav(const cola2_msgs::NavSts& msg);
 
+  /**
+   * Pause mission execution.
+   * @param req
+   * @param res
+   * @return
+   */
   bool pauseMission(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
 
+  /**
+   * Resume mession execution for the next step in which it was paused.
+   * @param req
+   * @param res
+   * @return
+   */
   bool resumeMission(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
 
+  /**
+   * Allows an external controller to 'fake' that a mission is under execution.
+   * @param req
+   * @param res
+   * @return
+   */
   bool enableExternalMission(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
 
+  /**
+   * Finalizes the exeternal mission.
+   * @param req
+   * @param res
+   * @return true if it has been previously enabled
+   */
   bool disableExternalMission(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
 
+  /**
+   * Enable mission defined in cola2_msgs::String::Request
+   * @return true if the mission file is valid
+   */
   bool enableMission(cola2_msgs::String::Request&, cola2_msgs::String::Response&);
 
+  /**
+   * Calls a standard action or an empty service with name const std::string action_id and parameters
+   * const std::vector<std::string> parameters
+   * @param is_empty
+   * @param action_id
+   * @param parameters
+   */
   void callAction(const bool is_empty, const std::string action_id, const std::vector<std::string> parameters);
 
+  /**
+   * Executes a world waypoint maneuver defined in a mission.
+   * @param wp
+   * @return
+   */
   bool worldWaypoint(const MissionWaypoint wp);
 
+  /**
+   * Executes a world section maneuver defined in a mission
+   * @param sec
+   * @return
+   */
   bool worldSection(const MissionSection sec);
 
+  /**
+   * Executes park maneuver defined in a mission
+   * @param park
+   * @return
+   */
   bool park(const MissionPark park);
 
+  /**
+   * Defunes a timer to publish the captain status.
+   */
   void captainStatusTimer(const ros::TimerEvent&);
 
 public:
+  /**
+   * Class constructor.
+   */
   Captain();
 };
 
@@ -172,11 +282,11 @@ Captain::Captain()
   // delayed after configuration is loaded
   ROS_INFO_STREAM("Wait for pilot action libs ...");
   section_client_ = boost::shared_ptr<actionlib::SimpleActionClient<cola2_msgs::WorldSectionAction> >(
-      new actionlib::SimpleActionClient<cola2_msgs::WorldSectionAction>("world_section_req", true));
+      new actionlib::SimpleActionClient<cola2_msgs::WorldSectionAction>("pilot/world_section_req", true));
   section_client_->waitForServer();  // Wait for infinite time
 
   waypoint_client_ = boost::shared_ptr<actionlib::SimpleActionClient<cola2_msgs::WorldWaypointAction> >(
-      new actionlib::SimpleActionClient<cola2_msgs::WorldWaypointAction>("world_waypoint_req", true));
+      new actionlib::SimpleActionClient<cola2_msgs::WorldWaypointAction>("pilot/world_waypoint_req", true));
   waypoint_client_->waitForServer();  // Wait for infinite time
   ROS_INFO_STREAM("Done!");
 
