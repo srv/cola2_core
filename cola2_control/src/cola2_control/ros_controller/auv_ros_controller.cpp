@@ -9,6 +9,7 @@
 #include <cola2_control/ros_controller/auv_ros_controller_base.h>
 
 IAUVROSController::IAUVROSController(const std::string name, const std::string frame_id):
+  nh_("~"),
   name_(name),
   frame_id_(frame_id),
   diagnostic_(nh_, name, "soft"),
@@ -27,44 +28,43 @@ void IAUVROSController::initBase(std::shared_ptr<IAUVController> auv_controller_
   frequency_ = 1.0/period;
 
   // Publishers
-  pub_wrench_ = nh_.advertise<cola2_msgs::BodyForceReq>("/cola2_control/merged_body_force_req", 1);
-  pub_merged_pose_ = nh_.advertise<cola2_msgs::WorldWaypointReq>("/cola2_control/merged_world_waypoint_req", 1);
-  pub_merged_twist_ = nh_.advertise<cola2_msgs::BodyVelocityReq>("/cola2_control/merged_body_velocity_req", 1);
-  pub_thrusters_setpoint_ = nh_.advertise<cola2_msgs::Setpoints>("/cola2_control/thrusters_data", 1);
-  pub_fins_setpoint_ = nh_.advertise<cola2_msgs::Setpoints>("/cola2_control/fins_data", 1);
-  pub_thrusters_state_ = nh_.advertise<std_msgs::Bool>("/cola2_control/thrusters_enabled", 1);
+  pub_wrench_ = nh_.advertise<cola2_msgs::BodyForceReq>("merged_body_force_req", 1);
+  pub_merged_pose_ = nh_.advertise<cola2_msgs::WorldWaypointReq>("merged_world_waypoint_req", 1);
+  pub_merged_twist_ = nh_.advertise<cola2_msgs::BodyVelocityReq>("merged_body_velocity_req", 1);
+  pub_thrusters_setpoint_ = nh_.advertise<cola2_msgs::Setpoints>("thrusters_data", 1);
+  pub_fins_setpoint_ = nh_.advertise<cola2_msgs::Setpoints>("fins_data", 1);
 
   // Subscribers --> WARNING! The buffer should be at least the size of maximum Request send per iteration/kind
-  sub_nav_data_ = nh_.subscribe("/cola2_navigation/nav_sts", 2, &IAUVROSController::updateNav, this);
-  sub_ww_req_ = nh_.subscribe("/cola2_control/world_waypoint_req", 10, &IAUVROSController::updateWWR, this);
-  sub_bv_req_ = nh_.subscribe("/cola2_control/body_velocity_req", 10, &IAUVROSController::updateBVR, this);
-  sub_bf_req_ = nh_.subscribe("/cola2_control/body_force_req", 10, &IAUVROSController::updateBFR, this);
+  sub_nav_data_ = nh_.subscribe(cola2::rosutils::getNamespace() + "/navigator/navigation", 2, &IAUVROSController::updateNav, this);
+  sub_ww_req_ = nh_.subscribe("world_waypoint_req", 10, &IAUVROSController::updateWWR, this);
+  sub_bv_req_ = nh_.subscribe("body_velocity_req", 10, &IAUVROSController::updateBVR, this);
+  sub_bf_req_ = nh_.subscribe("body_force_req", 10, &IAUVROSController::updateBFR, this);
 
   _are_thrusters_killed = false;
 
   // Services
-  enable_pose_controller_srv_ = nh_.advertiseService("/cola2_control/enable_pose_controller",
+  enable_pose_controller_srv_ = nh_.advertiseService("enable_pose_controller",
                                                     &IAUVROSController::enablePoseController,
                                                     this);
-  disable_pose_controller_srv_ = nh_.advertiseService("/cola2_control/disable_pose_controller",
+  disable_pose_controller_srv_ = nh_.advertiseService("disable_pose_controller",
                                                      &IAUVROSController::disablePoseController,
                                                      this);
-  enable_velocity_controller_srv_ = nh_.advertiseService("/cola2_control/enable_velocity_controller",
+  enable_velocity_controller_srv_ = nh_.advertiseService("enable_velocity_controller",
                                                         &IAUVROSController::enableVelocityController,
                                                         this);
-  disable_velocity_controller_srv_ = nh_.advertiseService("/cola2_control/disable_velocity_controller",
+  disable_velocity_controller_srv_ = nh_.advertiseService("disable_velocity_controller",
                                                          &IAUVROSController::disableVelocityController,
                                                          this);
-  enable_thruster_allocator_srv_ = nh_.advertiseService("/cola2_control/enable_thrusters",
+  enable_thruster_allocator_srv_ = nh_.advertiseService("enable_thrusters",
                                                        &IAUVROSController::enableThrusterAllocator,
                                                        this);
-  disable_thruster_allocator_srv_ = nh_.advertiseService("/cola2_control/disable_thrusters",
+  disable_thruster_allocator_srv_ = nh_.advertiseService("disable_thrusters",
                                                         &IAUVROSController::disableThrusterAllocator,
                                                         this);
-  enable_fin_allocator_srv_ = nh_.advertiseService("/cola2_control/enable_fins",
+  enable_fin_allocator_srv_ = nh_.advertiseService("enable_fins",
                                                   &IAUVROSController::enableFinAllocator,
                                                   this);
-  disable_fin_allocator_srv_ = nh_.advertiseService("/cola2_control/disable_fins",
+  disable_fin_allocator_srv_ = nh_.advertiseService("disable_fins",
                                                    &IAUVROSController::disableFinAllocator,
                                                    this);
 
@@ -144,10 +144,6 @@ bool IAUVROSController::disableFinAllocator(std_srvs::Empty::Request &req, std_s
 
 void IAUVROSController::checkDiagnostics(const ros::TimerEvent& event)
 {
-  std_msgs::Bool thruster_enabled;
-  thruster_enabled.data = auv_controller_->isThrusterAllocatorEnable();
-  pub_thrusters_state_.publish(thruster_enabled);
-
   // for diagnostic purposes
   if (fabs(diagnostic_.getCurrentFreq() - frequency_) > 1.0)
   {

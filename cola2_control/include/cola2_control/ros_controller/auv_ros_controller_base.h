@@ -63,7 +63,6 @@ private:
   ros::Publisher pub_merged_twist_;
   ros::Publisher pub_thrusters_setpoint_;
   ros::Publisher pub_fins_setpoint_;
-  ros::Publisher pub_thrusters_state_;
 
   // Subscriber
   ros::Subscriber sub_nav_data_;
