@@ -81,18 +81,58 @@ private:
   } config_;
 
   // Methods
+  /**
+   * Callback to topic VEHICLE_NAMESPACE/navigator/navigation
+   */
   void navCallback(const cola2_msgs::NavSts&);
+
+  /**
+   * Callback for actionlib Section.
+   */
   void sectionServerCallback(const cola2_msgs::WorldSectionGoalConstPtr&);
+
+  /**
+   * Callback for actionlib Waypoint
+   */
   void waypointServerCallback(const cola2_msgs::WorldWaypointGoalConstPtr&);
+
+  /**
+   * Helper method to publis control commands: WorldWaypointReq and BodyForceReq
+   */
   void publishControlCommands(const control::State&, unsigned int);
+
+  /**
+   * Publish feedback for actionlibs.
+   */
   void publishFeedback(const control::Feedback&, unsigned int);
+
+  /**
+   * Publish an RViz marker to the direction that the AUV is going.
+   */
   void publishMarker(double, double, double);
+
+  /**
+   * Publishes a Section RViz marker.
+   */
   void publishMarkerSections(const control::PointsList);
+
+  /**
+   * Load parameters from ROS param server.
+   */
   void getConfig();
+
   //void setParams(cola2_control::PilotConfig&, uint32_t);
+
+  /**
+   * Publishes the waypoint that the AUV is going to as a geometry_msgs::PointStamped
+   * REDUNDANT WITH publishMarker??
+   */
   void publishGoal(const double, const double, const double);
 
 public:
+  /**
+   * Class constructor.
+   */
   Pilot();
 };
 
