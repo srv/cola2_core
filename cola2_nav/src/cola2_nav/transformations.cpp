@@ -37,7 +37,8 @@ Eigen::Quaterniond orientation(const Eigen::Quaterniond measured_orientation,
 {
   Eigen::Matrix3d orientation_data = measured_orientation.toRotationMatrix();
   Eigen::Matrix3d R = rotation_from_origen.toRotationMatrix();
-  Eigen::Matrix3d ret = orientation_data * R.inverse();
+  //  Eigen::Matrix3d ret = orientation_data * R.inverse(); // TODO: it was like this
+  Eigen::Matrix3d ret = R * orientation_data;
 
   return Eigen::Quaterniond(ret);
 }
