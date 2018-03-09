@@ -172,11 +172,11 @@ Captain::Captain()
   // delayed after configuration is loaded
   ROS_INFO_STREAM("Wait for pilot action libs ...");
   section_client_ = boost::shared_ptr<actionlib::SimpleActionClient<cola2_msgs::WorldSectionAction> >(
-      new actionlib::SimpleActionClient<cola2_msgs::WorldSectionAction>("world_section_req", true));
+      new actionlib::SimpleActionClient<cola2_msgs::WorldSectionAction>("pilot/world_section_req", true));
   section_client_->waitForServer();  // Wait for infinite time
 
   waypoint_client_ = boost::shared_ptr<actionlib::SimpleActionClient<cola2_msgs::WorldWaypointAction> >(
-      new actionlib::SimpleActionClient<cola2_msgs::WorldWaypointAction>("world_waypoint_req", true));
+      new actionlib::SimpleActionClient<cola2_msgs::WorldWaypointAction>("pilot/world_waypoint_req", true));
   waypoint_client_->waitForServer();  // Wait for infinite time
   ROS_INFO_STREAM("Done!");
 
