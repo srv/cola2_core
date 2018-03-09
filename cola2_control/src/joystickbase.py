@@ -83,7 +83,7 @@ class JoystickBase(object):
                          self.update_ack,
                          queue_size=4)
 
-        rospy.Subscriber("/joy",
+        rospy.Subscriber(namespace+"joy",
                          Joy,
                          self.update_joy,
                          queue_size=4)
