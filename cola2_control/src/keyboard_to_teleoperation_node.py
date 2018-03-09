@@ -6,7 +6,7 @@
 
 
 import rospy
-from joystickbase import JoystickBase
+from cola2_control.joystickbase import JoystickBase
 
 
 class KeyboardToTeleoperation(JoystickBase):

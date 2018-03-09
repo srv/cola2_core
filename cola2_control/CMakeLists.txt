@@ -34,6 +34,7 @@ find_package(catkin REQUIRED COMPONENTS
         cmake_modules
         cola2_lib
         cola2_msgs
+        rospy
         roscpp
         roslib
         sensor_msgs
