@@ -26,11 +26,11 @@ import tf
 # Import msgs
 from nav_msgs.msg import Odometry
 from cola2_msgs.msg import Setpoints
-from auv_msgs.msg import BodyForceReq
+from cola2_msgs.msg import BodyForceReq
 from gazebo_msgs.msg import ModelState
 
 # Import srv
-from cola2_msgs.srv import SimulatedCurrents
+from cola2_sim.srv import SimulatedCurrents
 
 # More imports
 import PyKDL
@@ -38,8 +38,8 @@ import math
 import numpy as np
 
 # Custom libs
-from cola2_lib import cola2_lib, cola2_ros_lib
-
+from cola2_lib.utils.angles import wrap_angle
+from cola2_lib.rosutils.param_loader import get_ros_params
 
 class Dynamics :
     """ Simulates the dynamics of an AUV from thrusters rpm and fins angles """
@@ -58,16 +58,12 @@ class Dynamics :
         self.initialize()
 
         # Create publisher
-        self.pub_odom = rospy.Publisher(self.odom_topic_name,
-                                        Odometry,
-                                        queue_size = 2)
+        self.pub_odom = rospy.Publisher("odometry", Odometry, queue_size = 2)
 
-        self.pub_odom_gazebo = rospy.Publisher('/gazebo/set_model_state',
-                                               ModelState,
-                                               queue_size=2)
+        self.pub_odom_gazebo = rospy.Publisher('/gazebo/set_model_state', ModelState, queue_size=2)
 
         # Create subscribers
-        rospy.Subscriber(self.thrusters_topic,
+        rospy.Subscriber(NAMESPACE + "/controller/thrusters_setpoint",
                          Setpoints,
                          self.update_thrusters,
                          queue_size = 1)
