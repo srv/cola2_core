@@ -47,7 +47,7 @@ void EKFPositionVelocityLandmarks::computePredictionMatrices(const double dt)
   // The noise in the system is a term added to the acceleration:
   // e.g. x[0] = x1 + cos(pitch)*cos(yaw)*(vx1*t +  Eax) *t^2/2)-..
   // then, dEax/dt of x[0] = cos(pitch)*cos(yaw)*t^2/2
-  W_ = Eigen::MatrixXd::Zero(size, Q_.size());
+  W_ = Eigen::MatrixXd::Zero(size, Q_.rows());
   W_(0, 0) = +cp * cy * dt2;
   W_(0, 1) = -cr * sy * dt2 + sr * sp * cy * dt2;
   W_(0, 2) = +sr * sy * dt2 + cr * sp * cy * dt2;
@@ -204,7 +204,7 @@ bool EKFPositionVelocityLandmarks::updateOrientationRate(const double t, const E
   return true;
 }
 
-bool EKFPositionVelocityLandmarks::updateLandmarkMeasure(const double t, const Eigen::Vector3d& pose_xyz,
+bool EKFPositionVelocityLandmarks::updateLandmarkMeasure(const double, const Eigen::Vector3d& pose_xyz,
                                                          const Eigen::Vector3d& rpy, const std::string& id,
                                                          const Eigen::Matrix6d& cov)
 {

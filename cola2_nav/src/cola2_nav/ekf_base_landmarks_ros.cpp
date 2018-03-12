@@ -99,7 +99,7 @@ void EKFBaseLandmarksROS::resetFilter()
   {
     p_var(static_cast<unsigned int>(i)) = config_.initial_state_covariance_[i];
   }
-  P_ = Eigen::MatrixXd::Identity(p_var.size(), p_var.size());
+  P_ = Eigen::MatrixXd::Identity(p_var.rows(), p_var.rows());
   P_.diagonal() = p_var;
   // Reset prediction noise
   Eigen::VectorXd q_var = Eigen::VectorXd::Zero(static_cast<unsigned int>(config_.prediction_model_covariance_.size()));
@@ -107,7 +107,7 @@ void EKFBaseLandmarksROS::resetFilter()
   {
     q_var(static_cast<unsigned int>(i)) = config_.prediction_model_covariance_[i];
   }
-  Q_ = Eigen::MatrixXd::Identity(q_var.size(), q_var.size());
+  Q_ = Eigen::MatrixXd::Identity(q_var.rows(), q_var.rows());
   Q_.diagonal() = q_var;
 
   // Reset NED without GPS
@@ -1002,16 +1002,14 @@ void EKFBaseLandmarksROS::publishRangeMarker(const std::string& landmark_id, con
 // *****************************************
 // Services
 // *****************************************
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-parameter"
-bool EKFBaseLandmarksROS::srvResetLandmarks(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res)
+bool EKFBaseLandmarksROS::srvResetLandmarks(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
   ROS_INFO("Reset landmarks service called");
   resetLandmarks();
   return true;
 }
 
-bool EKFBaseLandmarksROS::srvResetNavigation(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res)
+bool EKFBaseLandmarksROS::srvResetNavigation(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
   ROS_INFO("Reset navigation service called");
   getConfig();
@@ -1019,11 +1017,10 @@ bool EKFBaseLandmarksROS::srvResetNavigation(std_srvs::Empty::Request& req, std_
   return true;
 }
 
-bool EKFBaseLandmarksROS::srvSetDepthSensorOffset(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res)
+bool EKFBaseLandmarksROS::srvSetDepthSensorOffset(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
   ROS_INFO("Set depth sensor offset service called");
   config_.depth_sensor_offset_ = config_.surface2depth_sensor_distance_ - pressure_meters_;
   ROS_INFO("New depth sensor offset at %.3f", config_.depth_sensor_offset_);
   return true;
 }
-#pragma clang diagnostic pop
