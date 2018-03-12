@@ -320,7 +320,7 @@ Captain::Captain()
   spinner_.spin();
 }
 
-void Captain::captainStatusTimer(const ros::TimerEvent& event)
+void Captain::captainStatusTimer(const ros::TimerEvent&)
 {
   captain_status_.mission_active = is_mission_running_;
   pub_captain_status_.publish(captain_status_);
@@ -608,7 +608,7 @@ bool Captain::enableDefaultMissionNonBlock(std_srvs::Empty::Request&, std_srvs::
   cola2_msgs::String::Request req;
   cola2_msgs::String::Response res;
   req.request = "last_mission.xml";
-  t = new boost::thread(&Captain::enableMission, this, req, res);
+  t = new boost::thread(&Captain::enableMission, this, req, res);  // TODO: check this!
   return true;
 }
 
@@ -772,7 +772,7 @@ nav_msgs::Path Captain::createPathFromMission(Mission mission)
   return path;
 }
 
-bool Captain::pauseMission(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res)
+bool Captain::pauseMission(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
   waypoint_client_->cancelGoal();
   section_client_->cancelGoal();
@@ -780,13 +780,13 @@ bool Captain::pauseMission(std_srvs::Empty::Request& req, std_srvs::Empty::Respo
   return true;
 }
 
-bool Captain::resumeMission(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res)
+bool Captain::resumeMission(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
   is_mission_paused_ = false;
   return true;
 }
 
-bool Captain::enableMission(cola2_msgs::String::Request& req, cola2_msgs::String::Response& res)
+bool Captain::enableMission(cola2_msgs::String::Request& req, cola2_msgs::String::Response&)
 {
   if (checkNoRequestRunning())
   {
@@ -1058,7 +1058,7 @@ bool Captain::park(const MissionPark park)
   return false;
 }
 
-bool Captain::enableExternalMission(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res)
+bool Captain::enableExternalMission(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
   // The only way to know if the mission is controlled by an external process is checking the total_steps
   // Add extra information in captainStatus msg?
@@ -1073,7 +1073,7 @@ bool Captain::enableExternalMission(std_srvs::Empty::Request& req, std_srvs::Emp
   return true;
 }
 
-bool Captain::disableExternalMission(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res)
+bool Captain::disableExternalMission(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
   ROS_INFO_STREAM("disable_external_mission service called.");
   if (captain_status_.mission_active && captain_status_.total_steps == -1)

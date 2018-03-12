@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(cola2_control)
 
-add_compile_options(-std=c++11)
+add_compile_options(-std=c++11 -Wall -Wextra)
 
 file(GLOB_RECURSE EXTRA_FILES src/*)
 file(GLOB_RECURSE EXTRA_INCLUDES include/${PROJECT_NAME}/*)

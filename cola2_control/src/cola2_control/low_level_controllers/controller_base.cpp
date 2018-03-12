@@ -16,12 +16,12 @@ void IController::reset()
 {
 }
 
-double IController::compute(double time_in_sec, double setpoint, double feedback)
+double IController::compute(double, double , double)
 {
   return 0.0;
 }
 
-bool IController::setParameters(std::map<std::string, double> params)
+bool IController::setParameters(std::map<std::string, double>)
 {
   return false;
 }
