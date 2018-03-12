@@ -33,7 +33,7 @@ class Keyboard
 {
 private:
   // Node handle
-  ros::NodeHandle n_;
+  ros::NodeHandle nh_;
 
   // Number of buttons
   int NBUTTONS_;
@@ -63,13 +63,13 @@ public:
 
     // Publishers
 
-    pub_ = n_.advertise<sensor_msgs::Joy>("/keyboard", 1);
+    pub_ = nh_.advertise<sensor_msgs::Joy>("joy", 1);
 
     // Init thread
     shutdownThread_ = false;
     reading_thread_ = boost::shared_ptr<boost::thread>(new boost::thread(&Keyboard::readKeyboardHits, this));
 
-    ROS_INFO("/keyboard: initialized");
+    ROS_INFO("keyboard node: initialized");
   }
 
   int getChar()
@@ -240,7 +240,7 @@ public:
       }
       else
       {
-        ROS_INFO("/keyboard: keycode is: %d. Ignored Key.", key);
+        ROS_INFO("keyboard node: keycode is: %d. Ignored Key.", key);
         continue;
       }
 
