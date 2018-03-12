@@ -31,6 +31,7 @@ public:
   friend std::ostream& operator<<(std::ostream& stream, const MissionTolerance& tol)
   {
     stream << "[" << tol.getX() << ", " << tol.getY() << ", " << tol.getZ() << "]";
+    return stream;
   }
 
   double getX() const;

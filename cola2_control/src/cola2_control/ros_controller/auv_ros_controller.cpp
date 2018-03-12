@@ -10,7 +10,7 @@
 
 IAUVROSController::IAUVROSController(const std::string name, const std::string frame_id):
   nh_("~"),
-  name_(name),
+  name_(name),  // TODO: remove this
   frame_id_(frame_id),
   diagnostic_(nh_, name, "soft"),
   last_altitude_(0.5),
@@ -73,35 +73,35 @@ void IAUVROSController::initBase(std::shared_ptr<IAUVController> auv_controller_
   check_diagnostics_ = nh_.createTimer(ros::Duration(1.0), &IAUVROSController::checkDiagnostics, this);
 }
 
-bool IAUVROSController::enablePoseController(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
+bool IAUVROSController::enablePoseController(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
   std::cout << "[Controller] Enable pose controller\n";
   auv_controller_->setPoseController(true);
   return true;
 }
 
-bool IAUVROSController::disablePoseController(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
+bool IAUVROSController::disablePoseController(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
   std::cout << "[Controller] Disable pose controller\n";
   auv_controller_->setPoseController(false);
   return true;
 }
 
-bool IAUVROSController::enableVelocityController(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
+bool IAUVROSController::enableVelocityController(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
   std::cout << "[Controller] Enable velocity controller\n";
   auv_controller_->setVelocityController(true);
   return true;
 }
 
-bool IAUVROSController::disableVelocityController(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
+bool IAUVROSController::disableVelocityController(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
   std::cout << "[Controller] Disable velocity controller\n";
   auv_controller_->setVelocityController(false);
   return true;
 }
 
-bool IAUVROSController::enableThrusterAllocator(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
+bool IAUVROSController::enableThrusterAllocator(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
   std::cout << "[Controller] Enable thruster allocator";
   auv_controller_->setThrusterAllocator(true);
@@ -110,7 +110,7 @@ bool IAUVROSController::enableThrusterAllocator(std_srvs::Empty::Request &req, s
   return true;
 }
 
-bool IAUVROSController::disableThrusterAllocator(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
+bool IAUVROSController::disableThrusterAllocator(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
   std::cout << "[Controller] Disable thruster allocator";
 
@@ -128,21 +128,21 @@ bool IAUVROSController::disableThrusterAllocator(std_srvs::Empty::Request &req, 
   return true;
 }
 
-bool IAUVROSController::enableFinAllocator(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
+bool IAUVROSController::enableFinAllocator(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
   std::cout << "[Controller] Enable fin allocator";
   auv_controller_->setFinAllocator(true);
   return true;
 }
 
-bool IAUVROSController::disableFinAllocator(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
+bool IAUVROSController::disableFinAllocator(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
   std::cout << "[Controller] Disable fin allocator";
   auv_controller_->setFinAllocator(false);
   return true;
 }
 
-void IAUVROSController::checkDiagnostics(const ros::TimerEvent& event)
+void IAUVROSController::checkDiagnostics(const ros::TimerEvent&)
 {
   // for diagnostic purposes
   if (fabs(diagnostic_.getCurrentFreq() - frequency_) > 1.0)
@@ -175,7 +175,7 @@ void IAUVROSController::checkDiagnostics(const ros::TimerEvent& event)
   diagnostic_.add("thruster_allocator_enabled", auv_controller_->isThrusterAllocatorEnable());
 }
 
-void IAUVROSController::timerCallback(const ros::TimerEvent& event)
+void IAUVROSController::timerCallback(const ros::TimerEvent&)
 {
   // Get current time
   ros::Time now = ros::Time::now();

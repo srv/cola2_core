@@ -91,8 +91,8 @@ void EKFBaseLandmarks::addLandmark(const Eigen::VectorXd& landmark, const Eigen:
   number_of_landmarks_++;
 
   // Increase P matrix
-  Eigen::MatrixXd P = Eigen::MatrixXd::Zero(x_.size() + LANDMARK_SIZE, x_.size() + LANDMARK_SIZE);
-  P.block(0, 0, x_.size(), x_.size()) = P_;
+  Eigen::MatrixXd P = Eigen::MatrixXd::Zero(x_.rows() + LANDMARK_SIZE, x_.rows() + LANDMARK_SIZE);
+  P.block(0, 0, x_.rows(), x_.rows()) = P_;
   // Correlations landmark position and vehicle position
   P.block(position, 0, 3, 3) = getPositionUncertainty();
   P.block(0, position, 3, 3) = getPositionUncertainty();
@@ -107,8 +107,8 @@ void EKFBaseLandmarks::addLandmark(const Eigen::VectorXd& landmark, const Eigen:
   P_ = P;  // overwrite
 
   // Increase state vector
-  Eigen::VectorXd x = Eigen::VectorXd::Zero(x_.size() + LANDMARK_SIZE);
-  x.head(x_.size()) = x_;
+  Eigen::VectorXd x = Eigen::VectorXd::Zero(x_.rows() + LANDMARK_SIZE);
+  x.head(x_.rows()) = x_;
   x.tail(LANDMARK_SIZE) = landmark;
   // Show
   std::cout << "Old x: " << x_.transpose() << '\n';

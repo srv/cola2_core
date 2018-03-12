@@ -29,6 +29,7 @@ public:
   friend std::ostream& operator<<(std::ostream& stream, const MissionConfiguration& conf)
   {
     stream << "configuration -> " << conf.getKey() << ": " << conf.getValue();
+    return stream;
   }
 
   std::string  getKey() const;

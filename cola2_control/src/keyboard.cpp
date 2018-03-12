@@ -270,10 +270,8 @@ public:
   }
 };
 
-void keyboardStopHandler(int sig)
+void keyboardStopHandler(int)
 {
-  // Stop handler changes flag
-
   keyboard_requested_shutdown = 1;
 }
 

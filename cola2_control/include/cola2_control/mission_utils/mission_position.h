@@ -36,6 +36,7 @@ public:
       stream << " (altitude)]";
     else
       stream << " (depth)]";
+    return stream;
   }
 
   double getLatitude() const;

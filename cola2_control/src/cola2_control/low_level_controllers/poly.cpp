@@ -16,7 +16,7 @@ void Poly::reset()
 {
 }
 
-double Poly::compute(double time_in_sec, double setpoint, double feedback)
+double Poly::compute(double, double setpoint, double)
 {
   double tau = 0.0;
   bool negative_setpoint = false;

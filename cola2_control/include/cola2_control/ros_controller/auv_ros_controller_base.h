@@ -42,6 +42,9 @@ private:
 
   void publishMergedWrench(const Request response, const ros::Time now);
 
+  // Node handle
+  ros::NodeHandle nh_;
+
   // Name
   std::string name_;
 
@@ -50,9 +53,6 @@ private:
 
   // Controller frequency
   double frequency_;
-
-  // Node handle
-  ros::NodeHandle nh_;
 
   // Diagnostics
   cola2::rosutils::DiagnosticHelper diagnostic_;

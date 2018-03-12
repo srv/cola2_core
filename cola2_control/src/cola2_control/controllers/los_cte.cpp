@@ -72,20 +72,12 @@ void LosCteController::compute(const control::State& current_state, const contro
   double s = (current_state.pose.position.north - section.initial_position.x) * cbeta +
              (current_state.pose.position.east - section.initial_position.y) * sbeta;
 
-  double e = -(current_state.pose.position.north - section.initial_position.x) * sbeta +
-             (current_state.pose.position.east - section.initial_position.y) * cbeta;
+  // double e = -(current_state.pose.position.north - section.initial_position.x) * sbeta +
+  //            (current_state.pose.position.east - section.initial_position.y) * cbeta;
 
   // Orthogonal projection
   double x_proj = section.initial_position.x + (s + config_.delta) * cbeta;
   double y_proj = section.initial_position.y + (s + config_.delta) * sbeta;
-
-  // Compute lookahead distance (los_delta). It is always positive
-  double delta = 0.0;
-  if (config_.distance_to_max_velocity > abs(e))
-    delta = sqrt(pow(config_.distance_to_max_velocity, 2.0) - pow(e, 2.0));
-
-  if (config_.distance_to_max_velocity > dist_final)
-    delta = sqrt(pow(section.final_position.x - x_proj, 2.0) + pow(section.final_position.y - y_proj, 2.0));
 
   // Compute LOS vector
   double LOSX;
@@ -114,26 +106,6 @@ void LosCteController::compute(const control::State& current_state, const contro
   }
 
   // Compute yaw
-  double beta_low_speed = 0.25;
-  double beta_high_speed = 0.5;
-  // self.parameters.sparus_los.sway_correction is true was defined in old param list
-  bool sway_correction = true;  // TODO
-  double beta_factor;
-  if (sway_correction)
-  {
-    if (current_state.velocity.linear.x > beta_high_speed)
-      beta_factor = 1.0;
-    else if (current_state.velocity.linear.x < beta_low_speed)
-      beta_factor = 0.0;
-    else
-      beta_factor = (current_state.velocity.linear.x - beta_low_speed) / (beta_high_speed - beta_low_speed);
-  }
-  else
-    beta_factor = 0.0;
-
-  // double beta = atan2(current_state.velocity.linear.y, current_state.velocity.linear.x);
-
-  // desired_yaw = cola2::util::normalizeAngle(alpha + atan2(-e, config_.delta) - beta); //TODO
   desired_yaw = cola2::utils::wrapAngle(atan2(LOSY, LOSX));
 
   // define current z according to altitude_mode
