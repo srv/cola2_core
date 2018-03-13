@@ -917,7 +917,7 @@ void EKFBaseLandmarksROS::publishGPSNED(const ros::Time& stamp, const Eigen::Vec
   msg.header.frame_id = frame_world_;
   msg.pose.position.x = ned(0);
   msg.pose.position.y = ned(1);
-  msg.pose.position.z = ned(2);
+  msg.pose.position.z = 0.0;
   msg.pose.orientation.x = 0.0;  // pointing upwards
   msg.pose.orientation.y = 0.70710678;
   msg.pose.orientation.z = 0.0;
