@@ -3,295 +3,122 @@ project(cola2_control)
 
 add_compile_options(-std=c++11 -Wall -Wextra)
 
+# QtCreator add all files
 file(GLOB_RECURSE EXTRA_FILES src/*)
 file(GLOB_RECURSE EXTRA_INCLUDES include/${PROJECT_NAME}/*)
 add_custom_target(${PROJECT_NAME}_OTHER_FILES ALL WORKING_DIRECTORY ${PROJECT_SOURCE_DIR} SOURCES ${EXTRA_FILES} ${EXTRA_INCLUDES})
 
-
-## Find catkin macros and libraries
-## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
-## is used, also find other catkin packages
-#find_package(catkin REQUIRED COMPONENTS
-#  cmake_modules
-#  cola2_lib
-#  actionlib
-#  actionlib_msgs
-#  cola2_msgs
-#  diagnostic_msgs
-#  dynamic_reconfigure
-#  roscpp
-#  rosparam
-#  rospy
-#  sensor_msgs
-#  std_msgs
-#  std_srvs
-#  tf
-#  visualization_msgs
-#)
-
 find_package(catkin REQUIRED COMPONENTS
-        actionlib
-        cmake_modules
-        cola2_lib
-        cola2_msgs
-        rospy
-        roscpp
-        roslib
-        sensor_msgs
-        std_msgs
-        )
+  # ROS Dependencies
+  cmake_modules
+  roscpp
+  rosparam
+  rospy
+  roslib
+  tf
+  std_msgs
+  std_srvs
+  sensor_msgs
+  geometry_msgs
+  visualization_msgs
+  diagnostic_msgs
+  actionlib
+  dynamic_reconfigure
 
-## System dependencies are found with CMake's conventions
-# find_package(Boost REQUIRED COMPONENTS system)
+  # COLA2 Dependencies
+  cola2_lib
+  cola2_msgs
+)
 
+# System dependencies
 find_package(TinyXML REQUIRED)
 find_package(Boost REQUIRED)
 
-
-## Uncomment this if the package has a setup.py. This macro ensures
-## modules and global scripts declared therein get installed
-## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
+# This package has a setup.py. This macro ensures modules and global scripts
+# declared therein get installed
 catkin_python_setup()
 
-################################################
-## Declare ROS messages, services and actions ##
-################################################
-
-## To declare and build messages, services or actions from within this
-## package, follow these steps:
-## * Let MSG_DEP_SET be the set of packages whose message types you use in
-##   your messages/services/actions (e.g. std_msgs, actionlib_msgs, ...).
-## * In the file package.xml:
-##   * add a build_depend tag for "message_generation"
-##   * add a build_depend and a run_depend tag for each package in MSG_DEP_SET
-##   * If MSG_DEP_SET isn't empty the following dependency has been pulled in
-##     but can be declared for certainty nonetheless:
-##     * add a run_depend tag for "message_runtime"
-## * In this file (CMakeLists.txt):
-##   * add "message_generation" and every package in MSG_DEP_SET to
-##     find_package(catkin REQUIRED COMPONENTS ...)
-##   * add "message_runtime" and every package in MSG_DEP_SET to
-##     catkin_package(CATKIN_DEPENDS ...)
-##   * uncomment the add_*_files sections below as needed
-##     and list every .msg/.srv/.action file to be processed
-##   * uncomment the generate_messages entry below
-##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
-
-## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
-
-## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
-
-## Generate actions in the 'action' folder
-# add_action_files(
-#   FILES
-#   Action1.action
-#   Action2.action
-# )
-
-## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   auv_msgs#   cola2_msgs#   diagnostic_msgs#   sensor_msgs#   std_msgs#   visualization_msgs
-# )
-
-################################################
-## Declare ROS dynamic reconfigure parameters ##
-################################################
-
-## To declare and build dynamic reconfigure parameters within this
-## package, follow these steps:
-## * In the file package.xml:
-##   * add a build_depend and a run_depend tag for "dynamic_reconfigure"
-## * In this file (CMakeLists.txt):
-##   * add "dynamic_reconfigure" to
-##     find_package(catkin REQUIRED COMPONENTS ...)
-##   * uncomment the "generate_dynamic_reconfigure_options" section below
-##     and list every .cfg file to be processed
-
-## Generate dynamic reconfigure parameters in the 'cfg' folder
-#generate_dynamic_reconfigure_options(
-#  cfg/Pilot.cfg
-#)
-
-###################################
-## catkin specific configuration ##
-###################################
-## The catkin_package macro generates cmake config files for your package
-## Declare things to be passed to dependent projects
-## INCLUDE_DIRS: uncomment this if you package contains header files
-## LIBRARIES: libraries you create in this project that dependent projects also need
-## CATKIN_DEPENDS: catkin_packages dependent projects also need
-## DEPENDS: system dependencies of this project that dependent projects also need
-#catkin_package(
-#        INCLUDE_DIRS include
-#        LIBRARIES cola2_control
-#        CATKIN_DEPENDS
-#        cola2_msgs
-#        diagnostic_msgs
-#        geometry_msgs
-#        nav_msgs
-#        roscpp
-#        sensor_msgs
-#        std_msgs
-#        std_srvs
-#        tf
-#        tf_conversions
-#        visualization_msgs
-#        # DEPENDS Eigen3
-#)
-
+# Declare things to be passed to dependent projects
 catkin_package(
-        INCLUDE_DIRS include
-        LIBRARIES controllers mission_utils low_level_controllers ros_control_base
-        CATKIN_DEPENDS actionlib cola2_lib cola2_msgs roscpp roslib sensor_msgs std_msgs
-        DEPENDS TinyXML Boost
+  INCLUDE_DIRS include
+  LIBRARIES controllers mission_utils low_level_controllers ros_control_base
+  # TODO: go and check what is in the headers
+  CATKIN_DEPENDS roscpp
+                 roslib
+                 std_msgs
+                 sensor_msgs
+                 actionlib
+                 cola2_lib
+                 cola2_msgs
+  DEPENDS TinyXML Boost
 )
-###########
-## Build ##
-###########
-# Boost thread
-#SET(BOOST_THREAD -lboost_thread)
 
-# TinyXML
-# SET(LIBS_TINYXML -ltinyxml)
-
-## Specify additional locations of header files
-## Your package locations should be listed before other locations
-# include_directories(include)
+# Specify locations of header files. Your package locations should be listed
+# before other locations
 include_directories(
-        include
-        ${catkin_INCLUDE_DIRS}
+  include
+  ${catkin_INCLUDE_DIRS}
 )
 
-## Declare a C++ library
+# Declare C++ libraries
 add_library(controllers SHARED
-        src/${PROJECT_NAME}/controllers/anchor.cpp
-        src/${PROJECT_NAME}/controllers/goto.cpp
-        src/${PROJECT_NAME}/controllers/holonomic_goto.cpp
-        src/${PROJECT_NAME}/controllers/los_cte.cpp)
+  src/${PROJECT_NAME}/controllers/anchor.cpp
+  src/${PROJECT_NAME}/controllers/goto.cpp
+  src/${PROJECT_NAME}/controllers/holonomic_goto.cpp
+  src/${PROJECT_NAME}/controllers/los_cte.cpp
+)
 target_link_libraries(controllers ${catkin_LIBRARIES})
+add_dependencies(controllers ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 add_library(mission_utils SHARED
-        src/${PROJECT_NAME}/mission_utils/mission_maneuver.cpp
-        src/${PROJECT_NAME}/mission_utils/mission_position.cpp
-        src/${PROJECT_NAME}/mission_utils/mission_tolerance.cpp
-        src/${PROJECT_NAME}/mission_utils/mission_waypoint.cpp
-        src/${PROJECT_NAME}/mission_utils/mission_section.cpp
-        src/${PROJECT_NAME}/mission_utils/mission_park.cpp
-        src/${PROJECT_NAME}/mission_utils/mission_configuration.cpp
-        src/${PROJECT_NAME}/mission_utils/mission_action.cpp
-        src/${PROJECT_NAME}/mission_utils/mission_step.cpp
-        src/${PROJECT_NAME}/mission_utils/mission.cpp
-        )
+  src/${PROJECT_NAME}/mission_utils/mission_maneuver.cpp
+  src/${PROJECT_NAME}/mission_utils/mission_position.cpp
+  src/${PROJECT_NAME}/mission_utils/mission_tolerance.cpp
+  src/${PROJECT_NAME}/mission_utils/mission_waypoint.cpp
+  src/${PROJECT_NAME}/mission_utils/mission_section.cpp
+  src/${PROJECT_NAME}/mission_utils/mission_park.cpp
+  src/${PROJECT_NAME}/mission_utils/mission_configuration.cpp
+  src/${PROJECT_NAME}/mission_utils/mission_action.cpp
+  src/${PROJECT_NAME}/mission_utils/mission_step.cpp
+  src/${PROJECT_NAME}/mission_utils/mission.cpp
+)
 target_link_libraries(mission_utils ${TinyXML_LIBRARIES})
+add_dependencies(mission_utils ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 add_library(low_level_controllers SHARED
-        src/${PROJECT_NAME}/low_level_controllers/auv_controller_base.cpp
-        src/${PROJECT_NAME}/low_level_controllers/controller_base.cpp
-        src/${PROJECT_NAME}/low_level_controllers/merge.cpp
-        src/${PROJECT_NAME}/low_level_controllers/ndof_controller.cpp
-        src/${PROJECT_NAME}/low_level_controllers/pid.cpp
-        src/${PROJECT_NAME}/low_level_controllers/poly.cpp
-        src/${PROJECT_NAME}/low_level_controllers/request.cpp
-        )
+  src/${PROJECT_NAME}/low_level_controllers/auv_controller_base.cpp
+  src/${PROJECT_NAME}/low_level_controllers/controller_base.cpp
+  src/${PROJECT_NAME}/low_level_controllers/merge.cpp
+  src/${PROJECT_NAME}/low_level_controllers/ndof_controller.cpp
+  src/${PROJECT_NAME}/low_level_controllers/pid.cpp
+  src/${PROJECT_NAME}/low_level_controllers/poly.cpp
+  src/${PROJECT_NAME}/low_level_controllers/request.cpp
+)
 target_link_libraries(low_level_controllers ${catkin_LIBRARIES})
+add_dependencies(low_level_controllers ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 add_library(ros_control_base SHARED
-        src/${PROJECT_NAME}/ros_controller/auv_ros_controller.cpp
-        )
+  src/${PROJECT_NAME}/ros_controller/auv_ros_controller.cpp
+)
 target_link_libraries(ros_control_base ${catkin_LIBRARIES})
+add_dependencies(ros_control_base ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-## Add cmake target dependencies of the library
-## as an example, code may need to be generated before libraries
-## either from message generation or dynamic reconfigure
-# add_dependencies(cola2_control ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-## Declare a C++ executable
-# add_executable(cola2_control_node src/cola2_control_node.cpp)
-
-## Add cmake target dependencies of the executable
-## same as for the library above
-# add_dependencies(cola2_control_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-## Specify libraries to link a library or executable target against
-# target_link_libraries(cola2_control_node
-#   ${catkin_LIBRARIES}
-# )
-
-#add_executable(test_mission_utils src/test_mission_utils.cpp)
-#target_link_libraries(test_mission_utils ${catkin_LIBRARIES} mission_utils controllers)
-
-# add_dependencies(test cola2_msgs_gencpp)
-
+# Add executables
 add_executable(keyboard src/keyboard.cpp)
-target_link_libraries(keyboard ${catkin_LIBRARIES})
-#add_dependencies(keyboard cola2_msgs_gencpp)
-#
+target_link_libraries(keyboard ${catkin_LIBRARIES} ${Boost_LIBRARIES})
+add_dependencies(keyboard ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 add_executable(pilot src/pilot_node.cpp)
-target_link_libraries(pilot ${catkin_LIBRARIES} controllers)
-add_dependencies(pilot cola2_msgs_gencpp) # ${PROJECT_NAME}_gencfg
+target_link_libraries(pilot ${catkin_LIBRARIES} ${Boost_LIBRARIES} controllers)
+add_dependencies(pilot ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-#include_directories(${Boost_INCLUDE_DIRS})
 add_executable(captain src/captain_node.cpp)
 target_link_libraries(captain ${catkin_LIBRARIES} ${Boost_LIBRARIES} mission_utils)
-add_dependencies(captain cola2_msgs_gencpp)
-#endif()
+add_dependencies(captain ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-#############
-## Install ##
-#############
-
-# all install targets should use catkin DESTINATION variables
-# See http://ros.org/doc/api/catkin/html/adv_user_guide/variables.html
-
-## Mark executable scripts (Python etc.) for installation
-## in contrast to setup.py, you can choose the destination
- install(PROGRAMS
-   src/cola2_control/joystickbase.py
-   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
- )
-
-## Mark executables and/or libraries for installation
-# install(TARGETS cola2_control cola2_control_node
-#   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
-
-## Mark cpp header files for installation
-# install(DIRECTORY include/${PROJECT_NAME}/
-#   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-#   FILES_MATCHING PATTERN "*.h"
-#   PATTERN ".svn" EXCLUDE
-# )
-
-## Mark other files for installation (e.g. launch and bag files, etc.)
-# install(FILES
-#   # myfile1
-#   # myfile2
-#   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-# )
-
-#############
-## Testing ##
-#############
-
-## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_cola2_control.cpp)
-# if(TARGET ${PROJECT_NAME}-test)
-#   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
-# endif()
-
-## Add folders to be run by python nosetests
-# catkin_add_nosetests(test)
+# Mark executable scripts (Python etc.) for installation. In contrast to
+# setup.py, you can choose the destination
+install(PROGRAMS
+  src/${PROJECT_NAME}/joystickbase.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
