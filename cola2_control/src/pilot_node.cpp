@@ -429,7 +429,7 @@ void Pilot::publishControlCommands(const control::State& controller_output, cons
 
   // Create ROS msgs for wwr
   cola2_msgs::WorldWaypointReq wwr;
-  wwr.header.frame_id = cola2::rosutils::getNamespace() + "/base_link";
+  wwr.header.frame_id = "/ned";
   wwr.header.stamp = now;
   wwr.goal.priority = priority;
   wwr.goal.requester = ros::this_node::getName() + "_pose_req";

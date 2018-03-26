@@ -42,7 +42,6 @@ class Teleoperation(object):
         """ Constructor """
         self.name = name
         self.last_map_ack = 0.0
-        self.robot_name = ''
 
         namespace = rospy.get_namespace()
 
@@ -164,6 +163,7 @@ class Teleoperation(object):
                 body_velocity_req.disable_axis.pitch = True
                 body_velocity_req.disable_axis.yaw = True
                 body_velocity_req.header.stamp = rospy.Time().now()
+                body_velocity_req.header.frame_id = rospy.get_namespace() + "/base_link"
                 self.pub_body_velocity_req.publish(body_velocity_req)
 
                 world_waypoint_req = WorldWaypointReq()
@@ -176,6 +176,7 @@ class Teleoperation(object):
                 world_waypoint_req.disable_axis.pitch = True
                 world_waypoint_req.disable_axis.yaw = True
                 world_waypoint_req.header.stamp = rospy.Time().now()
+                world_waypoint_req.header.frame_id = "/ned"
                 self.pub_world_waypoint_req.publish(world_waypoint_req)
         else:
             rospy.loginfo("%s: waiting for map ack...", self.name)
@@ -238,6 +239,8 @@ class Teleoperation(object):
             world_waypoint_req.disable_axis.pitch = not self.pose_controlled_axis[4]
             world_waypoint_req.disable_axis.yaw = not self.pose_controlled_axis[5]
             world_waypoint_req.header.stamp = rospy.Time().now()
+            world_waypoint_req.header.frame_id = "/ned"
+
             # if not world_waypoint_req.disable_axis.pitch:
             #    rospy.logfatal("%s: PITCH IS NOT DISABLED!", self.name)
             #    world_waypoint_req.disable_axis.pitch = True
@@ -299,6 +302,7 @@ class Teleoperation(object):
 
             # Publish message
             body_velocity_req.header.stamp = rospy.Time().now()
+            body_velocity_req.header.frame_id = rospy.get_namespace() + "/base_link"
             self.pub_body_velocity_req.publish(body_velocity_req)
 
     def get_config(self):
@@ -316,9 +320,7 @@ class Teleoperation(object):
                       'base_pose': ('base_pose',
                                     [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
                       'actualize_base_pose': ('actualize_base_pose',
-                                              True),
-                      'robot_name': (rospy.get_namespace()+'navigator/robot_frame_id',
-                                     rospy.get_namespace())}
+                                              True)}
 
         param_loader.get_ros_params(self, param_dict)
 

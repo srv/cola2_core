@@ -65,7 +65,7 @@ class ComputerLogger(object):
             ram_usage = psutil.virtual_memory().percent
 
             self.diagnostic.add("cpu_temperature", str(max_core_temp))
-            self.diagnostic.setLevel(DiagnosticStatus.OK)
+            self.diagnostic.set_level(DiagnosticStatus.OK)
 
             msg = Temperature()
             msg.header.stamp = rospy.Time.now()

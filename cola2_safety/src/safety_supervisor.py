@@ -244,7 +244,7 @@ class SafetySupervisor(object):
             for t in range(0, len(temperatures)):
                 if temperatures[t] > self.max_temperatures_values[t]:
                     self.error_code[ErrorCode.INTERNAL_SENSORS_ERROR] = '1'
-                    self.call_recovery_action(self.max_temperatures_ids[0] + " high temperature",
+                    self.call_recovery_action(vehicle_status.temperature_name[t] + " high temperature",
                                               RecoveryAction.ABORT_AND_SURFACE)
                 else:
                     self.diagnostic.add('vehicle_temperature', 'Ok')
@@ -311,7 +311,6 @@ class SafetySupervisor(object):
                       'timeout': (ns + '/safety/timeout', 3600),
                       'min_modem_update': (ns + '/safety/min_modem_update', 2.0),
                       'min_dvl_good_data': (ns + '/safety/min_dvl_good_data', 30),
-                      'max_temperatures_ids': (ns + '/safety/max_temperatures_ids', ['batteries', 'cpu', 'thrusters']),
                       'max_temperatures_values': (ns + '/safety/max_temperatures_values', [55.0, 80.0, 95.0])}
 
         param_loader.get_ros_params(self, param_dict)
