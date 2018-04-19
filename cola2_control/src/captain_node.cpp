@@ -65,6 +65,8 @@ private:
   bool is_keep_pose_enabled_;
   double min_goto_vel_;
   double min_loscte_vel_;
+  double last_lat_origin_;
+  double last_lon_origin_;
   cola2_msgs::CaptainStatus captain_status_;
 
   // Diagnostics
@@ -333,6 +335,8 @@ void Captain::updateNav(const cola2_msgs::NavSts& msg)
   nav_.z = msg.position.depth;
   nav_.yaw = msg.orientation.yaw;
   nav_.altitude = msg.altitude;
+  last_lat_origin_ = msg.origin.latitude;
+  last_lon_origin_ = msg.origin.longitude;
 
   if (is_keep_pose_enabled_)
   {
@@ -374,11 +378,9 @@ void Captain::getConfig()
 {
   // Default config here
   section_server_name_ = "section_server";
-  double ned_latitude;
-  double ned_longitude;
   // Check that NED origin is defined
-  if (!cola2::rosutils::getParam(cola2::rosutils::getNamespace() + "/navigator/ned_latitude", ned_latitude) ||
-      !cola2::rosutils::getParam(cola2::rosutils::getNamespace() + "/navigator/ned_longitude", ned_longitude))
+  if (!cola2::rosutils::getParam(cola2::rosutils::getNamespace() + "/navigator/ned_latitude", last_lat_origin_) ||
+      !cola2::rosutils::getParam(cola2::rosutils::getNamespace() + "/navigator/ned_longitude", last_lon_origin_))
   {
     ROS_ASSERT_MSG(false, "NED origin not found in param server");
   }
@@ -438,15 +440,7 @@ bool Captain::enableGoto(cola2_msgs::Goto::Request& req, cola2_msgs::Goto::Respo
     else if (req.reference == cola2_msgs::GotoRequest::REFERENCE_GLOBAL)
     {
       double north, east, depth;
-      double ned_latitude;
-      double ned_longitude;
-      // Load NED origin. It can be modified at any time
-      if (!cola2::rosutils::getParam(cola2::rosutils::getNamespace() + "/navigator/ned_latitude", ned_latitude) ||
-          !cola2::rosutils::getParam(cola2::rosutils::getNamespace() + "/navigator/ned_longitude", ned_longitude))
-      {
-        ROS_ASSERT_MSG(false, "NED origin not found in param server");
-      }
-      cola2::utils::NED ned(ned_latitude, ned_longitude, 0.0);
+      cola2::utils::NED ned(last_lat_origin_, last_lon_origin_, 0.0);
       ned.geodetic2Ned(req.position.x, req.position.y, 0.0, north, east, depth);
       waypoint.position.north = north;
       waypoint.position.east = east;
@@ -609,6 +603,7 @@ bool Captain::enableDefaultMissionNonBlock(std_srvs::Empty::Request&, std_srvs::
   cola2_msgs::String::Response res;
   req.request = "last_mission.xml";
   t = new boost::thread(&Captain::enableMission, this, req, res);  // TODO: check this!
+  t->get_id(); // Remove warning for unused var!
   return true;
 }
 
