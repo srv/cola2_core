@@ -57,29 +57,36 @@ class RecoveryActions(object):
 
         self.captain_clients = True
         try:
-            rospy.wait_for_service(namespace + 'pilot/disable_trajectory', 20)
-            self.abort_mission_srv = rospy.ServiceProxy(namespace + 'pilot/disable_trajectory', Empty)
+            rospy.wait_for_service(namespace + 'captain/disable_external_mission', 20)
+            self.abort_external_mission_srv = rospy.ServiceProxy(namespace + 'captain/disable_external_mission', Empty)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
-            rospy.logfatal("%s: disable trajectory service not available!", self.name)
+            rospy.logfatal("%s: disable external mission service not available!", self.name)
 
         try:
-            rospy.wait_for_service(namespace + 'pilot/disable_keep_position', 2)
-            self.abort_keep_pose_srv = rospy.ServiceProxy(namespace + 'pilot/disable_keep_position', Empty)
+            rospy.wait_for_service(namespace + 'captain/disable_mission', 20)
+            self.abort_mission_srv = rospy.ServiceProxy(namespace + 'captain/disable_mission', Empty)
+        except rospy.exceptions.ROSException:
+            self.captain_clients = False
+            rospy.logfatal("%s: disable mission service not available!", self.name)
+
+        try:
+            rospy.wait_for_service(namespace + 'captain/disable_keep_position', 2)
+            self.abort_keep_pose_srv = rospy.ServiceProxy(namespace + 'captain/disable_keep_position', Empty)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
             rospy.logfatal("%s: disable keep position service not available!", self.name)
 
         try:
-            rospy.wait_for_service(namespace + 'pilot/disable_goto', 2)
-            self.abort_goto_srv = rospy.ServiceProxy(namespace + 'pilot/disable_goto', Empty)
+            rospy.wait_for_service(namespace + 'captain/disable_goto', 2)
+            self.abort_goto_srv = rospy.ServiceProxy(namespace + 'captain/disable_goto', Empty)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
             rospy.logfatal("%s: disable goto service not available!", self.name)
 
         try:
-            rospy.wait_for_service(namespace + 'pilot/goto', 2)
-            self.goto_srv = rospy.ServiceProxy(namespace + 'pilot/goto', Goto)
+            rospy.wait_for_service(namespace + 'captain/enable_goto', 2)
+            self.goto_srv = rospy.ServiceProxy(namespace + 'captain/enable_goto', Goto)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
             rospy.logfatal("%s: goto service not available!", self.name)
@@ -88,8 +95,8 @@ class RecoveryActions(object):
             self.no_captain_clients_timer = rospy.Timer(rospy.Duration(0.4), self.no_captain_clients_message)
 
         try:
-            rospy.wait_for_service(namespace + 'pilot/disable_thrusters', 20)
-            self.abort_thrusters_srv = rospy.ServiceProxy( namespace + 'pilot/disable_thrusters', Empty)
+            rospy.wait_for_service(namespace + 'controller/disable_thrusters', 20)
+            self.abort_thrusters_srv = rospy.ServiceProxy( namespace + 'controller/disable_thrusters', Empty)
         except rospy.exceptions.ROSException:
             self.no_disable_thrusters_service_timer = rospy.Timer(rospy.Duration(0.4),
                                                                   self.no_disable_thrusters_message)
@@ -161,6 +168,11 @@ class RecoveryActions(object):
     def abort_mission(self):
         """ This method handles abort mission """
         rospy.loginfo("%s: abort mission", self.name)
+        try:
+            self.abort_external_mission_srv(EmptyRequest())
+        except rospy.exceptions.ROSException:
+            rospy.logerr('%s: error aborting the external mission', self.name)
+
         try:
             self.abort_mission_srv(EmptyRequest())
         except rospy.exceptions.ROSException:

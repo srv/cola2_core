@@ -76,30 +76,30 @@ class SafetySupervisor(object):
                                                            SafetySupervisorStatus, queue_size=2)
 
         # Init Service Clients
-        namespace = rospy.get_namespace()
+        ns = rospy.get_namespace()
         try:
-            rospy.wait_for_service(namespace + 'recovery_actions/recover', 20)
-            self.recover_action_srv = rospy.ServiceProxy(namespace + 'recovery_actions/recover', Recovery)
+            rospy.wait_for_service(ns + 'recovery_actions/recover', 20)
+            self.recover_action_srv = rospy.ServiceProxy(ns + 'recovery_actions/recover', Recovery)
         except rospy.exceptions.ROSException:
             rospy.logerr('%s, Error creating client to recovery action.', self.name)
             rospy.signal_shutdown('Error creating recover action client')
 
         try:
-            rospy.wait_for_service(namespace + 'cola2_watchdog/reset_timeout', 20)
+            rospy.wait_for_service(ns + 'cola2_watchdog/reset_timeout', 20)
             self.reset_timeout_srv = rospy.ServiceProxy(
-                        namespace + 'cola2_watchdog/reset_timeout', Empty)
+                        ns + 'cola2_watchdog/reset_timeout', Empty)
         except rospy.exceptions.ROSException:
             rospy.logerr('%s, Error creating client to reset timeout.', self.name)
             rospy.signal_shutdown('Error creating reset timeout client')
 
         # Subscriber
-        rospy.Subscriber(namespace + "vehicle_status",
+        rospy.Subscriber(ns + "vehicle_status",
                          VehicleStatus,
                          self.check_vehicle_status,
                          queue_size=1)
 
         # To handle recovery actions that have not been called from safety_supervisor
-        rospy.Subscriber(namespace + "recovery_action/external_recovery_action",
+        rospy.Subscriber(ns + "recovery_action/external_recovery_action",
                          RecoveryAction,
                          self.external_recovery_action,
                          queue_size=1)
@@ -244,7 +244,7 @@ class SafetySupervisor(object):
             for t in range(0, len(temperatures)):
                 if temperatures[t] > self.max_temperatures_values[t]:
                     self.error_code[ErrorCode.INTERNAL_SENSORS_ERROR] = '1'
-                    self.call_recovery_action(self.max_temperatures_ids[0] + " high temperature",
+                    self.call_recovery_action(vehicle_status.temperature_name[t] + " high temperature",
                                               RecoveryAction.ABORT_AND_SURFACE)
                 else:
                     self.diagnostic.add('vehicle_temperature', 'Ok')
@@ -291,26 +291,27 @@ class SafetySupervisor(object):
     def get_config(self):
         """ Read parameters from ROS Param Server """
 
-        param_dict = {'min_altitude': ('safe_depth_altitude/min_altitude', 1.5),
-                      'max_depth': ('safe_depth_altitude/max_depth', 20.0),
-                      'min_battery_charge': ('safety/min_battery_charge', 15.0),
-                      'min_battery_voltage': ('safety/min_battery_voltage', 25.0),
-                      'min_imu_update': ('safety/min_imu_update', 2.0),
-                      'min_depth_update': ('safety/min_depth_update', 2.0),
-                      'min_altitude_update': ('safety/min_altitude_update', 2.0),
-                      'min_gps_update': ('safety/min_gps_update', 2.0),
-                      'min_dvl_update': ('safety/min_dvl_update', 2.0),
-                      'min_nav_update': ('safety/min_nav_update', 2.0),
-                      'min_wifi_update': ('safety/min_wifi_update', 2.0),
-                      'working_area_north_origin': ('virtual_cage/north_origin', -50.0),
-                      'working_area_east_origin': ('virtual_cage/east_origin', -50.0),
-                      'working_area_north_length': ('virtual_cage/north_longitude', 100.0),
-                      'working_area_east_length': ('virtual_cage/east_longitude', 100.0),
-                      'timeout': ('safety/timeout', 3600),
-                      'min_modem_update': ('safety/min_modem_update', 2.0),
-                      'min_dvl_good_data': ('safety/min_dvl_good_data', 30),
-                      'max_temperatures_ids': ('safety/max_temperatures_ids', ['batteries', 'cpu', 'thrusters']),
-                      'max_temperatures_values': ('safety/max_temperatures_values', [55.0, 80.0, 95.0])}
+        ns = rospy.get_namespace()
+
+        param_dict = {'min_altitude': (ns + '/safe_depth_altitude/min_altitude', 1.5),
+                      'max_depth': (ns + '/safe_depth_altitude/max_depth', 20.0),
+                      'min_battery_charge': (ns + '/safety/min_battery_charge', 15.0),
+                      'min_battery_voltage': (ns + '/safety/min_battery_voltage', 25.0),
+                      'min_imu_update': (ns + '/safety/min_imu_update', 2.0),
+                      'min_depth_update': (ns + '/safety/min_depth_update', 2.0),
+                      'min_altitude_update': (ns + '/safety/min_altitude_update', 2.0),
+                      'min_gps_update': (ns + '/safety/min_gps_update', 2.0),
+                      'min_dvl_update': (ns + '/safety/min_dvl_update', 2.0),
+                      'min_nav_update': (ns + '/safety/min_nav_update', 2.0),
+                      'min_wifi_update': (ns + '/safety/min_wifi_update', 2.0),
+                      'working_area_north_origin': (ns + '/virtual_cage/north_origin', -50.0),
+                      'working_area_east_origin': (ns + '/virtual_cage/east_origin', -50.0),
+                      'working_area_north_length': (ns + '/virtual_cage/north_longitude', 100.0),
+                      'working_area_east_length': (ns + '/virtual_cage/east_longitude', 100.0),
+                      'timeout': (ns + '/safety/timeout', 3600),
+                      'min_modem_update': (ns + '/safety/min_modem_update', 2.0),
+                      'min_dvl_good_data': (ns + '/safety/min_dvl_good_data', 30),
+                      'max_temperatures_values': (ns + '/safety/max_temperatures_values', [55.0, 80.0, 95.0])}
 
         param_loader.get_ros_params(self, param_dict)
 

@@ -16,6 +16,8 @@ import datetime
 import os
 import sys
 
+global params_path
+
 params_path = str()
 
 def callback(event):
@@ -58,7 +60,6 @@ def save_params_callback(req):
 
 if __name__ == '__main__':
     # Init node
-    global params_path
     rospy.init_node('param_logger')
     params_path = "."
     if len(sys.argv) > 1:
