@@ -43,7 +43,7 @@ double MissionPosition::getZ() const
   return z_;
 }
 
-double MissionPosition::getAltitudeMode() const
+bool MissionPosition::getAltitudeMode() const
 {
   return altitude_mode_;
 }

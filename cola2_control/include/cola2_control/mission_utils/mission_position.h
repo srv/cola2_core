@@ -45,7 +45,7 @@ public:
 
   double getZ() const;
 
-  double getAltitudeMode() const;
+  bool getAltitudeMode() const;
 
   void setLatitude(const double latitude);
 

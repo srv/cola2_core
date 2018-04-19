@@ -126,13 +126,13 @@ private:
    * @param mission
    * @return mission path
    */
-  nav_msgs::Path createPathFromMission(const Mission mission);
+  nav_msgs::Path createPathFromMission(Mission mission);
 
   /**
    * Computes distance from current position to given x, y, z, altitude, altitude_moe
    * @return distance
    */
-  double distanceTo(const double, const double, const double, const double, const bool);
+  double distanceTo(double, double, double, double, bool);
 
   // ... services callbacks
   /**
@@ -228,28 +228,28 @@ private:
    * @param action_id
    * @param parameters
    */
-  void callAction(const bool is_empty, const std::string action_id, const std::vector<std::string> parameters);
+  void callAction(bool is_empty, const std::string &action_id, std::vector<std::string> parameters);
 
   /**
    * Executes a world waypoint maneuver defined in a mission.
    * @param wp
    * @return
    */
-  bool worldWaypoint(const MissionWaypoint wp);
+  bool worldWaypoint(const MissionWaypoint &wp);
 
   /**
    * Executes a world section maneuver defined in a mission
    * @param sec
    * @return
    */
-  bool worldSection(const MissionSection sec);
+  bool worldSection(const MissionSection &sec);
 
   /**
    * Executes park maneuver defined in a mission
    * @param park
    * @return
    */
-  bool park(const MissionPark park);
+  bool park(const MissionPark &park);
 
   /**
    * Defunes a timer to publish the captain status.
@@ -409,7 +409,7 @@ void Captain::getConfig()
   else
   {
     std::string path = ros::package::getPath(package);
-    if (path != "")
+    if (!path.empty())
     {
       config_.mission_path = path + "/missions";
       ROS_INFO_STREAM("Mission path: " << config_.mission_path);
@@ -517,10 +517,10 @@ bool Captain::enableGoto(cola2_msgs::Goto::Request& req, cola2_msgs::Goto::Respo
     {
       min_vel = waypoint.linear_velocity.x;
     }
-    waypoint.timeout = (2.0 * distance_to_waypoint) / min_vel;
-    if (waypoint.timeout < 30.0)
+    waypoint.timeout = static_cast<int>((2.0 * distance_to_waypoint) / min_vel);
+    if (waypoint.timeout < 30)
     {
-      waypoint.timeout = 30.0;
+      waypoint.timeout = 30;
     }
     if (req.timeout > 0 && req.timeout < waypoint.timeout)
     {
@@ -647,7 +647,7 @@ bool Captain::enableKeepPositionHolonomic(std_srvs::Empty::Request&, std_srvs::E
   goto_req.position.x = nav_.x;
   goto_req.position.y = nav_.y;
   goto_req.position.z = nav_.z;
-  goto_req.yaw = nav_.yaw;
+  goto_req.yaw = static_cast<float>(nav_.yaw);
 
   // If toloerance is 0.0 position, the waypoint is impossible to reach
   // and therefore, the controller will never finish.
@@ -685,7 +685,7 @@ bool Captain::enableKeepPositionNonHolonomic(std_srvs::Empty::Request&, std_srvs
   goto_req.position.x = nav_.x;
   goto_req.position.y = nav_.y;
   goto_req.position.z = nav_.z;
-  goto_req.yaw = nav_.yaw;
+  goto_req.yaw = static_cast<float>(nav_.yaw);
 
   // If tolerance is 0.0 position, the waypoint is impossible to reach
   // and therefore, the controller will never finish.
@@ -838,7 +838,7 @@ bool Captain::enableMission(cola2_msgs::String::Request& req, cola2_msgs::String
         // Play mission step maneuver
         if (step->getManeuverPtr()->getManeuverType() == WAYPOINT_MANEUVER)
         {
-          MissionWaypoint* wp = static_cast<MissionWaypoint*>(step->getManeuverPtr());
+          auto * wp = static_cast<MissionWaypoint*>(step->getManeuverPtr());
           // std::cout << *wp << std::endl;
           captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_WAYPOINT;
           if (!this->worldWaypoint(*wp))
@@ -848,7 +848,7 @@ bool Captain::enableMission(cola2_msgs::String::Request& req, cola2_msgs::String
         }
         else if (step->getManeuverPtr()->getManeuverType() == SECTION_MANEUVER)
         {
-          MissionSection* sec = static_cast<MissionSection*>(step->getManeuverPtr());
+          auto * sec = static_cast<MissionSection*>(step->getManeuverPtr());
           // std::cout << *sec << std::endl;
           captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_SECTION;
           if (!this->worldSection(*sec))
@@ -858,7 +858,7 @@ bool Captain::enableMission(cola2_msgs::String::Request& req, cola2_msgs::String
         }
         else if (step->getManeuverPtr()->getManeuverType() == PARK_MANEUVER)
         {
-          MissionPark* park = static_cast<MissionPark*>(step->getManeuverPtr());
+          auto * park = static_cast<MissionPark*>(step->getManeuverPtr());
           // std::cout << *park << std::endl;
           captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_PARK;
           if (!this->park(*park))
@@ -899,7 +899,7 @@ bool Captain::enableMission(cola2_msgs::String::Request& req, cola2_msgs::String
   return true;
 }
 
-void Captain::callAction(const bool is_empty, const std::string action_id, const std::vector<std::string> parameters)
+void Captain::callAction(const bool is_empty, const std::string &action_id, const std::vector<std::string> parameters)
 {
   if (is_empty)
   {
@@ -911,7 +911,7 @@ void Captain::callAction(const bool is_empty, const std::string action_id, const
   {
     ros::ServiceClient action_client = nh_.serviceClient<cola2_msgs::Action>(action_id);
     cola2_msgs::Action params;
-    for (auto param : parameters)
+    for (const auto &param : parameters)
     {
       params.request.param.push_back(param);
     }
@@ -920,7 +920,7 @@ void Captain::callAction(const bool is_empty, const std::string action_id, const
   ROS_INFO_STREAM("Call -> " << action_id << std::endl);
 }
 
-bool Captain::worldWaypoint(const MissionWaypoint wp)
+bool Captain::worldWaypoint(const MissionWaypoint &wp)
 {
   ROS_INFO_STREAM("Execute mission waypoint\n");
 
@@ -952,7 +952,7 @@ bool Captain::worldWaypoint(const MissionWaypoint wp)
   return enableGoto(goto_req, goto_res);
 }
 
-bool Captain::worldSection(const MissionSection sec)
+bool Captain::worldSection(const MissionSection &sec)
 {
   cola2_msgs::WorldSectionGoal section;
   section.priority = cola2_msgs::GoalDescriptor::PRIORITY_NORMAL;
@@ -1007,7 +1007,7 @@ bool Captain::worldSection(const MissionSection sec)
   return true;
 }
 
-bool Captain::park(const MissionPark park)
+bool Captain::park(const MissionPark &park)
 {
   std::cout << "Execute mission park: Reaching park waypoint\n";
 
@@ -1015,7 +1015,7 @@ bool Captain::park(const MissionPark park)
   cola2_msgs::Goto::Request goto_req;
   cola2_msgs::Goto::Response goto_res;
 
-  goto_req.altitude = park.getPosition().getZ();
+  goto_req.altitude = static_cast<float>(park.getPosition().getZ());
   goto_req.altitude_mode = park.getPosition().getAltitudeMode();
   goto_req.linear_velocity.x = 0.3;  // Fixed velocity when reaching park waypoint
   goto_req.position.x = park.getPosition().getLatitude();
@@ -1045,7 +1045,7 @@ bool Captain::park(const MissionPark park)
       goto_req.position_tolerance.x = 0.0;
       goto_req.position_tolerance.y = 0.0;
       goto_req.position_tolerance.z = 0.0;
-      goto_req.timeout = park.getTime();
+      goto_req.timeout = static_cast<unsigned short>(park.getTime());
       return enableGoto(goto_req, goto_res);
     }
     return true;
