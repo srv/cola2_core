@@ -42,9 +42,9 @@ safety_set_zero_velocity/set_zero_velocity_depth: 1.2
 
 # Parameters for the set_pose node.
 # Define as many 6DoF tuples as you want indicating which DoFs must be set to desired_pose (False) and which not (True)
-safety_set_pose/set_pose_axis: [[True, True, True, True, False, True]]
-safety_set_pose/desired_pose: [0.0, 0.0, 0.0, 0.0, -0.06, 0.0]
-safety_set_pose/set_pose_depth: 1.2
+# safety_set_pose/set_pose_axis: [[True, True, True, True, False, True]]
+# safety_set_pose/desired_pose: [0.0, 0.0, 0.0, 0.0, -0.06, 0.0]
+# safety_set_pose/set_pose_depth: 1.2
 
 # Define virtual cage (the vehicle is not allowed to move outside of this area)
 virtual_cage/north_origin: -500.0
