@@ -114,6 +114,7 @@ void EKFBaseLandmarksROS::resetFilter()
   if (!config_.initialize_ned_from_gps_)
   {
     ROS_INFO("Init NED from config file");
+    std::cout << "\n\n\nNED: " << config_.ned_latitude_ << ", " << config_.ned_longitude_ << std::endl;
     ned_ = cola2::utils::NED(config_.ned_latitude_, config_.ned_longitude_, 0.0);
     init_ned_ = true;
     diag_help_.add("ned_init", "True");
@@ -716,7 +717,9 @@ void EKFBaseLandmarksROS::updateAltitudeMsg(const sensor_msgs::Range& msg)
       double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
       double stdev = std::sqrt(sq_sum / static_cast<double>(window.size()));
       // Check inside
-      if ((mean - 1.5 * stdev <= range) && (range <= mean + 1.5 * stdev))
+      // TODO: AQUEST FILTRE ES SUPER PERILLOS! POT FER QUE QUAN EL ROBOT COMENCI A BAIXAR DEIXIN D'ENTRAR DADES NOVES
+      //       I SI BAIXA PER POSICIO BAIXARA PER SEMPRE!!!
+      if ((mean - 2.5 * stdev <= range) && (range <= mean + 2.5 * stdev))
       {
         altitude_ = range;
         last_altitude_time_ = msg.header.stamp.toSec();
@@ -801,7 +804,7 @@ void EKFBaseLandmarksROS::publishNavigationAndLandmarks(const ros::Time& stamp)
   pub_odom_.publish(odom);
 
   // Publish Nav Status
-  const Eigen::Vector3d latlonh = ned_.geodetic2Ned(pos);
+  const Eigen::Vector3d latlonh = ned_.ned2geodetic(pos);
   cola2_msgs::NavSts nav_sts;
   nav_sts.header.frame_id = frame_vehicle_;
   nav_sts.header.stamp = stamp;
