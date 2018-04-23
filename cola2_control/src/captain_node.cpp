@@ -1062,8 +1062,8 @@ bool Captain::enableExternalMission(std_srvs::Empty::Request&, std_srvs::Empty::
   {
     is_mission_running_ = true;
     captain_status_.mission_active = true;
-    captain_status_.current_step = -1;
-    captain_status_.total_steps = -1;
+    captain_status_.current_step = 0;
+    captain_status_.total_steps = 0;
   }
   return true;
 }
@@ -1071,7 +1071,7 @@ bool Captain::enableExternalMission(std_srvs::Empty::Request&, std_srvs::Empty::
 bool Captain::disableExternalMission(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
   ROS_INFO_STREAM("disable_external_mission service called.");
-  if (captain_status_.mission_active && captain_status_.total_steps == -1)
+  if (captain_status_.mission_active && captain_status_.total_steps == 0)
   {
     captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_NONE;
     is_mission_running_ = false;
