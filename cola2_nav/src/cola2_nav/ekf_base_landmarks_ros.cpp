@@ -439,7 +439,7 @@ void EKFBaseLandmarksROS::updatePositionUSBLMsg(const geometry_msgs::PoseWithCov
 void EKFBaseLandmarksROS::updatePositionDepthMsg(const sensor_msgs::FluidPressure& msg)
 {
   // Valid measurement
-  const double meters = msg.fluid_pressure / config_.water_density_ / 9.81;  // pascals to meters
+  const double meters = msg.fluid_pressure / (config_.water_density_ * 9.81);  // pascals to meters
   if (meters > 0.0)
   {
     // Save pressure message for setDepthSensorOffset
