@@ -31,7 +31,7 @@ void IAUVROSController::initBase(std::shared_ptr<IAUVController> auv_controller_
   pub_wrench_ = nh_.advertise<cola2_msgs::BodyForceReq>("merged_body_force_req", 1);
   pub_merged_pose_ = nh_.advertise<cola2_msgs::WorldWaypointReq>("merged_world_waypoint_req", 1);
   pub_merged_twist_ = nh_.advertise<cola2_msgs::BodyVelocityReq>("merged_body_velocity_req", 1);
-  pub_thrusters_setpoint_ = nh_.advertise<cola2_msgs::Setpoints>("thrusters_data", 1);
+  pub_thrusters_setpoint_ = nh_.advertise<cola2_msgs::Setpoints>("thruster_setpoints", 1);
   pub_fins_setpoint_ = nh_.advertise<cola2_msgs::Setpoints>("fins_data", 1);
 
   // Subscribers --> WARNING! The buffer should be at least the size of maximum Request send per iteration/kind
