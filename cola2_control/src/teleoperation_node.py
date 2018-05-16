@@ -347,7 +347,7 @@ class Teleoperation(object):
             else:
                 data.buttons.append(1)
 
-        self.map_ack_data_callback(data)
+        self.output_callback(data)
 
         return EmptyResponse()
 
