@@ -9,19 +9,12 @@
 @@>Used to handle requests for recovery actions coming from all nodes<@@
 """
 
-"""
-Created on Mar 25 2013
-Modified 11/2015
-@author: narcis palomeras
-"""
-
 import rospy
 from std_srvs.srv import Empty, EmptyRequest
 from cola2_msgs.srv import Goto, GotoRequest
 from cola2_msgs.srv import Recovery, RecoveryRequest, RecoveryResponse
-from cola2_msgs.msg import Setpoints, RecoveryAction, NavSts
+from cola2_msgs.msg import Setpoints, RecoveryAction, NavSts, GoalDescriptor
 from cola2_lib.rosutils import param_loader
-
 
 
 class RecoveryActions(object):
@@ -38,7 +31,7 @@ class RecoveryActions(object):
         namespace = rospy.get_namespace()
 
         # Create publisher
-        self.pub_thrusters = rospy.Publisher(self.name + "/thrusters_data", Setpoints, queue_size = 2)
+        self.pub_thrusters = rospy.Publisher(namespace + "controller/thruster_setpoints", Setpoints, queue_size = 2)
 
         self.pub_external_ra = rospy.Publisher(self.name + "/external_recovery_action",
                                                RecoveryAction, queue_size = 2)
@@ -50,7 +43,7 @@ class RecoveryActions(object):
 
         try:
             rospy.wait_for_service(namespace + 'teleoperation/set_joystick_axes_to_velocity', 20)
-            self.set_joy_to_vel_srv = rospy.ServiceProxy(namespace + 'teleopeartion/set_joystick_axes_to_velocity', Empty)
+            self.set_joy_to_vel_srv = rospy.ServiceProxy(namespace + 'teleoperation/set_joystick_axes_to_velocity', Empty)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
             rospy.logfatal("%s: set joystick axes to velocity service is not available!", self.name)
@@ -115,7 +108,8 @@ class RecoveryActions(object):
         """ Callback of recovery action service """
         rospy.loginfo('%s: received recovery action', self.name)
         who = req._connection_header['callerid']
-        if who != "/safety_supervisor":
+        if not "/safety_supervisor" in who:
+            rospy.loginfo("Recovery action requested by an external agent.")
             # Timestamp might not be included if service call was from command line, repack recovery action to add it
             if req.requested_action.header.stamp.secs == 0:
                 ra = RecoveryAction()
