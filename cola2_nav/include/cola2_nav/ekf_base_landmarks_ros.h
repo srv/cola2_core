@@ -39,6 +39,7 @@
 #include <tf/transform_broadcaster.h>
 #include <Eigen/Dense>
 #include <algorithm>
+#include <fstream>
 #include <string>
 #include <vector>
 #include "./ekf_base_landmarks.h"
@@ -90,6 +91,9 @@ private:
   ros::Timer timer_;                                  //!< keep checking diagnostics
   cola2::utils::NED ned_;                             //!< reference frame the AUV is in
   std::vector<Eigen::Vector3d> last_usbl_positions_;  //!< delayed USBL
+
+  // Debug in output
+  std::ofstream ofh_;
 
   /**
    * \brief Function called by the check diagnostics timer.

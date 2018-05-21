@@ -7,6 +7,8 @@
 
 #include "cola2_nav/ekf_base_landmarks_ros.h"
 
+const bool DEBUG_OUT = false;
+
 // *****************************************
 // Constructor and destructor
 // *****************************************
@@ -24,6 +26,12 @@ EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size)
   // Load configurations and reset filter
   getConfig(true);
   resetFilter();
+
+  // Debug in output
+  if (DEBUG_OUT)
+  {
+    ofh_ = std::ofstream("~/debug_navigator.txt");
+  }
 
   // Publishers
   pub_odom_ = nh_.advertise<nav_msgs::Odometry>("odometry", 1);
@@ -364,8 +372,16 @@ void EKFBaseLandmarksROS::updatePositionGPSMsg(const sensor_msgs::NavSatFix& msg
       ned = transforms::position(ned, getOrientation(), trans.translation());
       cov = transforms::positionCovariance(cov, getOrientationUncertainty(), getOrientation(), trans.translation());
       // Predict and update
-      if (!init_ekf_ || makePrediction(msg.header.stamp.toSec()))
+      const double tim = msg.header.stamp.toSec();
+      if (!init_ekf_ || makePrediction(tim))
       {
+        // Debug
+        if (DEBUG_OUT)
+        {
+          ofh_ << "#gps " << tim << ' ' << ned(0) << ' ' << ned(1) << ' ' << cov(0, 0) << ' ' << cov(0, 1) << ' '
+               << cov(1, 0) << ' ' << cov(1, 1) << '\n';
+        }
+        // Update and publish
         updatePositionXY(msg.header.stamp.toSec(), ned.head(2), cov.topLeftCorner(2, 2));
         publishNavigationAndLandmarks(msg.header.stamp);
       }
@@ -427,8 +443,16 @@ void EKFBaseLandmarksROS::updatePositionUSBLMsg(const geometry_msgs::PoseWithCov
       ned = transforms::position(ned, getOrientation(), trans.translation());
       cov = transforms::positionCovariance(cov, getOrientationUncertainty(), getOrientation(), trans.translation());
       // Predict and update
-      if (!init_ekf_ || makePrediction(msg.header.stamp.toSec()))
+      const double tim = msg.header.stamp.toSec();
+      if (!init_ekf_ || makePrediction(tim))
       {
+        // Debug
+        if (DEBUG_OUT)
+        {
+          ofh_ << "#usbl " << tim << ' ' << ned(0) << ' ' << ned(1) << ' ' << cov(0, 0) << ' ' << cov(0, 1) << ' '
+               << cov(1, 0) << ' ' << cov(1, 1) << '\n';
+        }
+        // Update and publish
         updatePositionXY(msg.header.stamp.toSec(), ned.head(2), cov.topLeftCorner(2, 2));
         publishNavigationAndLandmarks(msg.header.stamp);
       }
@@ -459,8 +483,15 @@ void EKFBaseLandmarksROS::updatePositionDepthMsg(const sensor_msgs::FluidPressur
     xyz = transforms::position(xyz, getOrientation(), trans.translation());
     cov = transforms::positionCovariance(cov, getOrientationUncertainty(), getOrientation(), trans.translation());
     // Predict and update
-    if (!init_ekf_ || makePrediction(msg.header.stamp.toSec()))
+    const double tim = msg.header.stamp.toSec();
+    if (!init_ekf_ || makePrediction(tim))
     {
+      // Debug
+      if (DEBUG_OUT)
+      {
+        ofh_ << "#depth " << tim << ' ' << xyz.tail(1) << ' ' << cov(2, 2) << '\n';
+      }
+      // Update and publish
       updatePositionZ(msg.header.stamp.toSec(), xyz.tail(1), cov.bottomRightCorner(1, 1));
       publishNavigationAndLandmarks(msg.header.stamp);
     }
@@ -499,8 +530,17 @@ void EKFBaseLandmarksROS::updateVelocityDVLMsg(const cola2_msgs::DVL& msg)
     vel = transforms::linearVelocity(vel, getAngularVelocity(), quat, trans.translation());
     cov = transforms::positionCovariance(cov, getAngularVelocityUncertainty(), quat, trans.translation());
     // Predict and update
-    if (!init_ekf_ || makePrediction(msg.header.stamp.toSec()))
+    const double tim = msg.header.stamp.toSec();
+    if (!init_ekf_ || makePrediction(tim))
     {
+      // Debug
+      if (DEBUG_OUT)
+      {
+        ofh_ << "#dvl " << tim << ' ' << vel(0) << ' ' << vel(1) << ' ' << vel(2) << ' ' << cov(0, 0) << ' '
+             << cov(0, 1) << ' ' << cov(0, 2) << ' ' << cov(1, 0) << ' ' << cov(1, 1) << ' ' << cov(1, 2) << ' '
+             << cov(2, 0) << ' ' << cov(2, 1) << ' ' << cov(2, 2) << '\n';
+      }
+      // Update and publish
       updateVelocity(msg.header.stamp.toSec(), vel, cov);
       publishNavigationAndLandmarks(msg.header.stamp);
     }
@@ -538,8 +578,21 @@ void EKFBaseLandmarksROS::updateIMUMsg(const sensor_msgs::Imu& msg)
   rpy = cola2::utils::quaternion2euler(ori);
   ang_vel = transforms::angularVelocity(ang_vel, quat);  // transform angular velocity
   // Predict and update
-  if (!init_ekf_ || makePrediction(msg.header.stamp.toSec()))
+  const double tim = msg.header.stamp.toSec();
+  if (!init_ekf_ || makePrediction(tim))
   {
+    // Debug
+    if (DEBUG_OUT)
+    {
+      ofh_ << "#imu " << tim << ' ' << rpy(0) << ' ' << rpy(1) << ' ' << rpy(2) << ' ' << rpy_cov(0, 0) << ' '
+           << rpy_cov(0, 1) << ' ' << rpy_cov(0, 2) << ' ' << rpy_cov(1, 0) << ' ' << rpy_cov(1, 1) << ' '
+           << rpy_cov(1, 2) << ' ' << rpy_cov(2, 0) << ' ' << rpy_cov(2, 1) << ' ' << rpy_cov(2, 2) << '\n';
+      ofh_ << "#rate " << tim << ' ' << ang_vel(0) << ' ' << ang_vel(1) << ' ' << ang_vel(2) << ' ' << ang_vel_cov(0, 0)
+           << ' ' << ang_vel_cov(0, 1) << ' ' << ang_vel_cov(0, 2) << ' ' << ang_vel_cov(1, 0) << ' '
+           << ang_vel_cov(1, 1) << ' ' << ang_vel_cov(1, 2) << ' ' << ang_vel_cov(2, 0) << ' ' << ang_vel_cov(2, 1)
+           << ' ' << ang_vel_cov(2, 2) << '\n';
+    }
+    // Update and publish
     updateOrientation(msg.header.stamp.toSec(), rpy, rpy_cov);
     updateOrientationRate(msg.header.stamp.toSec(), ang_vel, ang_vel_cov);
     publishNavigationAndLandmarks(msg.header.stamp);
@@ -686,8 +739,17 @@ void EKFBaseLandmarksROS::updateBodyForceReqMsg(const cola2_msgs::BodyForceReq& 
     cov(2, 2) = config_.force_model_covariance_[2];
     // Transform to vehicle frame => Velocities already in vehicle frame
     // Predict and update
-    if (makePrediction(msg.header.stamp.toSec()))
+    const double tim = msg.header.stamp.toSec();
+    if (makePrediction(tim))
     {
+      // Debug
+      if (DEBUG_OUT)
+      {
+        ofh_ << "#force " << tim << ' ' << velocity(0) << ' ' << velocity(1) << ' ' << velocity(2) << ' ' << cov(0, 0)
+             << ' ' << cov(0, 1) << ' ' << cov(0, 2) << ' ' << cov(1, 0) << ' ' << cov(1, 1) << ' ' << cov(1, 2) << ' '
+             << cov(2, 0) << ' ' << cov(2, 1) << ' ' << cov(2, 2) << '\n';
+      }
+      // Update and publish
       updateVelocity(msg.header.stamp.toSec(), velocity, cov, false);  // not coming from dvl
       publishNavigationAndLandmarks(msg.header.stamp);
     }
@@ -753,6 +815,25 @@ void EKFBaseLandmarksROS::publishNavigationAndLandmarks(const ros::Time& stamp)
   const Eigen::Matrix3d vel_cov = getVelocityUncertainty();
   const Eigen::Matrix3d rpy_cov = getOrientationUncertainty();
   const Eigen::Matrix3d ang_vel_cov = getAngularVelocityUncertainty();
+
+  // Debug
+  if (DEBUG_OUT)
+  {
+    // State
+    for (size_t i = 0; i < state_vector_size_; ++i)
+    {
+      ofh_ << x_(i) << ' ';
+    }
+    // Covariance
+    for (size_t i = 0; i < state_vector_size_; ++i)
+    {
+      for (size_t j = 0; j < state_vector_size_; ++j)
+      {
+        ofh_ << P_(i, j) << ' ';
+      }
+    }
+    ofh_ << '\n';
+  }
 
   // Save last 10s of positions for the USBL delayed data TODO: make more efficient
   last_usbl_positions_.push_back(Eigen::Vector3d(stamp.toSec(), pos(0), pos(1)));
