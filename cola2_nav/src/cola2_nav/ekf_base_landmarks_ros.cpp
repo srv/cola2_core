@@ -440,7 +440,7 @@ void EKFBaseLandmarksROS::updatePositionDepthMsg(const sensor_msgs::FluidPressur
 {
   // Valid measurement
   const double meters = msg.fluid_pressure / (config_.water_density_ * 9.81);  // pascals to meters
-  if (meters > 0.0)
+  if (meters > -1.0)
   {
     // Save pressure message for setDepthSensorOffset
     pressure_meters_ = meters;
@@ -464,6 +464,10 @@ void EKFBaseLandmarksROS::updatePositionDepthMsg(const sensor_msgs::FluidPressur
       updatePositionZ(msg.header.stamp.toSec(), xyz.tail(1), cov.bottomRightCorner(1, 1));
       publishNavigationAndLandmarks(msg.header.stamp);
     }
+  }
+  else 
+  {
+    ROS_WARN("Pressure in meters is smaller than -1.0");
   }
 }
 
