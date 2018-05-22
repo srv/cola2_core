@@ -145,7 +145,7 @@ class SafetySupervisor(object):
         # Rule: Init vehicle
         if vehicle_status.vehicle_initialized:
             self.vehicle_init = True
-            self.error_code[ErrorCode.INIT] = '1'
+            #self.error_code[ErrorCode.INIT] = '1'
 
         # Rule: Battery Level
         battery_charge = vehicle_status.battery_charge
