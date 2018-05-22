@@ -30,7 +30,9 @@ EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size)
   // Debug in output
   if (DEBUG_OUT)
   {
-    ofh_ = std::ofstream("~/debug_navigator.txt");
+    ofh_ = std::ofstream(std::string(std::getenv("HOME")) + std::string("/debug_navigator.txt"));
+    ofh_.setf(std::ios::fixed, std::ios::floatfield);
+    ofh_.precision(4);
   }
 
   // Publishers
@@ -819,6 +821,7 @@ void EKFBaseLandmarksROS::publishNavigationAndLandmarks(const ros::Time& stamp)
   // Debug
   if (DEBUG_OUT)
   {
+    ofh_ << stamp.toSec() << ' ';
     // State
     for (size_t i = 0; i < state_vector_size_; ++i)
     {

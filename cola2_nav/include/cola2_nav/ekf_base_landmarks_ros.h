@@ -39,6 +39,7 @@
 #include <tf/transform_broadcaster.h>
 #include <Eigen/Dense>
 #include <algorithm>
+#include <cstdlib>
 #include <fstream>
 #include <string>
 #include <vector>
