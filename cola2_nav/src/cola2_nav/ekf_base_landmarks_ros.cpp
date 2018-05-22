@@ -758,49 +758,19 @@ void EKFBaseLandmarksROS::updateBodyForceReqMsg(const cola2_msgs::BodyForceReq& 
   }
 }
 
-void EKFBaseLandmarksROS::updateSoundVelocityMsg(const std_msgs::Float32& msg)
+void EKFBaseLandmarksROS::updateSoundVelocityMsg(const cola2_msgs::Float32Stamped& msg)
 {
   sound_velocity_ = static_cast<double>(msg.data);
 }
 
 void EKFBaseLandmarksROS::updateAltitudeMsg(const sensor_msgs::Range& msg)
 {
-  // Delare window
-  static std::vector<double> window;
   // Check valid
   if (msg.range > 0.0f)
   {
-    // Transform measure TODO: transform [range defined on x] use rotation sensor and rotation vehicle
-    // TODO: what if different sensors? they contradict?
-    // TODO: take always the smaller? windows by frame?
-    double range = static_cast<double>(msg.range);
-    // Check window
-    if (window.size() >= ALTITUDE_WINDOW_SIZE)
-    {
-      // Mean
-      double mean = std::accumulate(window.begin(), window.end(), 0.0) / static_cast<double>(window.size());
-      // Std
-      std::vector<double> diff(window.size());
-      std::transform(window.begin(), window.end(), diff.begin(), [mean](double x) { return x - mean; });
-      double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
-      double stdev = std::sqrt(sq_sum / static_cast<double>(window.size()));
-      // Check inside
-      // TODO: AQUEST FILTRE ES SUPER PERILLOS! POT FER QUE QUAN EL ROBOT COMENCI A BAIXAR DEIXIN D'ENTRAR DADES NOVES
-      //       I SI BAIXA PER POSICIO BAIXARA PER SEMPRE!!!
-      if ((mean - 2.5 * stdev <= range) && (range <= mean + 2.5 * stdev))
-      {
-        altitude_ = range;
-        last_altitude_time_ = msg.header.stamp.toSec();
-        publishNavigationAndLandmarks(msg.header.stamp);
-      }
-    }
-    // Add measure to window and check size
-    window.push_back(range);
-    if (window.size() > ALTITUDE_WINDOW_SIZE)
-    {
-      long diff = static_cast<long>(window.size() - ALTITUDE_WINDOW_SIZE);
-      window = std::vector<double>(window.begin() + diff, window.end());
-    }
+    altitude_ = static_cast<double>(msg.range);
+    last_altitude_time_ = msg.header.stamp.toSec();
+    publishNavigationAndLandmarks(msg.header.stamp);
   }
 }
 

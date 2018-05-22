@@ -10,6 +10,7 @@
 
 // messages subscribed
 #include <cola2_msgs/BodyForceReq.h>                  // force velocity model
+#include <cola2_msgs/Float32Stamped.h>                  // force velocity model
 #include <cola2_msgs/DVL.h>                           // dvl
 #include <cola2_msgs/Detection.h>                     // landmark detection
 #include <cola2_msgs/RangeDetection.h>                // range detection
@@ -193,7 +194,7 @@ public:
   void updateRangeMsg(const cola2_msgs::RangeDetection& msg);
   // Others
   void updateBodyForceReqMsg(const cola2_msgs::BodyForceReq& msg);
-  void updateSoundVelocityMsg(const std_msgs::Float32& msg);
+  void updateSoundVelocityMsg(const cola2_msgs::Float32Stamped& msg);
   void updateAltitudeMsg(const sensor_msgs::Range& msg);
 
   // *****************************************
