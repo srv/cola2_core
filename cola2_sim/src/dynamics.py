@@ -140,9 +140,16 @@ class Dynamics:
     def update_thrusters(self, thrusters):
         """ Thruster callback, input in rpm """
         self.old_u = self.u
-        self.u = np.array(thrusters.setpoints).clip(
-            min=-abs(self.max_thrusters_rpm), max=abs(self.max_thrusters_rpm))
-
+        #self.u = np.array(thrusters.setpoints).clip(
+        #    min=-abs(self.max_thrusters_rpm), max=abs(self.max_thrusters_rpm))
+        # Linear approach with max rpm of self.max_thrusters_rpm
+        u = self.max_thrusters_rpm * np.array(thrusters.setpoints).clip(min=-1, max=1)
+        y = np.zeros(np.size(u))
+        for i in range(np.size(u)):
+            y[i] = ( (self.period * u[i] + self.thrusters_tau * self.u[i]) /
+                     (self.period + self.thrusters_tau) )
+        self.u = y
+        
     def update_force(self, force):
         """ Thruster callback, input in rpm """
         self.force = force
@@ -493,7 +500,8 @@ class Dynamics:
                       'current_min': ("current_min", [-0.1, -0.0, -0.0]),
                       'current_max': ("current_max", [0.1, 0.0, 0.0]),
                       'current_enabled': ("current_enabled", False),
-                      'contact_sensor_available': ("contact_sensor_available", False)}
+                      'contact_sensor_available': ("contact_sensor_available", False),
+                      'thrusters_tau': ("thrusters_tau", 0.1)}
 
         param_loader.get_ros_params(self, param_dict)
 
