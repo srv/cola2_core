@@ -243,7 +243,7 @@ class SafetySupervisor(object):
         if temperatures:
             for t in range(0, len(temperatures)):
                 if temperatures[t] > self.max_temperatures_values[t]:
-                    self.error_code[ErrorCode.INTERNAL_SENSORS_ERROR] = '1'
+                    self.error_code[ErrorCode.INTERNAL_SENSORS_WARNING] = '1'
                     self.call_recovery_action(vehicle_status.temperature_name[t] + " high temperature",
                                               RecoveryAction.ABORT_AND_SURFACE)
                 else:
