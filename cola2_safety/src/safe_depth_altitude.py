@@ -47,7 +47,7 @@ class SafeDepthAltitude(object):
 
         # Publisher
         resolved_namespace = rospy.get_namespace()
-        self.pub_body_velocity_req = rospy.Publisher(resolved_namespace + "body_velocity_req",
+        self.pub_body_velocity_req = rospy.Publisher(resolved_namespace + "/controller/body_velocity_req",
                                                      BodyVelocityReq, queue_size=2)
 
         # Subscriber
