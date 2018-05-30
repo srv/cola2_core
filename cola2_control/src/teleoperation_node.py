@@ -20,6 +20,7 @@ from cola2_msgs.msg import BodyVelocityReq
 from cola2_msgs.msg import WorldWaypointReq
 from cola2_msgs.msg import GoalDescriptor
 from cola2_msgs.msg import NavSts
+from cola2_msgs.msg import CaptainStatus
 from cola2_msgs.srv import MaxJoyVelocity, MaxJoyVelocityResponse
 from cola2_lib.rosutils.diagnostic_helper import DiagnosticHelper
 from cola2_lib.rosutils import param_loader
@@ -48,7 +49,7 @@ class Teleoperation(object):
         # Set up diagnostics
         self.diagnostic = DiagnosticHelper('teleoperation', "soft")
 
-        # Some vars
+        # Init vars
         self.map_ack_init = False
         self.map_ack_alive = True
         self.manual_pitch = False
@@ -57,6 +58,7 @@ class Teleoperation(object):
         self.base_pose = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self.last_pose = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self.nav_init = False
+        self.mission_active = False
 
         # Get config
         self.actualize_base_pose = True  # Default
@@ -94,6 +96,11 @@ class Teleoperation(object):
                          self.nav_sts_update,
                          queue_size=1)
 
+        rospy.Subscriber(namespace + "captain/status",
+                         CaptainStatus,
+                         self.update_mission_status,
+                         queue_size=1)
+
         # Create services
         self.set_joy_srv = rospy.Service(
             self.name+'/set_max_joy_velocity',
@@ -123,6 +130,9 @@ class Teleoperation(object):
         self.last_pose[4] = data.orientation.pitch
         self.last_pose[5] = data.orientation.yaw
 
+    def update_mission_status(self, captain_status):
+        self.mission_active = captain_status.mission_active
+
     def ack_callback(self, ack_msg):
         """ This is the callback for the ack safety message """
         data = ack_msg.data.split(' ')
@@ -136,6 +146,10 @@ class Teleoperation(object):
         """ This is a callback for a timer. It publishes ack safety message
             and pose and velocity safety messages if map_ack is lost """
         if self.map_ack_init:
+            # If there is a mission running, update last_map_ack so last_ack will be 0 
+            # and will start counting again once the mission finishes.
+            if self.mission_active:
+                self.last_map_ack = rospy.Time.now().to_sec()
             self.diagnostic.add(
                 "last_ack",
                 str(rospy.Time.now().to_sec() - self.last_map_ack))
@@ -143,7 +157,8 @@ class Teleoperation(object):
                 self.map_ack_alive = False
                 self.diagnostic.set_level(DiagnosticStatus.OK)
             else:
-                rospy.loginfo("%s: we have lost map_ack!", self.name)
+                if not self.mission_active: # Do not generate the loginfo if mission is active
+                    rospy.loginfo("%s: we have lost map_ack!", self.name)
                 self.diagnostic.set_level(
                     DiagnosticStatus.WARN,
                     'Communication with map_ack lost!')
