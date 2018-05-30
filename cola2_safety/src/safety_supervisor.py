@@ -194,7 +194,7 @@ class SafetySupervisor(object):
         # Rule: No GPS data
         last_gps = vehicle_status.gps_data_age
         self.diagnostic.add('last_gps_data', str(last_gps))
-        if last_gps > self.min_gps_update:
+        if (last_gps > self.min_gps_update) and self.vehicle_status.at_surface:
             self.error_code[ErrorCode.NAV_STS_WARNING] = '1'
             self.call_recovery_action("No GPS data!", RecoveryAction.INFORMATIVE)
 
@@ -213,7 +213,7 @@ class SafetySupervisor(object):
                 self.error_code[ErrorCode.INTERNAL_SENSORS_WARNING] = '0'
                 self.call_recovery_action("No WiFi data!", RecoveryAction.ABORT_AND_SURFACE)
         else:
-            rospy.loginfo("%s: A mission is active. WiFi timeout disabled.", self.name)
+            #rospy.loginfo("%s: A mission is active. WiFi timeout disabled.", self.name)
             self.diagnostic.add('last_ack', 'Mission active')
 
         # Rule: No Modem data
