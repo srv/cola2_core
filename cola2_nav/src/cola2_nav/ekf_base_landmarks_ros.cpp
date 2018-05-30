@@ -279,11 +279,25 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
     ROS_FATAL("Diagnostics frequency too low");
   }
   // If filter or NED not initialized set to Warning
-  if (!init_ekf_ || !init_ned_)
+  if (!init_ekf_)
   {
     is_nav_data_ok = false;
-    ROS_FATAL("EKF or NED not yet init");
+    ROS_FATAL("EKF not yet init");
   }
+  else
+  {
+    diag_help_.add("ekf_init", "True");
+  }
+  if (!init_ned_)
+  {
+    is_nav_data_ok = false;
+    ROS_FATAL("NED not yet init");
+  }
+  else
+  {
+    diag_help_.add("ned_init", "True");
+  }
+
   // If all nav data is ok set navigator to Ok
   if (is_nav_data_ok && !ned_error_)
   {
