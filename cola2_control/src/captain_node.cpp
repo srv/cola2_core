@@ -742,7 +742,7 @@ nav_msgs::Path Captain::createPathFromMission(Mission mission)
 {
   nav_msgs::Path path;
   path.header.stamp = ros::Time::now();
-  path.header.frame_id = "ned";
+  path.header.frame_id = "world_ned";
   double ned_latitude;
   double ned_longitude;
   // Load NED origin, it can be modified at any time

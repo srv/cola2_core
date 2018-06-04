@@ -439,7 +439,7 @@ class Dynamics:
         """ Publish odometry message """
         odom = Odometry()
         odom.header.stamp = rospy.Time.now()
-        odom.header.frame_id = "ned"
+        odom.header.frame_id = "world_ned"
         odom.child_frame_id = self.namespace + "dynamics"
 
         odom.pose.pose.position.x = self.p[0]

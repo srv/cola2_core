@@ -414,7 +414,7 @@ void Pilot::sectionServerCallback(const cola2_msgs::WorldSectionGoalConstPtr& da
 void Pilot::publishGoal(const double x, const double y, const double z)
 {
   geometry_msgs::PointStamped goal;
-  goal.header.frame_id = "ned";
+  goal.header.frame_id = "world_ned";
   goal.header.stamp = ros::Time::now();
   goal.point.x = x;
   goal.point.y = y;
@@ -508,7 +508,7 @@ void Pilot::publishMarker(double north, double east, double depth)
   // Publish marker. Marker is published periodically so that RViz always
   // receives it, even if RViz is started after the ActionGoal arrives
   visualization_msgs::Marker marker;
-  marker.header.frame_id = "ned";
+  marker.header.frame_id = "world_ned";
   marker.header.stamp = ros::Time::now();
   marker.ns = ros::this_node::getName();
   marker.type = visualization_msgs::Marker::SPHERE;
@@ -536,7 +536,7 @@ void Pilot::publishMarkerSections(const control::PointsList points)
 {
   // Create visualization marker
   visualization_msgs::Marker marker;
-  marker.header.frame_id = "ned";
+  marker.header.frame_id = "world_ned";
   marker.header.stamp = ros::Time::now();
   marker.ns = ros::this_node::getName();
   marker.type = visualization_msgs::Marker::LINE_LIST;
