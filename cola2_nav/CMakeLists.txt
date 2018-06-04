@@ -69,3 +69,8 @@ add_library(cola2_nav
 )
 target_link_libraries(cola2_nav ${catkin_LIBRARIES})
 add_dependencies(cola2_nav ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+# Navigator node
+add_executable(navigator src/navigator_node.cpp)
+target_link_libraries(navigator cola2_nav)
+#add_dependencies(navigator cola2_msgs_gencpp)
