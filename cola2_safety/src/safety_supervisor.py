@@ -194,7 +194,7 @@ class SafetySupervisor(object):
         # Rule: No GPS data
         last_gps = vehicle_status.gps_data_age
         self.diagnostic.add('last_gps_data', str(last_gps))
-        if (last_gps > self.min_gps_update) and self.vehicle_status.at_surface:
+        if (last_gps > self.min_gps_update) and vehicle_status.at_surface:
             self.error_code[ErrorCode.NAV_STS_WARNING] = '1'
             self.call_recovery_action("No GPS data!", RecoveryAction.INFORMATIVE)
 
