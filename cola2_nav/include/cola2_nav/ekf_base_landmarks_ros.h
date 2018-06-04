@@ -65,7 +65,7 @@ private:
   cola2::rosutils::TransformHandler tf_handler_;  //!< provide tfs
   tf::TransformBroadcaster tf_broadcast_;         //!< to publish world->vehicle
   std::string ns_;                                //!< namespace we are in
-  std::string frame_world_ = "ned";               //!< frame where AUV is located
+  std::string frame_world_ = "world_ned";         //!< frame where AUV is located
   std::string frame_vehicle_;                     //!< frame of the vehicle (ns/base_link)
 
   // ROS Publishers
