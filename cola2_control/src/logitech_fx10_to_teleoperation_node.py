@@ -5,17 +5,27 @@
 # 'LICENSE.txt', which is part of this source code package.
 
 
+"""
+@@>LogitechFX10 controler node.<@@
+"""
+
 import rospy
 from cola2_control.joystickbase import JoystickBase
+from cola2_lib.rosutils import param_loader
+from std_srvs.srv import Empty
 
 
 class LogitechFX10(JoystickBase):
-    """ This class inherits from JoystickBase. It has to overload the 
-    method update_joy(self, joy) that receives a sensor_msgs/Joy 
-    message and fill the var self.joy_msg as described in the class
-    JoystickBase. 
-    From this class it is also possible to call services or anything 
-    else reading the buttons in the update_joy method."""
+    """LogitechFX10 controler node."""
+
+    """
+        This class inherent from JoystickBase. It has to overload the
+        method update_joy(self, joy) that receives a sensor_msgs/Joy
+        message and fill the var self.joy_msg as described in the class
+        JoystickBase.
+        From this class it is also possible to call services or anything
+        else reading the buttons in the update_joy method.
+    """
 
     # JOYSTICK  DEFINITION:
     LEFT_JOY_HORIZONTAL = 0  # LEFT+, RIGHT-
@@ -43,18 +53,60 @@ class LogitechFX10(JoystickBase):
     MOVE_RIGHT = -1
 
     def __init__(self, name):
-        """ Constructor """
+        """Class constructor."""
         JoystickBase.__init__(self, name)
         # rospy.loginfo("%s: LogitechFX10 constructor", name)
 
         # To transform button into axis
         self.up_down = 0.0
         self.left_right = 0.0
+        self.start_service = ""
+        self.stop_service = ""
+
+        namespace = rospy.get_namespace()
+        self.get_config()
+
+        # Create client to services:
+        # ... start button service
+        if self.start_service != "":
+            rospy.wait_for_service(self.start_service, 10)
+            try:
+                self.enable_keep_pose = rospy.ServiceProxy(self.start_service, Empty)
+            except rospy.ServiceException, e:
+                rospy.logwarn("%s: Service call failed: %s", self.name, e)
+
+        # ... stop button service
+        if self.start_service != '':
+            rospy.wait_for_service(self.stop_service, 10)
+            try:
+                self.disable_keep_pose = rospy.ServiceProxy(self.stop_service, Empty)
+            except rospy.ServiceException, e:
+                rospy.logwarn("%s: Service call failed: %s", self.name, e)
+
+        # ... enable thrusters service
+        rospy.wait_for_service(
+            namespace + 'controller/enable_thrusters', 10)
+        try:
+            self.enable_thrusters = rospy.ServiceProxy(
+                namespace + 'controller/enable_thrusters', Empty)
+        except rospy.ServiceException, e:
+            rospy.logwarn("%s: Service call failed: %s", self.name, e)
+
+        # ... disable thrusters service
+        rospy.wait_for_service(
+            namespace + 'controller/disable_thrusters', 10)
+        try:
+            self.disable_thrusters = rospy.ServiceProxy(
+                namespace + 'controller/disable_thrusters', Empty)
+        except rospy.ServiceException, e:
+            rospy.logwarn("%s: Service call failed: %s", self.name, e)
 
     def update_joy(self, joy):
-        """ Transform FX10 joy data into 12 axis data (pose + twist) 
-        and sets the buttons that especify if position or velocity 
+        """Receive joystic raw data."""
+        """Transform FX10 joy data into 12 axis data (pose + twist)
+        and sets the buttons that especify if position or velocity
         commands are used in the teleoperation."""
+        self.mutual_exclusion.acquire()
 
         self.joy_msg.header = joy.header
 
@@ -62,24 +114,24 @@ class LogitechFX10(JoystickBase):
         # depth and yaw in position.
 
         # up-down (depth control pose)
-        if joy.axes[self.CROSS_VERTICAL] == self.MOVE_DOWN:
-            self.up_down = self.up_down + 0.1
+        if (joy.axes[self.CROSS_VERTICAL] == self.MOVE_DOWN):
+            self.up_down = self.up_down + 0.05
             if self.up_down > 1.0:
                 self.up_down = 1.0
-        elif joy.axes[self.CROSS_VERTICAL] == self.MOVE_UP:
-            self.up_down = self.up_down - 0.1
+        elif (joy.axes[self.CROSS_VERTICAL] == self.MOVE_UP):
+            self.up_down = self.up_down - 0.05
             if self.up_down < -1.0:
                 self.up_down = -1.0
 
         # left-right (yaw control pose)
-        if joy.axes[self.CROSS_HORIZONTAL] == self.MOVE_RIGHT:
-            self.left_right = self.left_right + 0.1
+        if (joy.axes[self.CROSS_HORIZONTAL] == self.MOVE_RIGHT):
+            self.left_right = self.left_right + 0.05
             if self.left_right > 1.0:
-                self.left_right = 1.0
-        elif joy.axes[self.CROSS_HORIZONTAL] == self.MOVE_LEFT:
-            self.left_right = self.left_right - 0.1
-            if self.left_right < -1.0:
                 self.left_right = -1.0
+        elif (joy.axes[self.CROSS_HORIZONTAL] == self.MOVE_LEFT):
+            self.left_right = self.left_right - 0.05
+            if self.left_right < -1.0:
+                self.left_right = 1.0
 
         self.joy_msg.axes[JoystickBase.AXIS_POSE_Z] = self.up_down
         self.joy_msg.axes[JoystickBase.AXIS_POSE_YAW] = self.left_right
@@ -88,7 +140,7 @@ class LogitechFX10(JoystickBase):
         self.joy_msg.axes[JoystickBase.AXIS_TWIST_W] = -joy.axes[self.LEFT_JOY_VERTICAL]
         self.joy_msg.axes[JoystickBase.AXIS_TWIST_R] = -joy.axes[self.LEFT_JOY_HORIZONTAL]
 
-        # We always publish the desired pose and the desired twist. 
+        # We always publish the desired pose and the desired twist.
         # However, using the buttons we decide which ones we use
 
         # enable/disable z control position
@@ -105,8 +157,37 @@ class LogitechFX10(JoystickBase):
             self.left_right = 0.0
             rospy.loginfo("%s: Reset left_right counter", self.name)
 
-        print 'JoystickBase.BUTTON_POSE_Z: ', JoystickBase.BUTTON_POSE_Z
+        # Additional functions:
 
+        # Enable/disable keep position
+        if joy.buttons[self.BUTTON_START] == 1.0:
+            rospy.loginfo("%s: Start button service called", self.name)
+            self.enable_keep_pose()
+        if joy.buttons[self.BUTTON_BACK] == 1.0:
+            rospy.loginfo("%s: Stop button service called", self.name)
+            self.disable_keep_pose()
+
+        # Enable/disable thrusters
+        if joy.axes[self.LEFT_TRIGGER] < -0.9 and joy.axes[self.RIGHT_TRIGGER] < -0.9:
+            rospy.loginfo("%s: DISABLE THRUSTERS!", self.name)
+            self.disable_thrusters()
+            rospy.sleep(1.0)
+
+        if joy.buttons[self.BUTTON_LEFT] == 1.0 and joy.buttons[self.BUTTON_RIGHT] == 1.0:
+            rospy.loginfo("%s: ENABLE THRUSTERS!", self.name)
+            self.enable_thrusters()
+        self.mutual_exclusion.release()
+
+    def get_config(self):
+        """ Read parameters from ROS Param Server """
+
+        ns = rospy.get_namespace()
+
+        param_dict = {'start_service': ('start_service', ''),
+                      'stop_service': ('stop_service', '')
+                     }
+
+        param_loader.get_ros_params(self, param_dict)
 
 if __name__ == '__main__':
     """ Initialize the logitech_fx10 node. """
