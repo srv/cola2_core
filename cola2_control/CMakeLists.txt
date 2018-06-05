@@ -38,6 +38,11 @@ find_package(Boost REQUIRED)
 # declared therein get installed
 catkin_python_setup()
 
+
+generate_dynamic_reconfigure_options(
+        cfg/controller_only_thrusters.cfg
+)
+
 # Declare things to be passed to dependent projects
 catkin_package(
   INCLUDE_DIRS include
@@ -103,6 +108,13 @@ add_library(ros_control_base SHARED
 target_link_libraries(ros_control_base ${catkin_LIBRARIES})
 add_dependencies(ros_control_base ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
+
+add_library(only_thrusters_controller_lib SHARED
+        src/${PROJECT_NAME}/low_level_controllers/only_thrusters_controller.cpp
+        src/${PROJECT_NAME}/low_level_controllers/only_thruster_allocator.cpp)
+target_link_libraries(only_thrusters_controller_lib ${catkin_LIBRARIES})
+
+
 # Add executables
 add_executable(keyboard src/keyboard.cpp)
 target_link_libraries(keyboard ${catkin_LIBRARIES} ${Boost_LIBRARIES})
@@ -115,6 +127,10 @@ add_dependencies(pilot ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TAR
 add_executable(captain src/captain_node.cpp)
 target_link_libraries(captain ${catkin_LIBRARIES} ${Boost_LIBRARIES} mission_utils)
 add_dependencies(captain ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+add_executable(controller_only_thrusters src/only_thrusters_controller_node.cpp)
+target_link_libraries(controller_only_thrusters ${catkin_LIBRARIES} low_level_controllers ros_control_base only_thrusters_controller_lib)
+add_dependencies(controller_only_thrusters ${PROJECT_NAME}_gencfg cola2_msgs_gencpp)
 
 # Mark executable scripts (Python etc.) for installation. In contrast to
 # setup.py, you can choose the destination
