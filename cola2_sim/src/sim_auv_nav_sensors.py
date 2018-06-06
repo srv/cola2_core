@@ -10,6 +10,7 @@ import rospy
 import tf
 # Import msgs
 from cola2_msgs.msg import DVL  # dvl
+from geometry_msgs.msg  import PoseWithCovarianceStamped # usbl
 from sensor_msgs.msg import FluidPressure  # depth
 from sensor_msgs.msg import Imu  # imu
 from sensor_msgs.msg import NavSatFix  # gps
@@ -58,6 +59,7 @@ class SimAUVNavSensors(object):
 
         # Create publishers
         self.pub_gps = rospy.Publisher(self.ns + 'navigator/gps', NavSatFix, queue_size=2)
+        self.pub_usbl = rospy.Publisher(self.ns + 'navigator/usbl', PoseWithCovarianceStamped, queue_size=2)
         self.pub_depth = rospy.Publisher(self.ns + 'navigator/pressure', FluidPressure, queue_size=2)
         self.pub_dvl = rospy.Publisher(self.ns + 'navigator/dvl', DVL, queue_size=2)
         self.pub_altitude = rospy.Publisher(self.ns + 'navigator/altitude', Range, queue_size=2)
@@ -69,6 +71,7 @@ class SimAUVNavSensors(object):
         # Create subscribers
         # Odometry from dynamics to know where the vehicle is
         self.has_odom = False
+        self.has_old_odom = False
         rospy.Subscriber(self.ns + 'dynamics/odometry', Odometry, self.update_odometry, queue_size=1)
         # Altitude from the simulator
         rospy.Subscriber(self.ns + 'dynamics/altitude', Range, self.update_altitude, queue_size=1)
@@ -79,27 +82,36 @@ class SimAUVNavSensors(object):
         while (not found) and (not rospy.is_shutdown()):
             try:
                 # GPS
-                _, gps_xyz, gps_rpy = self.tf_handler.get_transform(self.ns + 'gps')
-                self.tf_gps = transform_from_tf(gps_xyz, gps_rpy)
-                rospy.loginfo("gps tf loaded")
+                if self.gps_period > 0:
+                    _, gps_xyz, gps_rpy = self.tf_handler.get_transform(self.ns + 'gps')
+                    self.tf_gps = transform_from_tf(gps_xyz, gps_rpy)
+                    rospy.loginfo("gps tf loaded")
                 # Depth
-                _, depth_xyz, depth_rpy = self.tf_handler.get_transform(self.ns + 'pressure')
-                self.tf_depth = transform_from_tf(depth_xyz, depth_rpy)
-                rospy.loginfo("depth tf loaded")
+                if self.depth_period > 0:
+                    _, depth_xyz, depth_rpy = self.tf_handler.get_transform(self.ns + 'pressure')
+                    self.tf_depth = transform_from_tf(depth_xyz, depth_rpy)
+                    rospy.loginfo("depth tf loaded")
                 # DVL
-                _, dvl_xyz, dvl_rpy = self.tf_handler.get_transform(self.ns + 'dvl')
-                self.tf_dvl = transform_from_tf(dvl_xyz, dvl_rpy)
-                rospy.loginfo("dvl tf loaded")
+                if self.dvl_period > 0:
+                    _, dvl_xyz, dvl_rpy = self.tf_handler.get_transform(self.ns + 'dvl')
+                    self.tf_dvl = transform_from_tf(dvl_xyz, dvl_rpy)
+                    rospy.loginfo("dvl tf loaded")
                 # IMU
-                _, imu_xyz, imu_rpy = self.tf_handler.get_transform(self.ns + 'imu_filter')
-                self.tf_imu_filter = transform_from_tf(imu_xyz, imu_rpy)
-                rospy.loginfo("imu tf loaded")
+                if self.imu_period > 0:
+                    _, imu_xyz, imu_rpy = self.tf_handler.get_transform(self.ns + 'imu_filter')
+                    self.tf_imu_filter = transform_from_tf(imu_xyz, imu_rpy)
+                    rospy.loginfo("imu tf loaded")
+                # USBL
+                if self.usbl_period > 0:
+                    _, usbl_xyz, usbl_rpy = self.tf_handler.get_transform(self.ns + 'modem')
+                    self.tf_usbl = transform_from_tf(usbl_xyz, usbl_rpy)
+                    rospy.loginfo("usbl tf loaded")
                 # All ok
                 found = True
             except Exception as e:
-                rospy.logwarn("cannot find all transforms")
-                rospy.logwarn(e.message)
-                rospy.sleep(2.0)
+                rospy.logfatal("cannot find all transforms")
+                rospy.logfatal(e.message)
+                exit(1)
 
         # Init simulated sensors
         if self.gps_period > 0:
@@ -110,6 +122,8 @@ class SimAUVNavSensors(object):
             rospy.Timer(rospy.Duration(self.dvl_period), self.publish_dvl)
         if self.imu_period > 0:
             rospy.Timer(rospy.Duration(self.imu_period), self.publish_imu)
+        if self.usbl_period > 0:
+            rospy.Timer(rospy.Duration(self.usbl_period), self.publish_usbl)
 
     def get_config(self):
         """Define and load all necessary parameters from ROS param server."""
@@ -126,16 +140,21 @@ class SimAUVNavSensors(object):
             'depth_period': ("depth_period", 0.5),
             'dvl_period': ("dvl_period", 0.5),
             'imu_period': ("imu_period", 0.5),
+            'usbl_period': ("usbl_period", 5.0),
             # cov
             'gps_position_covariance': ("gps_position_covariance", 0.25),
             'depth_pressure_covariance': ("depth_pressure_covariance", 0.01),
             'dvl_velocity_covariance': ("dvl_velocity_covariance", 0.01),
             'imu_orientation_covariance': ("imu_orientation_covariance", 0.01),
+            'usbl_position_covariance': ("usbl_position_covariance", 0.5),
             # output cov
             'output_gps_position_covariance': ("output_gps_position_covariance", 0.5),
             'output_depth_pressure_covariance': ("output_depth_pressure_covariance", 0.1),
             'output_dvl_velocity_covariance': ("output_dvl_velocity_covariance", 0.1),
-            'output_imu_orientation_covariance': ("output_imu_orientation_covariance", 0.1)}
+            'output_imu_orientation_covariance': ("output_imu_orientation_covariance", 0.1),
+            'output_usbl_position_covariance': ("output_usbl_position_covariance", 3.0),
+            # usbl start at depth bigger than
+            'usbl_depth_start': ('usbl_depth_start', 4.0)}
         # Load them
         get_ros_params(self, param_dict)
 
@@ -169,8 +188,7 @@ class SimAUVNavSensors(object):
         # Transform to sensor
         ned = self.tf_gps[1].dot(ned) + self.tf_gps[0]
         # Transform to lat lon
-        # lat, lon, _ = self.ned.ned2geodetic([ned[0], ned[1], 0.0])
-        lat, lon, _ = self.ned.ned2geodetic([0.0, 0.0, 0.0])
+        lat, lon, _ = self.ned.ned2geodetic([ned[0], ned[1], 0.0])
         # Create message
         gps = NavSatFix()
         gps.header.stamp = event.current_real
@@ -191,6 +209,44 @@ class SimAUVNavSensors(object):
         self.pub_gps.publish(gps)
         # Diagnostic message
         self.diagnostic_gps.set_level(DiagnosticStatus.OK)
+
+    def publish_usbl(self, event):
+        """Publish USBL according to the current position and if close to surface."""
+        # Exit if no odom
+        if not self.has_odom:
+            rospy.loginfo("waiting for dynamics odometry")
+            return
+        # Accumulate old message
+        if not self.has_old_odom:
+            self.old_odom = self.odom
+            self.has_old_odom = True
+            return
+        old = self.old_odom  # message usign old odom
+        self.old_odom = self.odom  # save new old odom
+        # Exit if not deep enough
+        if old.pose.pose.position.z < self.usbl_depth_start:
+            return
+        # Compute position with noise
+        north = old.pose.pose.position.x + np.random.normal(0.0, self.usbl_position_covariance[0])
+        east = old.pose.pose.position.y + np.random.normal(0.0, self.usbl_position_covariance[1])
+        ned = np.array([[north, east, 0.0]]).T
+        # Transform to sensor
+        ned = self.tf_usbl[1].dot(ned) + self.tf_usbl[0]
+        # Transform to lat lon
+        lat, lon, _ = self.ned.ned2geodetic([ned[0], ned[1], 0.0])
+        # Create message
+        usbl = PoseWithCovarianceStamped()
+        usbl.header.stamp = event.current_real - rospy.Duration(self.usbl_period)
+        usbl.header.frame_id = self.ns + 'modem'
+        usbl.pose.pose.position.x = lat
+        usbl.pose.pose.position.y = lon
+        usbl.pose.pose.position.z = 0.0
+        usbl.pose.covariance[0] = self.output_usbl_position_covariance[0]
+        usbl.pose.covariance[7] = self.output_usbl_position_covariance[1]
+        # Publish
+        self.pub_usbl.publish(usbl)
+        # Diagnostic message
+        # self.diagnostic_usbl.set_level(DiagnosticStatus.OK)
 
     def publish_depth(self, event):
         """Publish depth according to the current position."""
