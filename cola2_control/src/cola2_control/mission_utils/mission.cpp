@@ -61,7 +61,7 @@ int Mission::loadAction(TiXmlHandle hDoc, MissionAction& action)
 
   // TODO: Check that parameters are really stored!
   pElem = hDoc.FirstChild().Element();
-  for (pElem; pElem; pElem = pElem->NextSiblingElement())
+  for (; pElem; pElem = pElem->NextSiblingElement())
   {
     std::string param_tag = pElem->Value();
     std::string param = pElem->GetText();
@@ -70,6 +70,7 @@ int Mission::loadAction(TiXmlHandle hDoc, MissionAction& action)
       action.addParameters(param);
     }
   }
+  return 0;  // Everything ok
 }
 
 bool Mission::loadPosition(TiXmlHandle hDoc, MissionPosition& position)
@@ -81,7 +82,7 @@ bool Mission::loadPosition(TiXmlHandle hDoc, MissionPosition& position)
   bool z_ = false;
   bool mode = false;
 
-  for (pElem; pElem; pElem = pElem->NextSiblingElement())
+  for (; pElem; pElem = pElem->NextSiblingElement())
   {
     std::string wp_tag = pElem->Value();
     if (wp_tag == "latitude")
@@ -127,7 +128,7 @@ bool Mission::loadTolerance(TiXmlHandle hDoc, MissionTolerance& tolerance)
   bool y_ = false;
   bool z_ = false;
 
-  for (pElem; pElem; pElem = pElem->NextSiblingElement())
+  for (; pElem; pElem = pElem->NextSiblingElement())
   {
     std::string wp_tag = pElem->Value();
     if (wp_tag == "x")
@@ -161,7 +162,7 @@ bool Mission::loadManeuverWaypoint(TiXmlHandle hDoc, MissionWaypoint& waypoint)
   bool speed = false;
   bool tolerance = false;
   std::cout << "Load maneuver waypoint\n";
-  for (pElem; pElem; pElem = pElem->NextSiblingElement())
+  for (; pElem; pElem = pElem->NextSiblingElement())
   {
     std::string wp_tag = pElem->Value();
     if (wp_tag == "position")
@@ -197,7 +198,7 @@ bool Mission::loadManeuverSection(TiXmlHandle hDoc, MissionSection& section)
   bool speed = false;
   bool tolerance = false;
 
-  for (pElem; pElem; pElem = pElem->NextSiblingElement())
+  for (; pElem; pElem = pElem->NextSiblingElement())
   {
     std::string wp_tag = pElem->Value();
     if (wp_tag == "initial_position")
@@ -240,7 +241,7 @@ bool Mission::loadManeuverPark(TiXmlHandle hDoc, MissionPark& park)
   bool time = false;
   bool tolerance = false;
 
-  for (pElem; pElem; pElem = pElem->NextSiblingElement())
+  for (; pElem; pElem = pElem->NextSiblingElement())
   {
     std::string wp_tag = pElem->Value();
     if (wp_tag == "position")
@@ -313,7 +314,7 @@ int Mission::loadStep(TiXmlHandle hDoc, MissionStep& step)
   else
   {
     std::cout << "Actions found in mission step!\n";
-    for (pElem; pElem; pElem = pElem->NextSiblingElement())
+    for (; pElem; pElem = pElem->NextSiblingElement())
     {
       std::string m_name = pElem->Value();
       std::cout << "found: " << m_name << std::endl;
@@ -350,7 +351,7 @@ int Mission::loadMission(const std::string mission_file_name)
   // Read all childs of mission tag
   pElem = hDoc.FirstChild("mission").FirstChild().Element();
   std::string m_name = pElem->Value();
-  for (pElem; pElem; pElem = pElem->NextSiblingElement())
+  for (; pElem; pElem = pElem->NextSiblingElement())
   {
     std::string m_name = pElem->Value();
     if (m_name == "mission_step")
