@@ -24,6 +24,7 @@ bool EKFBase::makePrediction(const double now)
       // x = f(x, u)
       // P = A P AT + W Q WT
       x_ = fx_;
+      normalizeState();
       P_ = A_ * P_ * A_.transpose() + W_ * Q_ * W_.transpose();
       last_prediction_ = now;
       return true;
