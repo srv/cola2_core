@@ -45,9 +45,6 @@ EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size)
   pub_landmarks_ = nh_.advertise<visualization_msgs::MarkerArray>("markers/landmarks", 1);
   pub_altitude_ = nh_.advertise<sensor_msgs::Range>("altitude", 1);
 
-  // Init timer
-  timer_ = nh_.createTimer(ros::Duration(1.0), &EKFBaseLandmarksROS::checkDiagnostics, this);
-
   // Init services
   // clang-format off
   srv_reload_params_ = nh_.advertiseService("reload_params", &EKFBaseLandmarksROS::srvResetNavigation, this);
@@ -512,7 +509,7 @@ void EKFBaseLandmarksROS::updatePositionDepthMsg(const sensor_msgs::FluidPressur
       publishNavigationAndLandmarks(msg.header.stamp);
     }
   }
-  else 
+  else
   {
     ROS_WARN("Pressure in meters is smaller than -1.0");
   }
