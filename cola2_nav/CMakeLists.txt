@@ -61,16 +61,23 @@ include_directories(
 
 # Declare C++ libraries
 add_library(cola2_nav
+  # Bases
   src/${PROJECT_NAME}/ekf_base.cpp
   src/${PROJECT_NAME}/ekf_base_landmarks.cpp
   src/${PROJECT_NAME}/ekf_base_landmarks_ros.cpp
-  src/${PROJECT_NAME}/ekf_position_velocity_landmarks.cpp
   src/${PROJECT_NAME}/transformations.cpp
+  # Complete filters
+  src/${PROJECT_NAME}/ekf_position_velocity_landmarks.cpp
+  src/${PROJECT_NAME}/ekf_surface_2d.cpp
 )
 target_link_libraries(cola2_nav ${catkin_LIBRARIES})
 add_dependencies(cola2_nav ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-# Navigator node
+# Navigator nodes
 add_executable(navigator src/navigator_node.cpp)
 target_link_libraries(navigator cola2_nav)
+#add_dependencies(navigator cola2_msgs_gencpp)
+
+add_executable(navigator_surface src/navigator_surface_node.cpp)
+target_link_libraries(navigator_surface cola2_nav)
 #add_dependencies(navigator cola2_msgs_gencpp)
