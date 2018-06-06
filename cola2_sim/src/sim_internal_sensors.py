@@ -148,6 +148,7 @@ class SimSensorsGirona500:
 
         # Publish diagnostic message
         self.diagnostic_bat.add('charge', str(battery_msg.charge))
+        self.diagnostic_bat.add('voltage', str(battery_msg.voltage))
         self.diagnostic_bat.add('minutes', str(self.battery_level * 3.15))
         self.diagnostic_bat.add('status', "DISCHARGING")
         if battery_msg.charge > 15.0:
