@@ -304,6 +304,15 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
   {
     diag_help_.setLevel(diagnostic_msgs::DiagnosticStatus::WARN);
   }
+
+  // *****************************************
+  // Sensor inits to diagnostics
+  // *****************************************
+  diag_help_.add("gps_init", !(config_.use_gps_data_ && !init_gps_));
+  diag_help_.add("depth_init", init_depth_);
+  diag_help_.add("dvl_init", init_dvl_);
+  diag_help_.add("imu_init", init_imu_);
+
   // *****************************************
   // Output to console
   // *****************************************

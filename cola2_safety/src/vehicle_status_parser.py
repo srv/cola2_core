@@ -61,7 +61,7 @@ class VehicleStatusParser:
                          queue_size=1)
 
         # Initialize temperature vector
-        self.status.temperature = [-1000.0] * len(self.temperature_name) 
+        self.status.temperature = [-1000.0] * len(self.temperature_name)
         t = rospy.Time.now()
         self.last_temperature = [t] * len(self.temperature_name)
 
@@ -104,7 +104,7 @@ class VehicleStatusParser:
 
             # Get thrusters status
             if __getDiagnostic__(status, self.diag_thrusters_enabled[0]):
-                if __getDiagnostic__(status, self.diag_thrusters_enabled[0], self.diag_thrusters_enabled[1], '0') == '1':
+                if __getDiagnostic__(status, self.diag_thrusters_enabled[0], self.diag_thrusters_enabled[1], 'False') == 'True':
                     self.status.thrusters_enabled = True
                 else:
                     self.status.thrusters_enabled = False
@@ -120,7 +120,7 @@ class VehicleStatusParser:
             if __getDiagnostic__(status, self.diag_battery_charge[0]):
                 charge = float(__getDiagnostic__(status, self.diag_battery_charge[0], self.diag_battery_charge[1], 100.0))
                 self.status.battery_charge = charge
-                
+
             # Get battery voltage
             if __getDiagnostic__(status, self.diag_battery_voltage[0]):
                 voltage = float(__getDiagnostic__(status, self.diag_battery_voltage[0], self.diag_battery_voltage[1], 100.0))
@@ -181,7 +181,7 @@ class VehicleStatusParser:
                 if abs(wifi_age) > 100000.0:
                     wifi_age = 0.0
                 self.status.wifi_data_age = wifi_age
-                
+
             # Get modem data age
             if __getDiagnostic__(status, self.diag_modem_data_age[0]):
                 modem_age = float(__getDiagnostic__(status, self.diag_modem_data_age[0], self.diag_modem_data_age[1], 0.0))
@@ -199,7 +199,7 @@ class VehicleStatusParser:
                     else:
                         self.status.temperature[i] = temp
 		        self.last_temperature[i] = rospy.Time.now()
-            
+
             # Water inside
             water_pc = water_bat = water_pc_external = water_bat_external = water_ins = False
             if __getDiagnostic__(status, self.diag_water_pc_internal[0]):
@@ -252,7 +252,7 @@ class VehicleStatusParser:
                       'diag_water_pc_internal': ('water_pc_internal', ["",""]),
                       'diag_water_pc_external': ('water_pc_external', ["",""]),
                       'diag_water_bat_internal': ('water_bat_internal', ["",""]),
-                      'diag_water_bat_external': ('water_bat_external', ["",""]),	
+                      'diag_water_bat_external': ('water_bat_external', ["",""]),
                       'temperature_name': ('temperature_name', ["",""])
                      }
 
