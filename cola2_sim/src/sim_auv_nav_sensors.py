@@ -169,8 +169,7 @@ class SimAUVNavSensors(object):
         # Transform to sensor
         ned = self.tf_gps[1].dot(ned) + self.tf_gps[0]
         # Transform to lat lon
-        # lat, lon, _ = self.ned.ned2geodetic([ned[0], ned[1], 0.0])
-        lat, lon, _ = self.ned.ned2geodetic([0.0, 0.0, 0.0])
+        lat, lon, _ = self.ned.ned2geodetic([ned[0], ned[1], 0.0])
         # Create message
         gps = NavSatFix()
         gps.header.stamp = event.current_real
