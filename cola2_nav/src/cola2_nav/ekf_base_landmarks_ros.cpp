@@ -121,7 +121,7 @@ void EKFBaseLandmarksROS::resetFilter()
   if (!config_.initialize_ned_from_gps_)
   {
     ROS_INFO("Init NED from config file");
-    std::cout << "\n\n\nNED: " << config_.ned_latitude_ << ", " << config_.ned_longitude_ << std::endl;
+    ROS_INFO("NED: %.8f, %.8f", config_.ned_latitude_, config_.ned_longitude_);
     ned_ = cola2::utils::NED(config_.ned_latitude_, config_.ned_longitude_, 0.0);
     init_ned_ = true;
     diag_help_.add("ned_init", "True");
@@ -439,21 +439,25 @@ void EKFBaseLandmarksROS::updatePositionUSBLMsg(const geometry_msgs::PoseWithCov
   {
     // Diagnostics
     diag_help_.increaseFrequencyCounter();
-    // Get delayed position increment and check valid time
+    // Get delayed position increment [dt dx dy]
     const Eigen::Vector3d position_increment = getPositionIncrementFrom(msg.header.stamp.toSec());
+    // Valid time increment
     if (position_increment(0) >= 0.0)
     {
+      // Current time
+      const ros::Time current_time = msg.header.stamp + ros::Duration(position_increment[0]);
       // Construct measurement
       const Eigen::Vector3d latlonh(msg.pose.pose.position.x, msg.pose.pose.position.y, 0.0);
       Eigen::Vector3d ned = ned_.geodetic2Ned(latlonh);
       ned.head(2) += position_increment.tail(2);  // increment the same we increased
-      publishUSBLNED(msg.header.stamp, ned);
+      ned(2) = getPosition()(2);          // show in current depth
+      publishUSBLNED(current_time, ned);  // show
       Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
       for (unsigned int i = 0; i < 3; ++i)
       {
         for (unsigned int j = 0; j < 3; ++j)
         {
-          cov(i, j) = msg.pose.covariance[6 * i + j];
+          cov(i, j) = msg.pose.covariance[6 * i + j];  // from 6x6 matrix
         }
       }
       // Transform to vehicle frame
@@ -465,7 +469,7 @@ void EKFBaseLandmarksROS::updatePositionUSBLMsg(const geometry_msgs::PoseWithCov
       ned = transforms::position(ned, getOrientation(), trans.translation());
       cov = transforms::positionCovariance(cov, getOrientationUncertainty(), getOrientation(), trans.translation());
       // Predict and update
-      const double tim = msg.header.stamp.toSec();
+      const double tim = current_time.toSec();
       if (!init_ekf_ || makePrediction(tim))
       {
         // Debug
@@ -475,8 +479,8 @@ void EKFBaseLandmarksROS::updatePositionUSBLMsg(const geometry_msgs::PoseWithCov
                << cov(1, 0) << ' ' << cov(1, 1) << '\n';
         }
         // Update and publish
-        updatePositionXY(msg.header.stamp.toSec(), ned.head(2), cov.topLeftCorner(2, 2));
-        publishNavigationAndLandmarks(msg.header.stamp);
+        updatePositionXY(tim, ned.head(2), cov.topLeftCorner(2, 2));
+        publishNavigationAndLandmarks(current_time);
       }
     }
   }
