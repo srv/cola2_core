@@ -57,15 +57,16 @@ public:
    */
   void setParams(cola2_control::controller_only_thrustersConfig& config, uint32_t)
   {
-    std::vector<double> thruster_poly;
-    cola2::rosutils::getParamVector("~thruster_poly", thruster_poly);
+    std::vector<double> thruster_poly_positive, thruster_poly_negative;
+    cola2::rosutils::getParamVector("~thruster_poly_positive", thruster_poly_positive);
+    cola2::rosutils::getParamVector("~thruster_poly_negative", thruster_poly_negative);
 
     std::vector<double> tcm;
     cola2::rosutils::getParamVector("~TCM", tcm);
 
     auv_controller_->thruster_allocator_.setParams(
-        config.max_force_thruster_forward, config.max_force_thruster_backward, config.thruster_distance_yaw,
-        config.force_to_thrusters_ratio, config.asymmetry, thruster_poly, tcm);
+        config.max_force_thruster_positive, config.max_force_thruster_negative, config.thruster_distance_yaw,
+        thruster_poly_positive, thruster_poly_negative, tcm);
 
     std::vector<std::map<std::string, double> > p_params;
     std::vector<std::string> keys = { "kp", "ti", "td", "i_limit", "fff" };

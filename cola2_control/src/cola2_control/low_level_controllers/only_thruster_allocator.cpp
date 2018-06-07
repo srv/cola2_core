@@ -10,15 +10,14 @@
 
 OnlyThrusterAllocator::OnlyThrusterAllocator(unsigned int n_thrusters) :
     n_thrusters_(n_thrusters),
-    poly_("thruster_allocator_"),
+    poly_positive_("thruster_allocator_"),
+    poly_negative_("thruster_allocator_"),
     is_init_(false)
 {
   // Load params
-  max_force_thruster_forward_ = 100.0;
-  max_force_thruster_backward_ = 70.0;
+  max_force_thruster_positive_ = 90.0;
+  max_force_thruster_negative_ = 100.0;
   thruster_distance_yaw_ = 0.51;
-  force_to_thrusters_ratio_ = 100.0;
-  asymmetry_ = 1.0;
   Eigen::MatrixXd tcm(6, n_thrusters_);
 }
 
@@ -26,31 +25,41 @@ OnlyThrusterAllocator::~OnlyThrusterAllocator()
 {
 }
 
-void OnlyThrusterAllocator::setParams(const double max_force_thruster_forward,
-                                           const double max_force_thruster_backward, const double thruster_distance_yaw,
-                                           const double force_to_thrusters_ratio, const double asymmetry,
-                                           const std::vector<double> thruster_poly,
-                                           const std::vector<double> tcm_values)
+void OnlyThrusterAllocator::setParams(const double max_force_thruster_positive,
+                                      const double max_force_thruster_negative,
+                                      const double thruster_distance_yaw,
+                                      const std::vector<double> thruster_poly_positive,
+                                      const std::vector<double> thruster_poly_negative,
+                                      const std::vector<double> tcm_values)
 {
   std::cout << "OnlyThrusterAllocator set params\n";
 
-  max_force_thruster_forward_ = max_force_thruster_forward;
-  max_force_thruster_backward_ = max_force_thruster_backward;
+  max_force_thruster_positive_ = max_force_thruster_positive;
+  max_force_thruster_negative_ = max_force_thruster_negative;
   thruster_distance_yaw_ = thruster_distance_yaw;
-  force_to_thrusters_ratio_ = force_to_thrusters_ratio;
-  asymmetry_ = asymmetry;
 
-  // Init thruster linearization polynomium
-  std::map<std::string, double> params;
-  params["n_dof"] = thruster_poly.size();
-  for (unsigned int i = 0; i < thruster_poly.size(); i++)
+  // Init thruster linearization polynomiums
+  std::map<std::string, double> params_positive;
+  params_positive["n_dof"] = thruster_poly_positive.size();
+  for (unsigned int i = 0; i < thruster_poly_positive.size(); i++)
   {
     std::ostringstream s;
     s << i;
     const std::string i_as_string(s.str());
-    params[i_as_string] = thruster_poly[i];
+    params_positive[i_as_string] = thruster_poly_positive[i];
   }
-  poly_.setParameters(params);
+  poly_positive_.setParameters(params_positive);
+
+  std::map<std::string, double> params_negative;
+  params_negative["n_dof"] = thruster_poly_negative.size();
+  for (unsigned int i = 0; i < thruster_poly_negative.size(); i++)
+  {
+    std::ostringstream s;
+    s << i;
+    const std::string i_as_string(s.str());
+    params_negative[i_as_string] = thruster_poly_negative[i];
+  }
+  poly_negative_.setParameters(params_negative);
 
   // Init TCM inverse
   std::cout << "tcm_values.size(): " << tcm_values.size() << "\n";
@@ -114,34 +123,28 @@ Eigen::VectorXd OnlyThrusterAllocator::compute(Request wrench)
   return setpoint;
 }
 
-Eigen::VectorXd OnlyThrusterAllocator::forceToSetpoint(const Eigen::VectorXd& wrench)
+Eigen::VectorXd OnlyThrusterAllocator::forceToSetpoint(Eigen::VectorXd thruster_forces)
 {
-  Eigen::VectorXd ret(wrench.size());
+  Eigen::VectorXd setpoints = Eigen::VectorXd::Zero(thruster_forces.size());
 
   // Compute newtons to setpoints for each thruster
-  for (unsigned int i = 0; i < wrench.size(); i++)
+  for (Eigen::Index i = 0; i < thruster_forces.size(); ++i)
   {
-    std::cout << "ret " << i << ": " << ret[i] << "\n";
-
-    ret[i] = wrench[i] / force_to_thrusters_ratio_;
-    // std::cout << "ret normalized " << i << ": " << ret[i] << "\n";
-
-    // Apply asymmetry
-    if (ret[i] < 0.0)
+    if (thruster_forces[i] > 0.0)
     {
-      ret[i] = ret[i] * asymmetry_;
+      cola2::utils::saturate(thruster_forces[i], max_force_thruster_positive_);
+      setpoints[i] = poly_positive_.compute(0.0, thruster_forces[i], 0.0);
     }
-    // std::cout << "ret asymetry " << i << ": " << ret[i] << "\n";
+    else if (thruster_forces[i] < 0.0)
+    {
+      cola2::utils::saturate(thruster_forces[i], max_force_thruster_negative_);
+      setpoints[i] = -poly_negative_.compute(0.0, -thruster_forces[i], 0.0);
+    }
 
-    // Saturate between -1.0 and 1.0
-    cola2::utils::saturate(ret[i], 1.0);
-    // std::cout << "ret saturate " << i << ": " << ret[i] << "\n";
-
-    // Pass through polynomy
-    ret[i] = poly_.compute(0.0, ret[i], 0.0);
-    // std::cout << "ret polynomy " << i << ": " << ret[i] << "\n";
+    cola2::utils::saturate(setpoints[i], 1.0);
   }
-  return ret;
+
+  return setpoints;
 }
 
 void OnlyThrusterAllocator::mergeSurgeYaw(double& surge, double& yaw)
@@ -151,10 +154,10 @@ void OnlyThrusterAllocator::mergeSurgeYaw(double& surge, double& yaw)
       reduced. */
 
   // Saturate surge
-  cola2::utils::saturate(surge, 2.0 * max_force_thruster_forward_, -2.0 * max_force_thruster_backward_);
+  cola2::utils::saturate(surge, 2.0 * max_force_thruster_positive_, -2.0 * max_force_thruster_negative_);
 
   // Saturate yaw
-  double min_force = std::min(max_force_thruster_forward_, max_force_thruster_backward_);
+  double min_force = std::min(max_force_thruster_positive_, max_force_thruster_negative_);
 
   cola2::utils::saturate(yaw, 2.0 * min_force * thruster_distance_yaw_);
 
@@ -163,17 +166,17 @@ void OnlyThrusterAllocator::mergeSurgeYaw(double& surge, double& yaw)
   double r_thruster = (surge / 2.0) - (yaw / thruster_distance_yaw_ / 2.0);
 
   // Check limits
-  if (fabs(l_thruster - r_thruster) > max_force_thruster_forward_ + max_force_thruster_backward_)
+  if (fabs(l_thruster - r_thruster) > max_force_thruster_positive_ + max_force_thruster_negative_)
   {
     if (l_thruster > r_thruster)
     {
-      l_thruster = max_force_thruster_forward_;
-      r_thruster = -max_force_thruster_backward_;
+      l_thruster = max_force_thruster_positive_;
+      r_thruster = -max_force_thruster_negative_;
     }
     else
     {
-      r_thruster = max_force_thruster_forward_;
-      l_thruster = -max_force_thruster_backward_;
+      r_thruster = max_force_thruster_positive_;
+      l_thruster = -max_force_thruster_negative_;
     }
   }
   else
@@ -181,28 +184,28 @@ void OnlyThrusterAllocator::mergeSurgeYaw(double& surge, double& yaw)
     double diff = fabs(l_thruster - r_thruster);
     if (l_thruster > r_thruster)
     {
-      if (l_thruster > max_force_thruster_forward_)
+      if (l_thruster > max_force_thruster_positive_)
       {
-        l_thruster = max_force_thruster_forward_;
-        r_thruster = max_force_thruster_forward_ - diff;
+        l_thruster = max_force_thruster_positive_;
+        r_thruster = max_force_thruster_positive_ - diff;
       }
-      if (r_thruster < -max_force_thruster_backward_)
+      if (r_thruster < -max_force_thruster_negative_)
       {
-        r_thruster = -max_force_thruster_backward_;
-        l_thruster = -max_force_thruster_backward_ + diff;
+        r_thruster = -max_force_thruster_negative_;
+        l_thruster = -max_force_thruster_negative_ + diff;
       }
     }
     if (r_thruster > l_thruster)
     {
-      if (r_thruster > max_force_thruster_forward_)
+      if (r_thruster > max_force_thruster_positive_)
       {
-        r_thruster = max_force_thruster_forward_;
-        l_thruster = max_force_thruster_forward_ - diff;
+        r_thruster = max_force_thruster_positive_;
+        l_thruster = max_force_thruster_positive_ - diff;
       }
-      if (l_thruster < -max_force_thruster_backward_)
+      if (l_thruster < -max_force_thruster_negative_)
       {
-        l_thruster = -max_force_thruster_backward_;
-        r_thruster = -max_force_thruster_backward_ + diff;
+        l_thruster = -max_force_thruster_negative_;
+        r_thruster = -max_force_thruster_negative_ + diff;
       }
     }
   }

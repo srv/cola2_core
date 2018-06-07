@@ -21,13 +21,12 @@ class OnlyThrusterAllocator
 {
 private:
   unsigned int n_thrusters_;
-  double max_force_thruster_forward_;
-  double max_force_thruster_backward_;
+  double max_force_thruster_positive_;
+  double max_force_thruster_negative_;
   double thruster_distance_yaw_;
   Eigen::MatrixXd tcm_inv_;
-  double force_to_thrusters_ratio_;
-  double asymmetry_;
-  Poly poly_;
+  Poly poly_positive_;
+  Poly poly_negative_;
   bool is_init_;
 
   /**
@@ -35,7 +34,7 @@ private:
    * @param wrench current force
    * @return setpoint for each thruster
    */
-  Eigen::VectorXd forceToSetpoint(const Eigen::VectorXd& wrench);
+  Eigen::VectorXd forceToSetpoint(Eigen::VectorXd thruster_forces);
 
   /**
    * Surge and yaw are controlled by the same thrusters. They must be merged with this function that prioritizes
@@ -43,7 +42,7 @@ private:
    * @param surge force
    * @param yaw torque
    */
-  void mergeSurgeYaw(double& surge, double& yaw);
+  void mergeSurgeYaw(double&, double& yaw);
 
 public:
   /**
@@ -54,9 +53,9 @@ public:
 
   ~OnlyThrusterAllocator();
 
-  void setParams(const double max_force_thruster_forward, const double max_force_thruster_backward,
-                 const double thruster_distance_yaw, const double force_to_thrusters_ratio, const double asymmetry,
-                 const std::vector<double> thruster_poly, const std::vector<double> tcm_values);
+  void setParams(const double max_force_thruster_positive, const double max_force_thruster_negative,
+                 const double thruster_distance_yaw, const std::vector<double> thruster_poly_positive,
+                 const std::vector<double> thruster_poly_negative, const std::vector<double> tcm_values);
 
   /**
    * Computes the setpoint for each thrusters taking into account the force + torque (wrench) to be
