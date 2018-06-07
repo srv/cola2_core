@@ -8,11 +8,6 @@
 #include <cola2_nav/ekf_position_velocity_landmarks.h>
 #include <ros/ros.h>
 
-namespace
-{
-const bool USE_MODEL = false;  // use force to velocity model when no DVL from botton or water velocity available
-}
-
 class NavigatorNode : public EKFPositionVelocityLandmarks
 {
 private:
@@ -50,7 +45,7 @@ NavigatorNode::NavigatorNode()
   sub_imu_ = nh_.subscribe("imu", 2, &EKFBaseLandmarksROS::updateIMUMsg,  reinterpret_cast<EKFBaseLandmarksROS*>(this));
   //sub_landmark_ = nh_.subscribe("detection_update", 2, &EKFBaseLandmarksROS::updateLandmarkMsg,  reinterpret_cast<EKFBaseLandmarksROS*>(this));
   //sub_range_ = nh_.subscribe("range_update", 2, &EKFBaseLandmarksROS::updateRangeMsg,  reinterpret_cast<EKFBaseLandmarksROS*>(this));
-  if (USE_MODEL)
+  if (config_.use_force_model_)
   {
     sub_model_ = nh_.subscribe("merged/body_force_req", 2, &EKFBaseLandmarksROS::updateBodyForceReqMsg,  reinterpret_cast<EKFBaseLandmarksROS*>(this));
   }

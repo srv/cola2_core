@@ -10,9 +10,9 @@
 
 // messages subscribed
 #include <cola2_msgs/BodyForceReq.h>                  // force velocity model
-#include <cola2_msgs/Float32Stamped.h>                  // force velocity model
 #include <cola2_msgs/DVL.h>                           // dvl
 #include <cola2_msgs/Detection.h>                     // landmark detection
+#include <cola2_msgs/Float32Stamped.h>                // force velocity model
 #include <cola2_msgs/RangeDetection.h>                // range detection
 #include <geometry_msgs/PoseWithCovarianceStamped.h>  // usbl
 #include <sensor_msgs/FluidPressure.h>                // depth
@@ -41,6 +41,7 @@
 #include <Eigen/Dense>
 #include <algorithm>
 #include <cstdlib>
+#include <ctime>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -143,6 +144,8 @@ protected:
     int gps_samples_to_init_;
     bool use_gps_data_;
     bool use_usbl_data_;
+    bool use_force_model_;
+    bool enable_debug_;
     // NED
     double ned_latitude_;
     double ned_longitude_;
