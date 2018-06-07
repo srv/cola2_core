@@ -7,8 +7,6 @@
 
 #include "cola2_nav/ekf_base_landmarks_ros.h"
 
-const bool DEBUG_OUT = false;
-
 // *****************************************
 // Constructor and destructor
 // *****************************************
@@ -28,9 +26,15 @@ EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size)
   resetFilter();
 
   // Debug in output
-  if (DEBUG_OUT)
+  if (config_.enable_debug_)
   {
-    ofh_ = std::ofstream(std::string(std::getenv("HOME")) + std::string("/debug_navigator.txt"));
+    // Current UTC time
+    time_t t = time(nullptr);     // get time now
+    struct tm* now = gmtime(&t);  // UTC time
+    char buffer[200];
+    strftime(buffer, sizeof(buffer), "/debug_navigator_%Y-%m-%d_%H-%M-%S.txt", now);
+    // Create debug file
+    ofh_ = std::ofstream(std::string(std::getenv("HOME")) + std::string(buffer));
     ofh_.setf(std::ios::fixed, std::ios::floatfield);
     ofh_.precision(4);
   }
@@ -152,6 +156,8 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
   cola2::rosutils::getParam("navigator/gps_samples_to_init", config_.gps_samples_to_init_, 10);
   cola2::rosutils::getParam("navigator/use_gps_data", config_.use_gps_data_, false);
   cola2::rosutils::getParam("navigator/use_usbl_data", config_.use_usbl_data_, false);
+  cola2::rosutils::getParam("navigator/use_force_model", config_.use_force_model_, false);
+  cola2::rosutils::getParam("navigator/enable_debug", config_.enable_debug_, false);
   // NED
   cola2::rosutils::getParam("navigator/ned_latitude", config_.ned_latitude_, 0.0);
   cola2::rosutils::getParam("navigator/ned_longitude", config_.ned_longitude_, 0.0);
@@ -179,7 +185,9 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
     ROS_INFO("   init ned from gps: %d", config_.initialize_ned_from_gps_);
     ROS_INFO(" gps samples to init: %d", config_.gps_samples_to_init_);
     ROS_INFO("        use gps data: %d", config_.use_gps_data_);
-    ROS_INFO("       use usbl data: %d\n", config_.use_usbl_data_);
+    ROS_INFO("       use usbl data: %d", config_.use_usbl_data_);
+    ROS_INFO("     use force model: %d", config_.use_force_model_);
+    ROS_INFO("        enable debug: %d\n", config_.enable_debug_);
     ROS_INFO("       ned latitude: %3.6f", config_.ned_latitude_);
     ROS_INFO("      ned longitude: %3.6f\n", config_.ned_longitude_);
     ROS_INFO("init depth sensor offset: %d", config_.initialize_depth_sensor_offset_);
@@ -401,7 +409,7 @@ void EKFBaseLandmarksROS::updatePositionGPSMsg(const sensor_msgs::NavSatFix& msg
       if (!init_ekf_ || makePrediction(tim))
       {
         // Debug
-        if (DEBUG_OUT)
+        if (config_.enable_debug_)
         {
           ofh_ << "#gps " << tim << ' ' << ned(0) << ' ' << ned(1) << ' ' << cov(0, 0) << ' ' << cov(0, 1) << ' '
                << cov(1, 0) << ' ' << cov(1, 1) << '\n';
@@ -476,7 +484,7 @@ void EKFBaseLandmarksROS::updatePositionUSBLMsg(const geometry_msgs::PoseWithCov
       if (!init_ekf_ || makePrediction(tim))
       {
         // Debug
-        if (DEBUG_OUT)
+        if (config_.enable_debug_)
         {
           ofh_ << "#usbl " << tim << ' ' << ned(0) << ' ' << ned(1) << ' ' << cov(0, 0) << ' ' << cov(0, 1) << ' '
                << cov(1, 0) << ' ' << cov(1, 1) << '\n';
@@ -516,7 +524,7 @@ void EKFBaseLandmarksROS::updatePositionDepthMsg(const sensor_msgs::FluidPressur
     if (!init_ekf_ || makePrediction(tim))
     {
       // Debug
-      if (DEBUG_OUT)
+      if (config_.enable_debug_)
       {
         ofh_ << "#depth " << tim << ' ' << xyz.tail(1) << ' ' << cov(2, 2) << '\n';
       }
@@ -563,7 +571,7 @@ void EKFBaseLandmarksROS::updateVelocityDVLMsg(const cola2_msgs::DVL& msg)
     if (!init_ekf_ || makePrediction(tim))
     {
       // Debug
-      if (DEBUG_OUT)
+      if (config_.enable_debug_)
       {
         ofh_ << "#dvl " << tim << ' ' << vel(0) << ' ' << vel(1) << ' ' << vel(2) << ' ' << cov(0, 0) << ' '
              << cov(0, 1) << ' ' << cov(0, 2) << ' ' << cov(1, 0) << ' ' << cov(1, 1) << ' ' << cov(1, 2) << ' '
@@ -611,7 +619,7 @@ void EKFBaseLandmarksROS::updateIMUMsg(const sensor_msgs::Imu& msg)
   if (!init_ekf_ || makePrediction(tim))
   {
     // Debug
-    if (DEBUG_OUT)
+    if (config_.enable_debug_)
     {
       ofh_ << "#imu " << tim << ' ' << rpy(0) << ' ' << rpy(1) << ' ' << rpy(2) << ' ' << rpy_cov(0, 0) << ' '
            << rpy_cov(0, 1) << ' ' << rpy_cov(0, 2) << ' ' << rpy_cov(1, 0) << ' ' << rpy_cov(1, 1) << ' '
@@ -772,7 +780,7 @@ void EKFBaseLandmarksROS::updateBodyForceReqMsg(const cola2_msgs::BodyForceReq& 
     if (makePrediction(tim))
     {
       // Debug
-      if (DEBUG_OUT)
+      if (config_.enable_debug_)
       {
         ofh_ << "#force " << tim << ' ' << velocity(0) << ' ' << velocity(1) << ' ' << velocity(2) << ' ' << cov(0, 0)
              << ' ' << cov(0, 1) << ' ' << cov(0, 2) << ' ' << cov(1, 0) << ' ' << cov(1, 1) << ' ' << cov(1, 2) << ' '
@@ -816,7 +824,7 @@ void EKFBaseLandmarksROS::publishNavigationAndLandmarks(const ros::Time& stamp)
   const Eigen::Matrix3d ang_vel_cov = getAngularVelocityUncertainty();
 
   // Debug
-  if (DEBUG_OUT)
+  if (config_.enable_debug_)
   {
     ofh_ << stamp.toSec() << ' ';
     // State
