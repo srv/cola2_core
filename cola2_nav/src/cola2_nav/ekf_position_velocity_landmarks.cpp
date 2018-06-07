@@ -99,7 +99,6 @@ bool EKFPositionVelocityLandmarks::updatePositionXY(const double t, const Eigen:
     return false;
   }
   // Update time
-  last_prediction_ = t;
   last_gps_time_ = t;
   // Initialization
   if (!init_ekf_)
@@ -121,7 +120,6 @@ bool EKFPositionVelocityLandmarks::updatePositionZ(const double t, const Eigen::
                                                    const Eigen::Matrix1d& cov)
 {
   // Update time
-  last_prediction_ = t;
   last_depth_time_ = t;
   // Initialization
   if (!init_ekf_)
@@ -142,7 +140,6 @@ bool EKFPositionVelocityLandmarks::updateOrientation(const double t, const Eigen
                                                      const Eigen::Matrix3d& cov)
 {
   // Update time
-  last_prediction_ = t;
   last_imu_time_ = t;
   // Initialization
   if (!init_ekf_)
@@ -167,7 +164,6 @@ bool EKFPositionVelocityLandmarks::updateVelocity(const double t, const Eigen::V
                                                   const Eigen::Matrix3d& cov, const bool from_dvl)
 {
   // Update time
-  last_prediction_ = t;
   if (from_dvl)
   {
     last_dvl_time_ = t;
@@ -196,7 +192,6 @@ bool EKFPositionVelocityLandmarks::updateOrientationRate(const double t, const E
                                                          const Eigen::Matrix3d& cov)
 {
   // Update time
-  last_prediction_ = t;
   last_imu_time_ = t;
   // Update (used as true reading)
   ang_vel_ = rate;
