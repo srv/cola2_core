@@ -7,8 +7,6 @@
 
 #include "cola2_nav/ekf_base_landmarks_ros.h"
 
-const bool DEBUG_OUT = false;
-
 // *****************************************
 // Constructor and destructor
 // *****************************************
@@ -28,9 +26,15 @@ EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size)
   resetFilter();
 
   // Debug in output
-  if (DEBUG_OUT)
+  if (config_.enable_debug_)
   {
-    ofh_ = std::ofstream(std::string(std::getenv("HOME")) + std::string("/debug_navigator.txt"));
+    // Current UTC time
+    time_t t = time(nullptr);     // get time now
+    struct tm* now = gmtime(&t);  // UTC time
+    char buffer[200];
+    strftime(buffer, sizeof(buffer), "/debug_navigator_%Y-%m-%d_%H-%M-%S.txt", now);
+    // Create debug file
+    ofh_ = std::ofstream(std::string(std::getenv("HOME")) + std::string(buffer));
     ofh_.setf(std::ios::fixed, std::ios::floatfield);
     ofh_.precision(4);
   }
@@ -121,7 +125,7 @@ void EKFBaseLandmarksROS::resetFilter()
   if (!config_.initialize_ned_from_gps_)
   {
     ROS_INFO("Init NED from config file");
-    std::cout << "\n\n\nNED: " << config_.ned_latitude_ << ", " << config_.ned_longitude_ << std::endl;
+    ROS_INFO("NED: %.8f, %.8f", config_.ned_latitude_, config_.ned_longitude_);
     ned_ = cola2::utils::NED(config_.ned_latitude_, config_.ned_longitude_, 0.0);
     init_ned_ = true;
     diag_help_.add("ned_init", "True");
@@ -152,6 +156,8 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
   cola2::rosutils::getParam("navigator/gps_samples_to_init", config_.gps_samples_to_init_, 10);
   cola2::rosutils::getParam("navigator/use_gps_data", config_.use_gps_data_, false);
   cola2::rosutils::getParam("navigator/use_usbl_data", config_.use_usbl_data_, false);
+  cola2::rosutils::getParam("navigator/use_force_model", config_.use_force_model_, false);
+  cola2::rosutils::getParam("navigator/enable_debug", config_.enable_debug_, false);
   // NED
   cola2::rosutils::getParam("navigator/ned_latitude", config_.ned_latitude_, 0.0);
   cola2::rosutils::getParam("navigator/ned_longitude", config_.ned_longitude_, 0.0);
@@ -179,7 +185,9 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
     ROS_INFO("   init ned from gps: %d", config_.initialize_ned_from_gps_);
     ROS_INFO(" gps samples to init: %d", config_.gps_samples_to_init_);
     ROS_INFO("        use gps data: %d", config_.use_gps_data_);
-    ROS_INFO("       use usbl data: %d\n", config_.use_usbl_data_);
+    ROS_INFO("       use usbl data: %d", config_.use_usbl_data_);
+    ROS_INFO("     use force model: %d", config_.use_force_model_);
+    ROS_INFO("        enable debug: %d\n", config_.enable_debug_);
     ROS_INFO("       ned latitude: %3.6f", config_.ned_latitude_);
     ROS_INFO("      ned longitude: %3.6f\n", config_.ned_longitude_);
     ROS_INFO("init depth sensor offset: %d", config_.initialize_depth_sensor_offset_);
@@ -261,8 +269,11 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
     diag_help_.add("last_gps_data", std::to_string(now - last_gps_time_));
     if (now - last_gps_time_ > 3.0)
     {
-      is_nav_data_ok = false;
-      ROS_WARN("GPS too old");
+      if (getPosition()(2) < 1.0)
+      {
+        is_nav_data_ok = false;
+        ROS_WARN("GPS too old");
+      }
     }
   }
   // *****************************************
@@ -398,7 +409,7 @@ void EKFBaseLandmarksROS::updatePositionGPSMsg(const sensor_msgs::NavSatFix& msg
       if (!init_ekf_ || makePrediction(tim))
       {
         // Debug
-        if (DEBUG_OUT)
+        if (config_.enable_debug_)
         {
           ofh_ << "#gps " << tim << ' ' << ned(0) << ' ' << ned(1) << ' ' << cov(0, 0) << ' ' << cov(0, 1) << ' '
                << cov(1, 0) << ' ' << cov(1, 1) << '\n';
@@ -439,21 +450,25 @@ void EKFBaseLandmarksROS::updatePositionUSBLMsg(const geometry_msgs::PoseWithCov
   {
     // Diagnostics
     diag_help_.increaseFrequencyCounter();
-    // Get delayed position increment and check valid time
+    // Get delayed position increment [dt dx dy]
     const Eigen::Vector3d position_increment = getPositionIncrementFrom(msg.header.stamp.toSec());
+    // Valid time increment
     if (position_increment(0) >= 0.0)
     {
+      // Current time
+      const ros::Time current_time = msg.header.stamp + ros::Duration(position_increment[0]);
       // Construct measurement
       const Eigen::Vector3d latlonh(msg.pose.pose.position.x, msg.pose.pose.position.y, 0.0);
       Eigen::Vector3d ned = ned_.geodetic2Ned(latlonh);
       ned.head(2) += position_increment.tail(2);  // increment the same we increased
-      publishUSBLNED(msg.header.stamp, ned);
+      ned(2) = getPosition()(2);                  // show in current depth
+      publishUSBLNED(current_time, ned);          // show
       Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
       for (unsigned int i = 0; i < 3; ++i)
       {
         for (unsigned int j = 0; j < 3; ++j)
         {
-          cov(i, j) = msg.pose.covariance[6 * i + j];
+          cov(i, j) = msg.pose.covariance[6 * i + j];  // from 6x6 matrix
         }
       }
       // Transform to vehicle frame
@@ -465,18 +480,18 @@ void EKFBaseLandmarksROS::updatePositionUSBLMsg(const geometry_msgs::PoseWithCov
       ned = transforms::position(ned, getOrientation(), trans.translation());
       cov = transforms::positionCovariance(cov, getOrientationUncertainty(), getOrientation(), trans.translation());
       // Predict and update
-      const double tim = msg.header.stamp.toSec();
+      const double tim = current_time.toSec();
       if (!init_ekf_ || makePrediction(tim))
       {
         // Debug
-        if (DEBUG_OUT)
+        if (config_.enable_debug_)
         {
           ofh_ << "#usbl " << tim << ' ' << ned(0) << ' ' << ned(1) << ' ' << cov(0, 0) << ' ' << cov(0, 1) << ' '
                << cov(1, 0) << ' ' << cov(1, 1) << '\n';
         }
         // Update and publish
-        updatePositionXY(msg.header.stamp.toSec(), ned.head(2), cov.topLeftCorner(2, 2));
-        publishNavigationAndLandmarks(msg.header.stamp);
+        updatePositionXY(tim, ned.head(2), cov.topLeftCorner(2, 2));
+        publishNavigationAndLandmarks(current_time);
       }
     }
   }
@@ -509,7 +524,7 @@ void EKFBaseLandmarksROS::updatePositionDepthMsg(const sensor_msgs::FluidPressur
     if (!init_ekf_ || makePrediction(tim))
     {
       // Debug
-      if (DEBUG_OUT)
+      if (config_.enable_debug_)
       {
         ofh_ << "#depth " << tim << ' ' << xyz.tail(1) << ' ' << cov(2, 2) << '\n';
       }
@@ -556,7 +571,7 @@ void EKFBaseLandmarksROS::updateVelocityDVLMsg(const cola2_msgs::DVL& msg)
     if (!init_ekf_ || makePrediction(tim))
     {
       // Debug
-      if (DEBUG_OUT)
+      if (config_.enable_debug_)
       {
         ofh_ << "#dvl " << tim << ' ' << vel(0) << ' ' << vel(1) << ' ' << vel(2) << ' ' << cov(0, 0) << ' '
              << cov(0, 1) << ' ' << cov(0, 2) << ' ' << cov(1, 0) << ' ' << cov(1, 1) << ' ' << cov(1, 2) << ' '
@@ -604,7 +619,7 @@ void EKFBaseLandmarksROS::updateIMUMsg(const sensor_msgs::Imu& msg)
   if (!init_ekf_ || makePrediction(tim))
   {
     // Debug
-    if (DEBUG_OUT)
+    if (config_.enable_debug_)
     {
       ofh_ << "#imu " << tim << ' ' << rpy(0) << ' ' << rpy(1) << ' ' << rpy(2) << ' ' << rpy_cov(0, 0) << ' '
            << rpy_cov(0, 1) << ' ' << rpy_cov(0, 2) << ' ' << rpy_cov(1, 0) << ' ' << rpy_cov(1, 1) << ' '
@@ -765,7 +780,7 @@ void EKFBaseLandmarksROS::updateBodyForceReqMsg(const cola2_msgs::BodyForceReq& 
     if (makePrediction(tim))
     {
       // Debug
-      if (DEBUG_OUT)
+      if (config_.enable_debug_)
       {
         ofh_ << "#force " << tim << ' ' << velocity(0) << ' ' << velocity(1) << ' ' << velocity(2) << ' ' << cov(0, 0)
              << ' ' << cov(0, 1) << ' ' << cov(0, 2) << ' ' << cov(1, 0) << ' ' << cov(1, 1) << ' ' << cov(1, 2) << ' '
@@ -809,7 +824,7 @@ void EKFBaseLandmarksROS::publishNavigationAndLandmarks(const ros::Time& stamp)
   const Eigen::Matrix3d ang_vel_cov = getAngularVelocityUncertainty();
 
   // Debug
-  if (DEBUG_OUT)
+  if (config_.enable_debug_)
   {
     ofh_ << stamp.toSec() << ' ';
     // State

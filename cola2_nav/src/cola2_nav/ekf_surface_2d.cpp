@@ -86,7 +86,6 @@ bool EKFSurface2D::updatePositionXY(const double t, const Eigen::Vector2d& pose_
     return false;
   }
   // Update time
-  last_prediction_ = t;
   last_gps_time_ = t;
   // Initialization
   if (!init_ekf_)
@@ -112,7 +111,6 @@ bool EKFSurface2D::updatePositionZ(const double, const Eigen::Vector1d&, const E
 bool EKFSurface2D::updateOrientation(const double t, const Eigen::Vector3d& rpy, const Eigen::Matrix3d& cov)
 {
   // Update time
-  last_prediction_ = t;
   last_imu_time_ = t;
   // Initialization
   if (!init_ekf_)
@@ -143,7 +141,6 @@ bool EKFSurface2D::updateVelocity(const double t, const Eigen::Vector3d& vel, co
                                   const bool from_dvl)
 {
   // Update time
-  last_prediction_ = t;
   if (from_dvl)
   {
     last_dvl_time_ = t;
@@ -170,7 +167,6 @@ bool EKFSurface2D::updateVelocity(const double t, const Eigen::Vector3d& vel, co
 bool EKFSurface2D::updateOrientationRate(const double t, const Eigen::Vector3d& rate, const Eigen::Matrix3d& cov)
 {
   // Update time
-  last_prediction_ = t;
   last_imu_time_ = t;
   // Update (used as true reading)
   ang_vel_ = rate;
