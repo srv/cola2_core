@@ -261,8 +261,11 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
     diag_help_.add("last_gps_data", std::to_string(now - last_gps_time_));
     if (now - last_gps_time_ > 3.0)
     {
-      is_nav_data_ok = false;
-      ROS_WARN("GPS too old");
+      if (getPosition()(2) < 1.0)
+      {
+        is_nav_data_ok = false;
+        ROS_WARN("GPS too old");
+      }
     }
   }
   // *****************************************
@@ -450,8 +453,8 @@ void EKFBaseLandmarksROS::updatePositionUSBLMsg(const geometry_msgs::PoseWithCov
       const Eigen::Vector3d latlonh(msg.pose.pose.position.x, msg.pose.pose.position.y, 0.0);
       Eigen::Vector3d ned = ned_.geodetic2Ned(latlonh);
       ned.head(2) += position_increment.tail(2);  // increment the same we increased
-      ned(2) = getPosition()(2);          // show in current depth
-      publishUSBLNED(current_time, ned);  // show
+      ned(2) = getPosition()(2);                  // show in current depth
+      publishUSBLNED(current_time, ned);          // show
       Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
       for (unsigned int i = 0; i < 3; ++i)
       {
