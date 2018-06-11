@@ -1,12 +1,11 @@
 #!/usr/bin/env python
-# Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+# Copyright (c) 2018 Iqua Robotics SL - All Rights Reserved
 #
 # This file is subject to the terms and conditions defined in file
 # 'LICENSE.txt', which is part of this source code package.
 
 
-
-"""@@>This node prevents an AUV to move beyond some given virtual limits.<@@"""
+"""@@>This node checks if the vehicle moves beyond some given virtual limits defined in NED coordinates<@@"""
 
 """
 Created on 02/13/2014
@@ -17,18 +16,23 @@ Created on 02/13/2014
 # ROS imports
 import roslib
 import rospy
+
 from geometry_msgs.msg import Point
 from visualization_msgs.msg import Marker
-from auv_msgs.msg import NavSts
-from cola2_lib import cola2_ros_lib
-from cola2_lib.diagnostic_helper import DiagnosticHelper
-from diagnostic_msgs.msg import DiagnosticStatus
 
+from diagnostic_msgs.msg import DiagnosticStatus
 from dynamic_reconfigure.server import Server
-from cola2_msgs.cfg import VirtualCageInfoConfig
+
+from cola2_msgs.msg import NavSts
+from cola2_safety.cfg import VirtualCageInfoConfig
+
+from cola2_lib.rosutils import param_loader
+from cola2_lib.rosutils.diagnostic_helper import DiagnosticHelper
 
 class VirtualCage(object):
-
+    """
+    This node checks if the vehicle moves beyond some given virtual limits defined in NED coordinates
+    """
 
     def __init__(self, name):
         """ Init the class. """
@@ -43,38 +47,34 @@ class VirtualCage(object):
         self.virtual_cage_enabled = True
         self.navigation_enabled = True
         self.vehicle_position = [0.0, 0.0, 0.0]
-        
+
         # Set up diagnostics
         self.diagnostic = DiagnosticHelper(self.name, "soft")
-        
+
         # Publisher
-        self.cage_marker_pub = rospy.Publisher(
-                                        "/cola2_safety/cage_marker", 
-                                        Marker,
-                                        queue_size = 2)
+        namespace = rospy.get_namespace()
+        self.cage_marker_pub = rospy.Publisher(self.name + "/markers/cage", Marker, queue_size = 2)
 
         # Subscriber
-        rospy.Subscriber("/cola2_navigation/nav_sts",
-                         NavSts,
-                         self.update_nav_sts)
-                         
+        rospy.Subscriber(namespace + "navigator/navigation", NavSts, self.update_nav_sts)
+
         # Timer
         rospy.Timer(rospy.Duration(1.0), self.check_cage)
 
-        # Create dynamic reconfigure servoce
-        self.dynamic_reconfigure_srv = Server( VirtualCageInfoConfig, 
-                                               self.dynamic_reconfigure_callback )
-                                               
+        # Create dynamic reconfigure service
+        self.dynamic_reconfigure_srv = Server(VirtualCageInfoConfig, self.dynamic_reconfigure_callback)
+
 
     def dynamic_reconfigure_callback(self, config, level):
-        rospy.loginfo("""Reconfigure Request: {north_origin}, {east_origin}, {north_longitude}, {east_longitude}, {enable}""".format(**config))
+        rospy.loginfo("""Reconfigure Request: {north_origin}, {east_origin}, {north_longitude}, {east_longitude},
+                      {enable}""".format(**config))
         self.north_origin = config.north_origin
         self.east_origin = config.east_origin
         self.north_longitude = config.north_longitude
         self.east_longitude = config.east_longitude
         self.virtual_cage_enabled = config.enable
         return config
-  
+
 
     def check_cage(self, event):
         """ Check if the vehicle is inside or out of the virtual cage. """
@@ -106,23 +106,23 @@ class VirtualCage(object):
         cage_marker.points.append( Point(self.north_origin, self.east_origin + self.east_longitude, 0.0) )
         cage_marker.points.append( Point(self.north_origin, self.east_origin, 0.0) )
         cage_marker.frame_locked = True
-        
-        
+
         if self.virtual_cage_enabled and self.navigation_enabled:
-            if self.vehicle_position[0] < self.north_origin or self.vehicle_position[0] > self.north_origin + self.north_longitude or self.vehicle_position[1] < self.east_origin or self.vehicle_position[1] > self.east_origin + self.east_longitude:
+            if self.vehicle_position[0] < self.north_origin or self.vehicle_position[0] > self.north_origin + \
+               self.north_longitude or self.vehicle_position[1] < self.east_origin or self.vehicle_position[1] > \
+               self.east_origin + self.east_longitude:
                 rospy.logwarn("%s: Vehicle out of virtual cage!", self.name)
                 cage_marker.color.r = 1.0
                 cage_marker.color.g = 0.0
                 cage_marker.color.b = 0.0
                 cage_marker.color.a = 1.0
-                self.diagnostic.setLevel(DiagnosticStatus.WARN, 
-                                         'Vehicle out of virtual cage')
+                self.diagnostic.set_level(DiagnosticStatus.WARN, 'Vehicle out of virtual cage')
             else:
-                self.diagnostic.setLevel(DiagnosticStatus.OK)
-                
+                self.diagnostic.set_level(DiagnosticStatus.OK)
+
             self.cage_marker_pub.publish(cage_marker)
-                
-            
+
+
     def update_nav_sts(self, nav):
         """ Save current navigation data. """
 
@@ -130,22 +130,22 @@ class VirtualCage(object):
         self.vehicle_position = [nav.position.north,
                                  nav.position.east,
                                  nav.position.depth]
-                                     
+
     def get_config(self):
         """ Read parameters from ROS Param Server."""
-        param_dict = {'north_origin': 'virtual_cage/north_origin',
-                      'east_origin': 'virtual_cage/east_origin',
-                      'north_longitude': 'virtual_cage/north_longitude',
-                      'east_longitude': 'virtual_cage/east_longitude',
-                      'enabled': 'virtual_cage/enabled'}
+        param_dict = {'north_origin': ('north_origin', -500.0),
+                      'east_origin': ('east_origin', -500.0),
+                      'north_longitude': ('north_longitude', 1000.0),
+                      'east_longitude': ('east_longitude', 1000.0),
+                      'enabled': ('enabled', False)}
 
-        cola2_ros_lib.getRosParams(self, param_dict, self.name)
+        param_loader.get_ros_params(self, param_dict)
 
 
 if __name__ == '__main__':
     try:
         rospy.init_node('virtual_cage')
-        V_CAGE = VirtualCage(rospy.get_name())
+        vc = VirtualCage(rospy.get_name())
         rospy.spin()
     except rospy.ROSInterruptException:
         pass

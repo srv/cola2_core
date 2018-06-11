@@ -20,21 +20,18 @@ Modified 11/2015
 import roslib
 import rospy
 
-from auv_msgs.msg import WorldWaypointReq
-from auv_msgs.msg import GoalDescriptor
-from auv_msgs.msg import NavSts
-from cola2_lib import cola2_ros_lib
+from cola2_msgs.msg import WorldWaypointReq
+from cola2_msgs.msg import GoalDescriptor
+from cola2_msgs.msg import NavSts
+from cola2_lib.rosutils import param_loader
 
 
 class SetPose(object):
-    """ This class generates several WorldWaypointReq set at 0 enabling
-        only the axis selected in the configuration file when the vehicle
-        is below a configured depth. This provoques that the vehicle keeps
-        its pose as specified below the desired depth. As the priority of this
-        behavior is minimum and it can send commands for each DoF indepen-
-        dently, it is easy to merge with other pose or velocity requests.
-        WARNING: If force requests are used it is better to disable here the
-        axis that the force controller is trying to achieve!"""
+    """ This class generates several WorldWaypointReq set at 0 enabling only the axis selected in the configuration file
+    when the vehicle is below a configured depth. This provoques that the vehicle keeps its pose as specified below the
+    desired depth. As the priority of this behavior is minimum and it can send commands for each DoF independently, it
+    is easy to merge with other pose or velocity requests. WARNING: If force requests are used it is better to disable
+    here the axis that the force controller is trying to achieve!"""
 
     def __init__(self, name):
         """ Initialize the class """
@@ -48,17 +45,14 @@ class SetPose(object):
         # Get config parameters
         self.get_config()
 
+        namespace = rospy.get_namespace()
+
         # Publisher
-        self.pub_world_waypoint_req = rospy.Publisher(
-            "/cola2_control/world_waypoint_req",
-            WorldWaypointReq,
-            queue_size = 2)
+        self.pub_world_waypoint_req = rospy.Publisher(namespace + "controller/world_waypoint_req",
+                                                      WorldWaypointReq, queue_size = 2)
 
         # Subscriber
-        rospy.Subscriber("/cola2_navigation/nav_sts",
-                         NavSts,
-                         self.update_nav_sts,
-                         queue_size = 1)
+        rospy.Subscriber(namespace + "navigator/navigation", NavSts, self.update_nav_sts, queue_size = 1)
 
         # Timer
         rospy.Timer(rospy.Duration(0.1), self.set_pose)
@@ -73,8 +67,7 @@ class SetPose(object):
 
 
     def set_pose(self, event):
-        """ Send zero velocity requests if the vehicle is below the
-            desired depth """
+        """ Send zero velocity requests if the vehicle is below the desired depth """
 
         if self.navigation.position.depth > self.set_pose_depth:
             wwr = WorldWaypointReq()
@@ -102,25 +95,18 @@ class SetPose(object):
 
 
     def get_config(self):
-        """ Reads configuration from ROSPARAM SERVER """
-        param_dict = {'set_pose_depth': 'safety_set_pose/set_pose_depth',
-                      'set_pose_axis': 'safety_set_pose/set_pose_axis',
-                      'desired_pose': 'safety_set_pose/desired_pose'}
+        """ Reads configuration from ROS Param Server """
+        param_dict = {'set_pose_depth': ('set_pose_depth', [0.0, 0.0, 0.0, 0.0, -0.06, 0.0]),
+                      'set_pose_axis': ('set_pose_axis', [[True, True, True, True, False, True]]),
+                      'desired_pose': ('desired_pose', 1.2)}
 
-        if not cola2_ros_lib.getRosParams(self, param_dict, self.name):
-            self.bad_config_timer = rospy.Timer(rospy.Duration(0.4),
-                                                self.bad_config_message)
-
-
-    def bad_config_message(self, event):
-        """ Timer to show an error if loading parameters failed """
-        rospy.logerr('%s: bad parameters in param server!', self.name)
+        param_loader.get_ros_params(self, param_dict)
 
 
 if __name__ == '__main__':
     try:
         rospy.init_node('set_pose')
-        __set_zero_velocity__ = SetPose(rospy.get_name())
+        set_pose = SetPose(rospy.get_name())
         rospy.spin()
     except rospy.ROSInterruptException:
         pass

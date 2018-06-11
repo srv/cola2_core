@@ -7,8 +7,8 @@
 
 
 """
-@@>If the robot is below a configured depth and teleoperation is giving only disabled setpoints,
-this node tells the vehicle to keep velocities at zero.<@@
+@@>If the robot is below a configured depth and teleoperation is giving only disabled setpoints,this node tells the
+ vehicle to keep velocities at zero.<@@
 """
 
 """
@@ -24,24 +24,22 @@ import rospy
 
 import threading
 
-from auv_msgs.msg import WorldWaypointReq
-from auv_msgs.msg import BodyVelocityReq
-from auv_msgs.msg import BodyForceReq
+from cola2_msgs.msg import WorldWaypointReq
+from cola2_msgs.msg import BodyVelocityReq
+from cola2_msgs.msg import BodyForceReq
+from cola2_msgs.msg import GoalDescriptor
+from cola2_msgs.msg import NavSts
 
-from auv_msgs.msg import GoalDescriptor
-from auv_msgs.msg import NavSts
-from cola2_lib import cola2_ros_lib
+from cola2_lib.rosutils import param_loader
 
 
 class SetZeroVelocity(object):
-    """ This class generates several BodyVelocityReq set at 0 enabling
-        only the axis selected in the configuration file when the vehicle
-        is below a configured depth. This causes that the vehicle keeps
-        its velocity at 0 below the desired depth. As the priority of this
-        behavior is minimum and it can send commands for each DoF indepen-
-        dently, it is easy to merge with other pose or velocity requests.
-        WARNING: If force requests are used it is better to disable here the
-        axis that the force controller is trying to achieve!"""
+    """ This class generates several BodyVelocityReq set at 0 enabling only the axis selected in the configuration file
+        when the vehicle is below a configured depth. This causes that the vehicle keep its velocity at 0 below the
+        desired depth. As the priority of this behavior is minimum and it can send commands for each DoF independently,
+        it is easy to merge with other pose or velocity requests.
+        WARNING: If force requests are used it is better to disable here the axis that the force controller is trying to
+        achieve!"""
 
     def __init__(self, name):
         """ Initialize the class """
@@ -49,40 +47,24 @@ class SetZeroVelocity(object):
         self.name = name
         self.navigation = NavSts()
         self.set_zero_velocity_depth = 2.0
-        self.set_zero_velocity_axis = [[False, False, False,
-                                        False, False, False]]
+        self.set_zero_velocity_axis = [[False, False, False, False, False, False]]
         self.current_enabled_axis = [False, False, False, False, False, False]
         self.lock = threading.Lock()
 
         # Get config parameters
         self.get_config()
 
+        namespace = rospy.get_namespace()
+
         # Publisher
-        self.pub_body_velocity_req = rospy.Publisher(
-            "/cola2_control/body_velocity_req",
-            BodyVelocityReq,
-            queue_size = 10)
+        self.pub_body_velocity_req = rospy.Publisher(namespace + "controller/body_velocity_req",
+                                                     BodyVelocityReq, queue_size = 10)
 
         # Subscriber
-        rospy.Subscriber("/cola2_navigation/nav_sts",
-                         NavSts,
-                         self.update_nav_sts,
-                         queue_size = 1)
-
-        rospy.Subscriber("/cola2_control/world_waypoint_req",
-                         WorldWaypointReq,
-                         self.update_req,
-                         queue_size = 1)
-
-        rospy.Subscriber("/cola2_control/body_velocity_req",
-                         BodyVelocityReq,
-                         self.update_req,
-                         queue_size = 1)
-
-        rospy.Subscriber("/cola2_control/body_force_req",
-                         BodyForceReq,
-                         self.update_req,
-                         queue_size = 1)
+        rospy.Subscriber(namespace + "navigator/navigation", NavSts, self.update_nav_sts, queue_size = 1)
+        rospy.Subscriber(namespace + "controller/world_waypoint_req", WorldWaypointReq, self.update_req, queue_size = 1)
+        rospy.Subscriber(namespace + "controller/body_velocity_req", BodyVelocityReq, self.update_req, queue_size = 1)
+        rospy.Subscriber(namespace + "controller/body_force_req", BodyForceReq, self.update_req, queue_size = 1)
 
         # Timer
         rospy.Timer(rospy.Duration(0.1), self.set_zero_velocity)
@@ -119,8 +101,7 @@ class SetZeroVelocity(object):
 
 
     def set_zero_velocity(self, event):
-        """ Send zero velocity requests if the vehicle is below the
-            desired depth """
+        """ Send zero velocity requests if the vehicle is below the desired depth """
 
         self.lock.acquire()
         if self.navigation.position.depth > self.set_zero_velocity_depth:
@@ -177,22 +158,19 @@ class SetZeroVelocity(object):
 
     def get_config(self):
         """ Reads configuration from ROSPARAM SERVER """
-        param_dict = {'set_zero_velocity_depth': 'safety_set_zero_velocity/set_zero_velocity_depth',
-                      'set_zero_velocity_axis': 'safety_set_zero_velocity/set_zero_velocity_axis'}
+        param_dict = {'set_zero_velocity_depth': ('set_zero_velocity_depth', 1.2),
+                      'set_zero_velocity_axis': ('set_zero_velocity_axis', [[False, False, True, True, True, True],
+                                                                            [True, True, False, True, True, True],
+                                                                            [True, True, True, True, True, False]]
+                                                 )}
 
-        if not cola2_ros_lib.getRosParams(self, param_dict, self.name):
-            self.bad_config_timer = rospy.Timer(rospy.Duration(0.4), self.bad_config_message)
-
-
-    def bad_config_message(self, event):
-        """ Timer to show an error if loading parameters failed """
-        rospy.logerr('%s: bad parameters in param server!', self.name)
+        param_loader.get_ros_params(self, param_dict)
 
 
 if __name__ == '__main__':
     try:
         rospy.init_node('set_zero_velocity')
-        __set_zero_velocity__ = SetZeroVelocity(rospy.get_name())
+        set_zero_velocity = SetZeroVelocity(rospy.get_name())
         rospy.spin()
     except rospy.ROSInterruptException:
         pass

@@ -1,4 +1,0 @@
-geometry_msgs/PoseWithCovariance landmark
-std_msgs/String id
----
-bool success

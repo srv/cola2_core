@@ -1,0 +1,6 @@
+<launch>
+    <rosparam command="load" file="$(find cola2_log)/config/default_param_handler.yaml"/>       
+    <node respawn="true" pkg="cola2_log" type="default_param_handler.py" name="default_param_handler" output="screen"> 
+        <param name="config_folder" value="config_test"/>
+    </node>
+</launch>

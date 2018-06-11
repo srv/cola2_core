@@ -1,0 +1,7 @@
+<launch>
+    <!-- Load configs in their node namespace -->
+    <rosparam command="load" file="$(find cola2_sim)/config/dynamics.yaml"/>
+
+    <!-- Start nodes -->
+    <node name="dynamics" pkg="cola2_sim" type="dynamics.py" output="screen"/>
+</launch>
