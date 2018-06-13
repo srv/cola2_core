@@ -87,6 +87,7 @@ namespace control
     bool altitude_mode;
     bool disable_z;
     control::Point tolerance;
+    double surge_velocity;
   } Section;
 
   typedef struct

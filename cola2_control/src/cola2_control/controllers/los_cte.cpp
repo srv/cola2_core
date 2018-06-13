@@ -6,6 +6,7 @@
  */
 
 #include <cola2_control/controllers/los_cte.h>
+#include <cola2_control/controllers/types.h>
 
 // Constructor
 LosCteController::LosCteController(LosCteControllerConfig config) : config_(config)
@@ -43,7 +44,7 @@ void LosCteController::compute(const control::State& current_state, const contro
   // std::cout << section.initial_position.x << ", " << section.initial_position.y << " to " << section.final_position.x
   // << ", " << section.final_position.y << " \n";
   // Compute desired surge and yaw
-  double surge = config_.max_surge_velocity;
+  double surge = std::min(section.surge_velocity, config_.max_surge_velocity);
   double desired_yaw;
 
   // std::cout << "Surge: " << surge << std::endl;

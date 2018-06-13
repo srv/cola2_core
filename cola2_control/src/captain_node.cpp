@@ -961,7 +961,7 @@ bool Captain::worldSection(const MissionSection &sec)
   section.tolerance.x = sec.getTolerance().getX();
   section.tolerance.y = sec.getTolerance().getY();
   section.tolerance.z = sec.getTolerance().getZ();
-
+  section.surge_velocity = sec.getSpeed();
   double initial_north, initial_east, initial_depth;
   double ned_latitude;
   double ned_longitude;
