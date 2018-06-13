@@ -6,6 +6,7 @@
 
 MissionAction::MissionAction()
 {
+  is_empty_ = true;
 }
 
 MissionAction::MissionAction(std::string action_id, std::vector<std::string> parameters)
@@ -32,6 +33,7 @@ void MissionAction::setActionId(const std::string value)
 void MissionAction::addParameters(const std::string param)
 {
   parameters_.push_back(param);
+  is_empty_ = false;
 }
 
 std::vector<std::string> MissionAction::getParameters() const
