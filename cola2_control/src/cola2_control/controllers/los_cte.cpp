@@ -198,31 +198,6 @@ void LosCteController::compute(const control::State& current_state, const contro
 
   // Set desired Z
   double desired_depth = section.final_position.z;
-  if ((!section.altitude_mode) && (config_.heave_in_3D))
-  {
-    double s = (current_state.pose.position.north - section.initial_position.x) * cbeta +
-               (current_state.pose.position.east - section.initial_position.y) * sbeta;
-    double section_dx = (section.final_position.x - section.initial_position.x);
-    double section_dy = (section.final_position.y - section.initial_position.y);
-    double section_length = sqrt(pow(section_dx, 2.0) + pow(section_dy, 2.0));
-
-    if (s < 0.0)
-    {
-      desired_depth = section.initial_position.z;
-    }
-    else if (s > section_length)
-    {
-      desired_depth = section.final_position.z;
-    }
-    else
-    {
-      if (section_length != 0.0)
-      {
-        desired_depth =
-            section.initial_position.z + (section.final_position.z - section.initial_position.z) * (s / section_length);
-      }
-    }
-  }
 
   controller_output.pose.altitude_mode = section.altitude_mode;
   controller_output.pose.altitude = section.final_position.z;

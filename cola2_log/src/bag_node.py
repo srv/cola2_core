@@ -11,8 +11,8 @@
 """
 
 import rospy
-from std_srvs.srv import Empty
-from std_srvs.srv import EmptyResponse
+from std_srvs.srv import Trigger
+from std_srvs.srv import TriggerResponse
 import subprocess
 import time
 
@@ -22,8 +22,8 @@ class LogBag:
  
     def __init__(self):
         """Class constructor."""
-        self.start_bag = rospy.Service('~enable_logs', Empty, self.enable_logs)
-        self.stop_bag = rospy.Service('~disable_logs', Empty,
+        self.start_bag = rospy.Service('~enable_logs', Trigger, self.enable_logs)
+        self.stop_bag = rospy.Service('~disable_logs', Trigger,
                                       self.disable_logs)
         self.bag_enabled = False
         rospy.loginfo("This node will execute the launch file cola2_log/launch/bag.launch")
@@ -42,10 +42,14 @@ class LogBag:
         subprocess.Popen(command, stdin=subprocess.PIPE, shell=True, cwd="./")
         self.bag_enabled = True
         rospy.loginfo("Launched bag file")
-        return EmptyResponse()
+        tr = TriggerResponse()
+        tr.success = True
+        tr.message = "Launched bag file"
+        return tr
 
     def disable_logs(self, req):
         """Stop launch/bag.launch file."""
+        tr = TriggerResponse()
         if self.bag_enabled:
             nodes = subprocess.check_output(['rosnode', 'list']).split()
             for node in nodes:
@@ -57,10 +61,14 @@ class LogBag:
             # subprocess.Popen(killcommand, shell=True)
             # rospy.loginfo("Kill process: " + killcommand)
             self.bag_enabled = False
+            tr.success = True
+            tr.message = "Stopped bag file"
         else:
             rospy.logwarn("Bag is not enabled!")
+            tr.success = False
+            tr.message = "Bag is not enabled"
 
-        return EmptyResponse()
+        return tr
 
 if __name__ == '__main__':
     """ Main function. """

@@ -32,6 +32,7 @@
 #include <ros/ros.h>
 #include <std_msgs/Bool.h>
 #include <std_srvs/Empty.h>
+#include <std_srvs/Trigger.h>
 #include <unistd.h>
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
@@ -903,12 +904,15 @@ void Captain::callAction(const bool is_empty, const std::string &action_id, cons
 {
   if (is_empty)
   {
-    ros::ServiceClient action_client = nh_.serviceClient<std_srvs::Empty>(action_id);
-    std_srvs::Empty params;
+    std::cout << "Calling a trigger service" << std::endl;
+    ros::ServiceClient action_client = nh_.serviceClient<std_srvs::Trigger>(action_id);
+    std_srvs::Trigger params;
     action_client.call(params);
   }
   else
   {
+    std::cout << "Calling an action service" << std::endl;
+
     ros::ServiceClient action_client = nh_.serviceClient<cola2_msgs::Action>(action_id);
     cola2_msgs::Action params;
     for (const auto &param : parameters)

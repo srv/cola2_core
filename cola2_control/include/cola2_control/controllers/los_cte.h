@@ -25,7 +25,6 @@ typedef struct
   double min_velocity_ratio;  // from 0 to 1
   double delta;
   double distance_to_max_velocity;
-  bool heave_in_3D;
 } LosCteControllerConfig;
 
 /**

@@ -597,7 +597,6 @@ void Pilot::setParams(cola2_control::PilotConfig& config, uint32_t level)
   config_.los_cte_config.max_surge_velocity = config.los_cte_max_surge_velocity;
   config_.los_cte_config.min_surge_velocity = config.los_cte_min_surge_velocity;
   config_.los_cte_config.min_velocity_ratio = config.los_cte_min_velocity_ratio;
-  config_.los_cte_config.heave_in_3D = config.los_cte_heave_in_3D;
   _los_cte_controller->setConfig(_config.los_cte_config);
 
   config_.goto_config.max_angle_error = config.goto_max_angle_error;
