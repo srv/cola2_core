@@ -47,7 +47,7 @@ EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size)
   pub_usbl_ned_ = nh_.advertise<geometry_msgs::PoseStamped>("usbl_ned", 1);
   pub_range_update_ = nh_.advertise<visualization_msgs::Marker>("markers/range_update", 1);
   pub_landmarks_ = nh_.advertise<visualization_msgs::MarkerArray>("markers/landmarks", 1);
-  pub_altitude_ = nh_.advertise<sensor_msgs::Range>("altitude", 1);
+  pub_altitude_ = nh_.advertise<sensor_msgs::Range>("altitude_filtered", 1);
 
   // Init services
   // clang-format off
@@ -88,17 +88,17 @@ void EKFBaseLandmarksROS::resetFilter()
   // general
   init_ekf_ = false;
   init_ned_ = false;
-  diag_help_.add("ekf_init", "False");
-  diag_help_.add("ned_init", "False");
+  diag_help_.add("ekf_init", false);
+  diag_help_.add("ned_init", false);
   // sensors
   init_gps_ = false;
   init_depth_ = false;
   init_dvl_ = false;
   init_imu_ = false;
-  diag_help_.add("gps_init", "False");
-  diag_help_.add("depth_init", "False");
-  diag_help_.add("dvl_init", "False");
-  diag_help_.add("imu_init", "False");
+  diag_help_.add("gps_init", false);
+  diag_help_.add("depth_init", false);
+  diag_help_.add("dvl_init", false);
+  diag_help_.add("imu_init", false);
 
   // Delete landmarks
   resetLandmarks();
@@ -128,7 +128,7 @@ void EKFBaseLandmarksROS::resetFilter()
     ROS_INFO("NED: %.8f, %.8f", config_.ned_latitude_, config_.ned_longitude_);
     ned_ = cola2::utils::NED(config_.ned_latitude_, config_.ned_longitude_, 0.0);
     init_ned_ = true;
-    diag_help_.add("ned_init", "True");
+    diag_help_.add("ned_init", true);
   }
 }
 
@@ -294,7 +294,7 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
   }
   else
   {
-    diag_help_.add("ekf_init", "True");
+    diag_help_.add("ekf_init", true);
   }
   if (!init_ned_)
   {
@@ -303,7 +303,7 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
   }
   else
   {
-    diag_help_.add("ned_init", "True");
+    diag_help_.add("ned_init", true);
   }
 
   // If all nav data is ok set navigator to Ok
@@ -830,14 +830,14 @@ void EKFBaseLandmarksROS::publishNavigationAndLandmarks(const ros::Time& stamp)
     // State
     for (size_t i = 0; i < state_vector_size_; ++i)
     {
-      ofh_ << x_(i) << ' ';
+      ofh_ << x_(static_cast<long>(i)) << ' ';
     }
     // Covariance
     for (size_t i = 0; i < state_vector_size_; ++i)
     {
       for (size_t j = 0; j < state_vector_size_; ++j)
       {
-        ofh_ << P_(i, j) << ' ';
+        ofh_ << P_(static_cast<long>(i), static_cast<long>(j)) << ' ';
       }
     }
     ofh_ << '\n';
@@ -935,7 +935,7 @@ void EKFBaseLandmarksROS::publishNavigationAndLandmarks(const ros::Time& stamp)
 
   // Publish altitude range and TF
   sensor_msgs::Range range;
-  range.header.frame_id = "/altitude_sensor";
+  range.header.frame_id = ns_ + "/altitude";
   range.header.stamp = stamp;
   range.max_range = 60.0;
   range.min_range = 0.3f;
@@ -943,11 +943,6 @@ void EKFBaseLandmarksROS::publishNavigationAndLandmarks(const ros::Time& stamp)
   range.field_of_view = 0.05f;
   range.range = (altitude_ > 0.0) ? static_cast<float>(altitude_) : 0.0;
   pub_altitude_.publish(range);
-  tf::Transform tf_altitude;
-  tf_altitude.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
-  tf_altitude.setRotation(tf::Quaternion(0.0, -0.7071, 0.0, 0.7071));  // -90 deg in y axis
-  tf_broadcast_.sendTransform(
-      tf::StampedTransform(tf_altitude, stamp, frame_vehicle_, ns_ + std::string("/altitude_sensor")));
 
   // Landmarks
   if (getNumberOfLandmarks() > 0)
