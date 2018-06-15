@@ -76,6 +76,8 @@ class Dynamics:
 
         # Show message
         rospy.loginfo("%s: initialized", self.name)
+        namespace = rospy.get_namespace()
+        self.vehicle_name = namespace[1:-1]
 
     def initialize(self):
         """ Initialize vars and matrices """
@@ -472,7 +474,7 @@ class Dynamics:
         #        GAZEBO MESSAGE FOR SIMULATION                       #####
         ##################################################################
         gazebo_odom = ModelState()
-        gazebo_odom.model_name = 'girona500'
+        gazebo_odom.model_name = self.vehicle_name
         gazebo_odom.pose = odom.pose.pose
         gazebo_odom.reference_frame = 'world'
         self.pub_odom_gazebo.publish(gazebo_odom)
