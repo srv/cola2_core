@@ -145,6 +145,8 @@ protected:
     bool use_gps_data_;
     bool use_usbl_data_;
     bool use_force_model_;
+    bool use_depth_data_;
+    bool use_dvl_data_;
     bool enable_debug_;
     // NED
     double ned_latitude_;
@@ -162,6 +164,8 @@ protected:
     std::vector<double> prediction_model_covariance_;
     std::vector<double> force_model_covariance_;
     std::vector<double> force_model_scale_;
+    // Diagnostics
+    double min_diagnostics_frequency_;
     // TODO: enable/disable dvl_bottom dvl_water force_model
   };
   Config config_;  //!< config loaded by getConfig()
