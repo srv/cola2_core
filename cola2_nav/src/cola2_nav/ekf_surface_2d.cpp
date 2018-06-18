@@ -115,7 +115,7 @@ bool EKFSurface2D::updateOrientation(const double t, const Eigen::Vector3d& rpy,
   // Initialization
   if (!init_ekf_)
   {
-    if ((!config_.use_gps_data_) || (init_gps_))
+    if (((!config_.use_gps_data_) || (init_gps_)) && ((!config_.use_dvl_data_) || (init_dvl_)))
     {
       init_ekf_ = true;
       ROS_INFO_ONCE("ekf init");
@@ -135,7 +135,9 @@ bool EKFSurface2D::updateOrientation(const double t, const Eigen::Vector3d& rpy,
   const Eigen::Vector1d h = x_.segment<1>(2);          // h(x)
   Eigen::MatrixXd H = Eigen::MatrixXd::Zero(1, size);  // H = dh(x)/dx
   H(0, 2) = 1;
-  return applyUpdate(rpy.tail(1) - h, H, cov, Eigen::Matrix1d::Identity(), 30.0);
+  Eigen::Vector1d inno = rpy.tail(1) - h;
+  inno(0) = cola2::utils::wrapAngle(inno(0));
+  return applyUpdate(inno, H, cov.bottomRightCorner(1, 1), Eigen::Matrix1d::Identity(), 30.0);
 }
 bool EKFSurface2D::updateVelocity(const double t, const Eigen::Vector3d& vel, const Eigen::Matrix3d& cov,
                                   const bool from_dvl)

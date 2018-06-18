@@ -47,7 +47,7 @@ EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size)
   pub_usbl_ned_ = nh_.advertise<geometry_msgs::PoseStamped>("usbl_ned", 1);
   pub_range_update_ = nh_.advertise<visualization_msgs::Marker>("markers/range_update", 1);
   pub_landmarks_ = nh_.advertise<visualization_msgs::MarkerArray>("markers/landmarks", 1);
-  pub_altitude_ = nh_.advertise<sensor_msgs::Range>("altitude", 1);
+  pub_altitude_ = nh_.advertise<sensor_msgs::Range>("altitude_filtered", 1);
 
   // Init services
   // clang-format off
@@ -88,17 +88,17 @@ void EKFBaseLandmarksROS::resetFilter()
   // general
   init_ekf_ = false;
   init_ned_ = false;
-  diag_help_.add("ekf_init", "False");
-  diag_help_.add("ned_init", "False");
+  diag_help_.add("ekf_init", false);
+  diag_help_.add("ned_init", false);
   // sensors
   init_gps_ = false;
   init_depth_ = false;
   init_dvl_ = false;
   init_imu_ = false;
-  diag_help_.add("gps_init", "False");
-  diag_help_.add("depth_init", "False");
-  diag_help_.add("dvl_init", "False");
-  diag_help_.add("imu_init", "False");
+  diag_help_.add("gps_init", false);
+  diag_help_.add("depth_init", false);
+  diag_help_.add("dvl_init", false);
+  diag_help_.add("imu_init", false);
 
   // Delete landmarks
   resetLandmarks();
@@ -128,7 +128,7 @@ void EKFBaseLandmarksROS::resetFilter()
     ROS_INFO("NED: %.8f, %.8f", config_.ned_latitude_, config_.ned_longitude_);
     ned_ = cola2::utils::NED(config_.ned_latitude_, config_.ned_longitude_, 0.0);
     init_ned_ = true;
-    diag_help_.add("ned_init", "True");
+    diag_help_.add("ned_init", true);
   }
 }
 
@@ -157,6 +157,8 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
   cola2::rosutils::getParam("navigator/use_gps_data", config_.use_gps_data_, false);
   cola2::rosutils::getParam("navigator/use_usbl_data", config_.use_usbl_data_, false);
   cola2::rosutils::getParam("navigator/use_force_model", config_.use_force_model_, false);
+  cola2::rosutils::getParam("navigator/use_depth_data", config_.use_force_model_, true);
+  cola2::rosutils::getParam("navigator/use_dvl_data", config_.use_force_model_, true);
   cola2::rosutils::getParam("navigator/enable_debug", config_.enable_debug_, false);
   // NED
   cola2::rosutils::getParam("navigator/ned_latitude", config_.ned_latitude_, 0.0);
@@ -175,6 +177,8 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
   cola2::rosutils::getParamVector("navigator/prediction_model_covariance", config_.prediction_model_covariance_);
   cola2::rosutils::getParamVector("navigator/force_model_covariance", config_.force_model_covariance_);
   cola2::rosutils::getParamVector("navigator/force_model_scale", config_.force_model_scale_);
+  // Diagnostics
+  cola2::rosutils::getParam("navigator/min_diagnostics_frequency", config_.min_diagnostics_frequency_, 25.0);
 
   // Show
   if (show)
@@ -187,6 +191,8 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
     ROS_INFO("        use gps data: %d", config_.use_gps_data_);
     ROS_INFO("       use usbl data: %d", config_.use_usbl_data_);
     ROS_INFO("     use force model: %d", config_.use_force_model_);
+    ROS_INFO("      use depth data: %d", config_.use_depth_data_);
+    ROS_INFO("        use dvl data: %d", config_.use_dvl_data_);
     ROS_INFO("        enable debug: %d\n", config_.enable_debug_);
     ROS_INFO("       ned latitude: %3.6f", config_.ned_latitude_);
     ROS_INFO("      ned longitude: %3.6f\n", config_.ned_longitude_);
@@ -196,6 +202,7 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
     ROS_INFO(" declination deg: %.3f", declination_deg);
     ROS_INFO("dvl max velocity: %.3f", config_.dvl_max_v_);
     ROS_INFO("   water density: %.3f\n", config_.water_density_);
+    ROS_INFO("min diagnostics frequancy: %.3f\n", config_.min_diagnostics_frequency_);
     // vectors
     std::stringstream ss;
     ss << "   initial state covariance: ";
@@ -243,11 +250,14 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
     ROS_WARN("IMU too old");
   }
   // Check DVL data
-  diag_help_.add("last_dvl_data", std::to_string(now - last_dvl_time_));
-  if (now - last_dvl_time_ > 2.0)
+  if (config_.use_dvl_data_)
   {
-    is_nav_data_ok = false;
-    ROS_WARN("DVL too old");
+    diag_help_.add("last_dvl_data", std::to_string(now - last_dvl_time_));
+    if (now - last_dvl_time_ > 2.0)
+    {
+      is_nav_data_ok = false;
+      ROS_WARN("DVL too old");
+    }
   }
   // Check altitude data
   diag_help_.add("last_altitude_data", std::to_string(now - last_altitude_time_));
@@ -257,11 +267,14 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
     ROS_WARN("Altitude too old");
   }
   // Check depth data
-  diag_help_.add("last_depth_data", std::to_string(now - last_depth_time_));
-  if (now - last_depth_time_ > 2.0)
+  if (config_.use_depth_data_)
   {
-    is_nav_data_ok = false;
-    ROS_WARN("Depth too old");
+    diag_help_.add("last_depth_data", std::to_string(now - last_depth_time_));
+    if (now - last_depth_time_ > 2.0)
+    {
+      is_nav_data_ok = false;
+      ROS_WARN("Depth too old");
+    }
   }
   // Check gps data
   if (config_.use_gps_data_)
@@ -281,7 +294,7 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
   // *****************************************
   // Check current freq
   diag_help_.add("freq", std::to_string(diag_help_.getCurrentFreq()));
-  if (diag_help_.getCurrentFreq() < 25)
+  if (diag_help_.getCurrentFreq() < config_.min_diagnostics_frequency_)
   {
     is_nav_data_ok = false;
     ROS_FATAL("Diagnostics frequency too low");
@@ -294,7 +307,7 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
   }
   else
   {
-    diag_help_.add("ekf_init", "True");
+    diag_help_.add("ekf_init", true);
   }
   if (!init_ned_)
   {
@@ -303,7 +316,7 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
   }
   else
   {
-    diag_help_.add("ned_init", "True");
+    diag_help_.add("ned_init", true);
   }
 
   // If all nav data is ok set navigator to Ok
@@ -327,11 +340,11 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
   // *****************************************
   // Output to console
   // *****************************************
-  if (!init_dvl_)
+  if (config_.use_dvl_data_ && !init_dvl_)
   {
     ROS_FATAL("DVL not initialized");
   }
-  if (!init_depth_)
+  if (config_.use_depth_data_ && !init_depth_)
   {
     ROS_FATAL("Depth not initialized");
   }
@@ -830,14 +843,14 @@ void EKFBaseLandmarksROS::publishNavigationAndLandmarks(const ros::Time& stamp)
     // State
     for (size_t i = 0; i < state_vector_size_; ++i)
     {
-      ofh_ << x_(i) << ' ';
+      ofh_ << x_(static_cast<long>(i)) << ' ';
     }
     // Covariance
     for (size_t i = 0; i < state_vector_size_; ++i)
     {
       for (size_t j = 0; j < state_vector_size_; ++j)
       {
-        ofh_ << P_(i, j) << ' ';
+        ofh_ << P_(static_cast<long>(i), static_cast<long>(j)) << ' ';
       }
     }
     ofh_ << '\n';
@@ -935,7 +948,7 @@ void EKFBaseLandmarksROS::publishNavigationAndLandmarks(const ros::Time& stamp)
 
   // Publish altitude range and TF
   sensor_msgs::Range range;
-  range.header.frame_id = "/altitude_sensor";
+  range.header.frame_id = ns_ + "/altitude";
   range.header.stamp = stamp;
   range.max_range = 60.0;
   range.min_range = 0.3f;
@@ -943,11 +956,6 @@ void EKFBaseLandmarksROS::publishNavigationAndLandmarks(const ros::Time& stamp)
   range.field_of_view = 0.05f;
   range.range = (altitude_ > 0.0) ? static_cast<float>(altitude_) : 0.0;
   pub_altitude_.publish(range);
-  tf::Transform tf_altitude;
-  tf_altitude.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
-  tf_altitude.setRotation(tf::Quaternion(0.0, -0.7071, 0.0, 0.7071));  // -90 deg in y axis
-  tf_broadcast_.sendTransform(
-      tf::StampedTransform(tf_altitude, stamp, frame_vehicle_, ns_ + std::string("/altitude_sensor")));
 
   // Landmarks
   if (getNumberOfLandmarks() > 0)
