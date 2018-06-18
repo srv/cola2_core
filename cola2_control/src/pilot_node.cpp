@@ -21,6 +21,7 @@ setpoints to the position and velocity controllers.<@@*/
 #include <cola2_msgs/NavSts.h>
 #include <cola2_msgs/WorldWaypointReq.h>
 #include <cola2_msgs/BodyVelocityReq.h>
+#include <std_srvs/Empty.h>
 #include <visualization_msgs/Marker.h>
 #include <cola2_control/controllers/types.h>
 #include <cola2_control/controllers/los_cte.h>
@@ -50,6 +51,7 @@ private:
   ros::Publisher pub_bvr_;
   ros::Publisher pub_marker_;
   ros::Publisher pub_goal_;
+  ros::ServiceServer srv_reload_params_;
 
   // Actionlib servers
   boost::shared_ptr<actionlib::SimpleActionServer<cola2_msgs::WorldSectionAction> > section_server_;
@@ -121,6 +123,11 @@ private:
    */
   void getConfig();
 
+  /**
+   * Sevice to reload parameters from ROS param server.
+   */
+  bool reloadConfigServiceCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+
   //void setParams(cola2_control::PilotConfig&, uint32_t);
 
   /**
@@ -150,6 +157,9 @@ Pilot::Pilot(): nh_("~")
   holonomic_goto_controller_ = std::unique_ptr<HolonomicGotoController>(new HolonomicGotoController(config_.holonomic_goto_config));
   // Anchor controller (for keep position in non holonomic vehicles)
   anchor_controller_ = std::unique_ptr<AnchorController>(new AnchorController(config_.anchor_config));
+
+  // Reload parameters service
+  srv_reload_params_ = nh_.advertiseService("reload_params", &Pilot::reloadConfigServiceCallback, this);
 
   // Publishers
   pub_wwr_ = nh_.advertise<cola2_msgs::WorldWaypointReq>(cola2::rosutils::getNamespace() + "/controller/world_waypoint_req", 1);
@@ -586,6 +596,16 @@ void Pilot::getConfig()
   cola2::rosutils::getParam("~anchor/safety_distance", config_.anchor_config.safety_distance, 50.0);
   cola2::rosutils::getParam("~anchor/max_angle_error", config_.anchor_config.max_angle_error, 0.5);
   // clang-format on
+}
+
+bool Pilot::reloadConfigServiceCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+    getConfig();
+    los_cte_controller_->setConfig(config_.los_cte_config);
+    goto_controller_->setConfig(config_.goto_config);
+    holonomic_goto_controller_->setConfig(config_.holonomic_goto_config);
+    anchor_controller_->setConfig(config_.anchor_config);
+    return true;
 }
 
 /*
