@@ -157,8 +157,8 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
   cola2::rosutils::getParam("navigator/use_gps_data", config_.use_gps_data_, false);
   cola2::rosutils::getParam("navigator/use_usbl_data", config_.use_usbl_data_, false);
   cola2::rosutils::getParam("navigator/use_force_model", config_.use_force_model_, false);
-  cola2::rosutils::getParam("navigator/use_depth_data", config_.use_force_model_, true);
-  cola2::rosutils::getParam("navigator/use_dvl_data", config_.use_force_model_, true);
+  cola2::rosutils::getParam("navigator/use_depth_data", config_.use_depth_data_, true);
+  cola2::rosutils::getParam("navigator/use_dvl_data", config_.use_dvl_data_, true);
   cola2::rosutils::getParam("navigator/enable_debug", config_.enable_debug_, false);
   // NED
   cola2::rosutils::getParam("navigator/ned_latitude", config_.ned_latitude_, 0.0);
