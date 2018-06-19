@@ -77,8 +77,8 @@ public:
   /**
    *  \brief Update the filter according to a measurement.
    */
-  bool applyUpdate(const Eigen::VectorXd innovation, const Eigen::MatrixXd H, const Eigen::MatrixXd R,
-                   const Eigen::MatrixXd V, const double mahalanobis_distance_threshold);
+  bool applyUpdate(const Eigen::VectorXd& innovation, const Eigen::MatrixXd& H, const Eigen::MatrixXd& R,
+                   const Eigen::MatrixXd& V, const double mahalanobis_distance_threshold);
 
   // *****************************************
   // Getters
