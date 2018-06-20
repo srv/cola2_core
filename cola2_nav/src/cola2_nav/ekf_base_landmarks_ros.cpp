@@ -259,9 +259,9 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
       ROS_WARN("DVL too old");
     }
   }
-  // Check altitude data
+  // Check altitude data (if it was ever received)
   diag_help_.add("last_altitude_data", std::to_string(now - last_altitude_time_));
-  if (now - last_altitude_time_ > 5.0)
+  if ((last_altitude_time_ != 0.0) && (now - last_altitude_time_ > 5.0))
   {
     is_nav_data_ok = false;
     ROS_WARN("Altitude too old");
