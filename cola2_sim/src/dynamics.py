@@ -26,6 +26,7 @@ import tf
 from nav_msgs.msg import Odometry
 from cola2_msgs.msg import Setpoints
 from cola2_msgs.msg import BodyForceReq
+from gazebo_msgs.msg import ModelState
 
 # Import srv
 from cola2_sim.srv import SimulatedCurrents
@@ -56,6 +57,7 @@ class Dynamics:
 
         # Create publisher
         self.pub_odom = rospy.Publisher(self.name + "/odometry", Odometry, queue_size=2)
+        self.pub_odom_gazebo = rospy.Publisher('/gazebo/set_model_state', ModelState, queue_size=2)
 
         # Create subscribers
         rospy.Subscriber(self.namespace + "controller/thruster_setpoints", Setpoints, self.update_thrusters,
@@ -74,6 +76,8 @@ class Dynamics:
 
         # Show message
         rospy.loginfo("%s: initialized", self.name)
+        namespace = rospy.get_namespace()
+        self.vehicle_name = namespace[1:-1]
 
     def initialize(self):
         """ Initialize vars and matrices """
@@ -465,6 +469,16 @@ class Dynamics:
         br = tf.TransformBroadcaster()
         br.sendTransform((self.p[0], self.p[1], self.p[2]), orientation,
                          odom.header.stamp, odom.child_frame_id, odom.header.frame_id)
+
+        ##################################################################
+        #        GAZEBO MESSAGE FOR SIMULATION                       #####
+        ##################################################################
+        gazebo_odom = ModelState()
+        gazebo_odom.model_name = self.vehicle_name
+        gazebo_odom.pose = odom.pose.pose
+        gazebo_odom.reference_frame = 'world'
+        self.pub_odom_gazebo.publish(gazebo_odom)
+        ##################################################################
 
     def get_config(self):
         """ Get config from config file """

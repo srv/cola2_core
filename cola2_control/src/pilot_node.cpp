@@ -21,6 +21,7 @@ setpoints to the position and velocity controllers.<@@*/
 #include <cola2_msgs/NavSts.h>
 #include <cola2_msgs/WorldWaypointReq.h>
 #include <cola2_msgs/BodyVelocityReq.h>
+#include <std_srvs/Empty.h>
 #include <visualization_msgs/Marker.h>
 #include <cola2_control/controllers/types.h>
 #include <cola2_control/controllers/los_cte.h>
@@ -50,6 +51,7 @@ private:
   ros::Publisher pub_bvr_;
   ros::Publisher pub_marker_;
   ros::Publisher pub_goal_;
+  ros::ServiceServer srv_reload_params_;
 
   // Actionlib servers
   boost::shared_ptr<actionlib::SimpleActionServer<cola2_msgs::WorldSectionAction> > section_server_;
@@ -121,6 +123,11 @@ private:
    */
   void getConfig();
 
+  /**
+   * Sevice to reload parameters from ROS param server.
+   */
+  bool reloadConfigServiceCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+
   //void setParams(cola2_control::PilotConfig&, uint32_t);
 
   /**
@@ -150,6 +157,9 @@ Pilot::Pilot(): nh_("~")
   holonomic_goto_controller_ = std::unique_ptr<HolonomicGotoController>(new HolonomicGotoController(config_.holonomic_goto_config));
   // Anchor controller (for keep position in non holonomic vehicles)
   anchor_controller_ = std::unique_ptr<AnchorController>(new AnchorController(config_.anchor_config));
+
+  // Reload parameters service
+  srv_reload_params_ = nh_.advertiseService("reload_params", &Pilot::reloadConfigServiceCallback, this);
 
   // Publishers
   pub_wwr_ = nh_.advertise<cola2_msgs::WorldWaypointReq>(cola2::rosutils::getNamespace() + "/controller/world_waypoint_req", 1);
@@ -335,6 +345,7 @@ void Pilot::sectionServerCallback(const cola2_msgs::WorldSectionGoalConstPtr& da
   section.tolerance.x = data->tolerance.x;
   section.tolerance.y = data->tolerance.y;
   section.tolerance.z = data->tolerance.z;
+  section.surge_velocity = data->surge_velocity;
 
   // Main loop
   double init_time = ros::Time::now().toSec();
@@ -587,6 +598,16 @@ void Pilot::getConfig()
   // clang-format on
 }
 
+bool Pilot::reloadConfigServiceCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+    getConfig();
+    los_cte_controller_->setConfig(config_.los_cte_config);
+    goto_controller_->setConfig(config_.goto_config);
+    holonomic_goto_controller_->setConfig(config_.holonomic_goto_config);
+    anchor_controller_->setConfig(config_.anchor_config);
+    return true;
+}
+
 /*
 void Pilot::setParams(cola2_control::PilotConfig& config, uint32_t level)
 {
@@ -596,7 +617,6 @@ void Pilot::setParams(cola2_control::PilotConfig& config, uint32_t level)
   config_.los_cte_config.max_surge_velocity = config.los_cte_max_surge_velocity;
   config_.los_cte_config.min_surge_velocity = config.los_cte_min_surge_velocity;
   config_.los_cte_config.min_velocity_ratio = config.los_cte_min_velocity_ratio;
-  config_.los_cte_config.heave_in_3D = config.los_cte_heave_in_3D;
   _los_cte_controller->setConfig(_config.los_cte_config);
 
   config_.goto_config.max_angle_error = config.goto_max_angle_error;

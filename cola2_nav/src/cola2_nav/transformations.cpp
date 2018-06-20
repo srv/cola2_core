@@ -9,16 +9,16 @@
 
 namespace transforms
 {
-Eigen::Vector3d position(const Eigen::Vector3d measured_position, const Eigen::Quaterniond body_orientation,
-                         const Eigen::Vector3d translation_from_origin)
+Eigen::Vector3d position(const Eigen::Vector3d& measured_position, const Eigen::Quaterniond& body_orientation,
+                         const Eigen::Vector3d& translation_from_origin)
 {
   // std::cout << "Rotation Matrix: " << body_orientation.toRotationMatrix() << "\n";
   return measured_position - (body_orientation.toRotationMatrix() * translation_from_origin);
 }
 
-Eigen::Vector3d landmarkPosition(const Eigen::Vector3d measured_landmark_position,
-                                 const Eigen::Quaterniond rotation_from_origen,
-                                 const Eigen::Vector3d translation_from_origin)
+Eigen::Vector3d landmarkPosition(const Eigen::Vector3d& measured_landmark_position,
+                                 const Eigen::Quaterniond& rotation_from_origen,
+                                 const Eigen::Vector3d& translation_from_origin)
 {
   // To create the TF multiply a translation by a quaternion (rotation)
   Eigen::Translation<double, 3> translation(translation_from_origin);
@@ -32,8 +32,8 @@ Eigen::Vector3d landmarkPosition(const Eigen::Vector3d measured_landmark_positio
   return h.hnormalized();
 }
 
-Eigen::Quaterniond orientation(const Eigen::Quaterniond measured_orientation,
-                               const Eigen::Quaterniond rotation_from_origen)
+Eigen::Quaterniond orientation(const Eigen::Quaterniond& measured_orientation,
+                               const Eigen::Quaterniond& rotation_from_origen)
 {
   Eigen::Matrix3d orientation_data = measured_orientation.toRotationMatrix();
   Eigen::Matrix3d R = rotation_from_origen.toRotationMatrix();
@@ -43,16 +43,16 @@ Eigen::Quaterniond orientation(const Eigen::Quaterniond measured_orientation,
   return Eigen::Quaterniond(ret);
 }
 
-Eigen::Quaterniond landmarkOrientation(const Eigen::Quaterniond measured_landmark_orientation,
-                                       const Eigen::Quaterniond rotation_from_origen)
+Eigen::Quaterniond landmarkOrientation(const Eigen::Quaterniond& measured_landmark_orientation,
+                                       const Eigen::Quaterniond& rotation_from_origen)
 {
   return Eigen::Quaterniond(rotation_from_origen.toRotationMatrix() * measured_landmark_orientation.toRotationMatrix());
 }
 
-Eigen::Vector3d linearVelocity(const Eigen::Vector3d measured_linear_velocity,
-                               const Eigen::Vector3d origin_angular_velocity,
-                               const Eigen::Quaterniond rotation_from_origen,
-                               const Eigen::Vector3d translation_from_origen)
+Eigen::Vector3d linearVelocity(const Eigen::Vector3d& measured_linear_velocity,
+                               const Eigen::Vector3d& origin_angular_velocity,
+                               const Eigen::Quaterniond& rotation_from_origen,
+                               const Eigen::Vector3d& translation_from_origen)
 {
   // Align measured velocity with origin frame
   Eigen::Matrix3d R = rotation_from_origen.toRotationMatrix();
@@ -64,16 +64,16 @@ Eigen::Vector3d linearVelocity(const Eigen::Vector3d measured_linear_velocity,
   return v_r - origin_angular_velocity.cross(translation_from_origen);
 }
 
-Eigen::Vector3d angularVelocity(const Eigen::Vector3d measured_angular_velocity,
-                                const Eigen::Quaterniond rotation_from_origen)
+Eigen::Vector3d angularVelocity(const Eigen::Vector3d& measured_angular_velocity,
+                                const Eigen::Quaterniond& rotation_from_origen)
 {
   return rotation_from_origen.toRotationMatrix() * measured_angular_velocity;
 }
 
-Eigen::Matrix3d positionCovariance(const Eigen::Matrix3d measured_position_covariance,
-                                   const Eigen::Matrix3d origen_orientation_covariance,
-                                   const Eigen::Quaterniond origen_orientation,
-                                   const Eigen::Vector3d translation_from_origin)
+Eigen::Matrix3d positionCovariance(const Eigen::Matrix3d& measured_position_covariance,
+                                   const Eigen::Matrix3d& origen_orientation_covariance,
+                                   const Eigen::Quaterniond& origen_orientation,
+                                   const Eigen::Vector3d& translation_from_origin)
 {
   Eigen::Vector3d angle = cola2::utils::quaternion2euler(origen_orientation);
 
@@ -118,10 +118,10 @@ Eigen::Matrix3d positionCovariance(const Eigen::Matrix3d measured_position_covar
   return (measured_position_covariance + rpy_cov * origen_orientation_covariance * rpy_cov.transpose());
 }
 
-Eigen::Matrix3d linearVelocityCov(const Eigen::Matrix3d measured_linear_velocity_covariance,
-                                  const Eigen::Matrix3d origin_angular_velocity_covariance,
-                                  const Eigen::Quaterniond rotation_from_origen,
-                                  const Eigen::Vector3d translation_from_origen)
+Eigen::Matrix3d linearVelocityCov(const Eigen::Matrix3d& measured_linear_velocity_covariance,
+                                  const Eigen::Matrix3d& origin_angular_velocity_covariance,
+                                  const Eigen::Quaterniond& rotation_from_origen,
+                                  const Eigen::Vector3d& translation_from_origen)
 {
   //    Z = RPY*Measured_v - cross(w, trans)
   //
@@ -156,7 +156,7 @@ Eigen::Matrix3d linearVelocityCov(const Eigen::Matrix3d measured_linear_velocity
   return RPY_x_M_v + w_cov * origin_angular_velocity_covariance * w_cov.transpose();
 }
 
-Eigen::Matrix3d rotatedCovariance(const Eigen::Matrix3d covariance, const Eigen::Quaterniond rotation)
+Eigen::Matrix3d rotatedCovariance(const Eigen::Matrix3d& covariance, const Eigen::Quaterniond& rotation)
 {
   //    Z = RPY*W
   //    Zwx = cy*cp*wx + (cy*sp*sr - sy*cr)*wy + (cy*sp*cr + sy*sr)*wz

@@ -65,6 +65,9 @@ class VehicleStatusParser:
         t = rospy.Time.now()
         self.last_temperature = [t] * len(self.temperature_name)
 
+        # Initialize water vector
+        self.water = [False] * len(self.diag_water)
+
     def update_timeout(self, watchdog_msg):
         """Update timeout in vehicle status."""
         #self.status.up_time = watchdog_msg.elapsed_time
@@ -192,33 +195,20 @@ class VehicleStatusParser:
             # Temperatures
             dt = rospy.Duration(secs=20.0)
             for i in range(0, len(self.diag_temperature)):
-                if __getDiagnostic__(status, self.diag_temperature[i]):
+                if __getDiagnostic__(status, self.diag_temperature[i][0]):
                     temp = float(__getDiagnostic__(status, self.diag_temperature[i][0], self.diag_temperature[i][1], 0.0))
                     if (rospy.Time.now() - self.last_temperature[i]) > dt:
                         self.status.temperature[i] = -1000
                     else:
                         self.status.temperature[i] = temp
-		        self.last_temperature[i] = rospy.Time.now()
+                    self.last_temperature[i] = rospy.Time.now()
 
             # Water inside
-            water_pc = water_bat = water_pc_external = water_bat_external = water_ins = False
-            if __getDiagnostic__(status, self.diag_water_pc_internal[0]):
-                water_pc = __getDiagnostic__(status, self.diag_water_pc_internal[0], self.diag_water_pc_internal[1], 'False') == 'True'
-            if __getDiagnostic__(status, self.diag_water_bat_internal[0]):
-                water_bat = __getDiagnostic__(status, self.diag_water_bat_internal[0], self.diag_water_bat_internal[1], 'False') == 'True'
-            if __getDiagnostic__(status, self.diag_water_pc_external[0]):
-                water_pc_external = __getDiagnostic__(status, self.diag_water_pc_external[0], self.diag_water_pc_external[1], 'False') == 'True'
-            if __getDiagnostic__(status, self.diag_water_bat_external[0]):
-                water_bat_external = __getDiagnostic__(status, self.diag_water_bat_external[0], self.diag_water_bat_external[1], 'False') == 'True'
-            #if __getDiagnostic__(status, '/safety/ixblue_phinsc3_ins'):
-            #    water_ins = __getDiagnostic__(status, '/safety/ixblue_phinsc3_ins', 'water_detected', 'False') == 'True'
+            for i in range(0, len(self.diag_water)):
+                if __getDiagnostic__(status, self.diag_water[i][0]):
+                    self.water[i] = __getDiagnostic__(status, self.diag_water[i][0], self.diag_water[i][1], 'False') == 'True'
 
-            if water_pc_external and not water_bat:
-                water_ins = True
-            if water_bat_external and not water_pc:
-                water_ins = True
-
-            if water_pc or water_bat or water_ins:
+            if any(self.water):
                 self.status.water_detected = True
             else:
                 self.status.water_detected = False
@@ -249,10 +239,7 @@ class VehicleStatusParser:
                       'diag_wifi_data_age': ('wifi_data_age', ["",""]),
                       'diag_modem_data_age': ('modem_data_age', ["",""]),
                       'diag_temperature': ('temperature', [["",""],["",""]]),
-                      'diag_water_pc_internal': ('water_pc_internal', ["",""]),
-                      'diag_water_pc_external': ('water_pc_external', ["",""]),
-                      'diag_water_bat_internal': ('water_bat_internal', ["",""]),
-                      'diag_water_bat_external': ('water_bat_external', ["",""]),
+                      'diag_water': ('water', [["", ""], ["", ""]]),
                       'temperature_name': ('temperature_name', ["",""])
                      }
 

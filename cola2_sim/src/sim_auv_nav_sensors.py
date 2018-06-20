@@ -94,7 +94,10 @@ class SimAUVNavSensors(object):
                 # DVL
                 if self.dvl_period > 0:
                     _, dvl_xyz, dvl_rpy = self.tf_handler.get_transform(self.ns + 'dvl')
-                    self.tf_dvl = transform_from_tf(dvl_xyz, dvl_rpy)
+                    # self.tf_dvl = transform_from_tf(dvl_xyz, dvl_rpy)  # not standard inverse
+                    v = np.array([[dvl_xyz[0], dvl_xyz[1], dvl_xyz[2]]]).T
+                    r = tf.transformations.euler_matrix(dvl_rpy[0], dvl_rpy[1], dvl_rpy[2])[:3, :3]
+                    self.tf_dvl = v, r.T  # special case (coordinates from base_link to sensor to transform velocity)
                     rospy.loginfo("dvl tf loaded")
                 # IMU
                 if self.imu_period > 0:

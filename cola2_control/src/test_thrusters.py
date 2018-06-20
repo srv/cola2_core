@@ -30,7 +30,7 @@ class TestThrusters:
 
         # Create publisher
         self.pub_thrusters_data = rospy.Publisher(
-            rospy.get_namespace() + "controller/thrusters_setpoints",
+            rospy.get_namespace() + "controller/thruster_setpoints",
             Setpoints, queue_size=1)
 
         # Create client to disable thrusters service
@@ -63,9 +63,8 @@ class TestThrusters:
             data.header.stamp = rospy.Time.now()
             self.pub_thrusters_data.publish(data)
             rate.sleep()
-
-        self.disable_thrusters(EmptyRequest())
-	return EmptyResponse()
+       
+        return []
 
 if __name__ == '__main__':
     try:

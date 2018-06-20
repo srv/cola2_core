@@ -48,8 +48,8 @@ bool EKFBase::makePrediction(const double now)
   }
 }
 
-bool EKFBase::applyUpdate(const Eigen::VectorXd innovation, const Eigen::MatrixXd H, const Eigen::MatrixXd R,
-                          const Eigen::MatrixXd V, const double mahalanobis_distance_threshold)
+bool EKFBase::applyUpdate(const Eigen::VectorXd& innovation, const Eigen::MatrixXd& H, const Eigen::MatrixXd& R,
+                          const Eigen::MatrixXd& V, const double mahalanobis_distance_threshold)
 {
   const double distance = mahalanobisDistance(innovation, R, H);
   if (filter_updates_ < 100 || distance < mahalanobis_distance_threshold)
@@ -59,7 +59,9 @@ bool EKFBase::applyUpdate(const Eigen::VectorXd innovation, const Eigen::MatrixX
     const Eigen::MatrixXd K = P_ * H.transpose() * S.inverse();
     x_ += K * innovation;
     normalizeState();
-    P_ = (Eigen::MatrixXd::Identity(state_vector_size_, state_vector_size_) - K * H) * P_;
+    const Eigen::MatrixXd IKH = Eigen::MatrixXd::Identity(state_vector_size_, state_vector_size_) - K * H;
+    // P_ = (Eigen::MatrixXd::Identity(state_vector_size_, state_vector_size_) - K * H) * P_;
+    P_ = IKH * P_ * IKH.transpose() + K * R * K.transpose();  // Joseph form
     filter_updates_++;
     // Check integrity
     checkIntegrity();
