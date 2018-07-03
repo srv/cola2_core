@@ -12,6 +12,11 @@ HolonomicGotoController::HolonomicGotoController(HolonomicGotoControllerConfig c
 {
 }
 
+void HolonomicGotoController::setConfig(const HolonomicGotoControllerConfig& config)
+{
+  config_ = config;
+}
+
 // Compute Method
 void HolonomicGotoController::compute(const control::State& current_state, const control::Waypoint& waypoint,
                                       control::State& controller_output, control::Feedback& feedback,

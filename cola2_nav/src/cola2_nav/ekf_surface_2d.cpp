@@ -14,31 +14,31 @@ EKFSurface2D::EKFSurface2D() : EKFBaseLandmarksROS(6)
   P_(0, 0) = 0.1;  // cov x
   P_(1, 1) = 0.1;  // cov y
   P_(2, 2) = 0.1;  // cov yaw
-  P_(3, 3) = 0.0;  // cov vx
-  P_(4, 4) = 0.0;  // cov vy
+  P_(3, 3) = 0.0;  // cov vx (vehicle frame)
+  P_(4, 4) = 0.0;  // cov vy (vehicle frame)
   P_(5, 5) = 0.0;  // cov vyaw
 }
 
 void EKFSurface2D::normalizeState()
 {
   // normalize yaw
-  P_(2, 2) = cola2::utils::wrapAngle(P_(2, 2));
+  x_(2) = cola2::utils::wrapAngle(x_(2));
 }
 
 void EKFSurface2D::computePredictionMatrices(const double dt)
 {
-  Eigen::Vector3d rpy = getEuler();
-  double sy = sin(rpy(2));  // sin(yaw)
-  double cy = cos(rpy(2));  // cos(yaw)
-  unsigned int size = state_vector_size_;
-  double dt2 = (dt * dt) / 2.0;
-  Eigen::Vector3d vel = getVelocity();
-  double vx = vel(0);
-  double vy = vel(1);
+  const Eigen::Vector3d rpy = getEuler();
+  const double sy = sin(rpy(2));  // sin(yaw)
+  const double cy = cos(rpy(2));  // cos(yaw)
+  const unsigned int size = state_vector_size_;
+  const double dt2 = (dt * dt) / 2.0;
+  const Eigen::Vector3d vel = getVelocity();
+  const double vx = vel(0);
+  const double vy = vel(1);
 
   // State prediction
   // x = x + (vx * dt + nvx * dt2) * cy - (vy * dt + nvy * dt2) * sy
-  // y = y + (vx * dt + nvx * dt2) * sy + (vy * dt + nvy * dt2) * sy
+  // y = y + (vx * dt + nvx * dt2) * sy + (vy * dt + nvy * dt2) * cy
   // yaw = yaw + vyaw * dt + nvyaw * dt2
   // vx = vx + nvx * dt
   // vy = vy + nvy * dt
@@ -46,13 +46,13 @@ void EKFSurface2D::computePredictionMatrices(const double dt)
 
   // A is the jacobian matrix of f(x)
   A_ = Eigen::MatrixXd::Identity(size, size);
-  A_(0, 3) = -vx * dt * sy - vy * dt * cy;  // fx/yaw
-  A_(0, 4) = +dt * cy;                      // fx/vx
-  A_(0, 5) = -dt * sy;                      // fx/vy
+  A_(0, 2) = -vx * dt * sy - vy * dt * cy;  // fx/yaw
+  A_(0, 3) = +dt * cy;                      // fx/vx
+  A_(0, 4) = -dt * sy;                      // fx/vy
 
-  A_(1, 3) = +vx * dt * cy - vy * dt * sy;  // fy/yaw
-  A_(1, 4) = +dt * sy;                      // fy/vx
-  A_(1, 5) = +dt * cy;                      // fy/vy
+  A_(1, 2) = +vx * dt * cy - vy * dt * sy;  // fy/yaw
+  A_(1, 3) = +dt * sy;                      // fy/vx
+  A_(1, 4) = +dt * cy;                      // fy/vy
 
   A_(2, 5) = dt;  // fyaw/vyaw
 
@@ -105,6 +105,11 @@ bool EKFSurface2D::updatePositionXY(const double t, const Eigen::Vector2d& pose_
 }
 bool EKFSurface2D::updatePositionZ(const double, const Eigen::Vector1d&, const Eigen::Matrix1d&)
 {
+  // Check usage
+  if (!config_.use_depth_data_)
+  {
+    return false;
+  }
   ROS_FATAL("updatePositionZ() not implemented");
   return false;
 }
@@ -142,6 +147,11 @@ bool EKFSurface2D::updateOrientation(const double t, const Eigen::Vector3d& rpy,
 bool EKFSurface2D::updateVelocity(const double t, const Eigen::Vector3d& vel, const Eigen::Matrix3d& cov,
                                   const bool from_dvl)
 {
+  // Check usage
+  if (!config_.use_dvl_data_)
+  {
+    return false;
+  }
   // Update time
   if (from_dvl)
   {
@@ -173,7 +183,12 @@ bool EKFSurface2D::updateOrientationRate(const double t, const Eigen::Vector3d& 
   // Update (used as true reading)
   ang_vel_ = rate;
   ang_vel_cov_ = cov;
-  return true;
+  // Üpdate
+  const unsigned int size = state_vector_size_;
+  const Eigen::Vector1d h = x_.tail(1);
+  Eigen::MatrixXd H = Eigen::MatrixXd::Zero(1, size);
+  H(0, 5) = 1;
+  return applyUpdate(rate.tail(1) - h, H, cov.bottomRightCorner(1, 1), Eigen::Matrix1d::Identity(), 16.0);
 }
 
 bool EKFSurface2D::updateLandmarkMeasure(const double, const Eigen::Vector3d&, const Eigen::Vector3d&,
@@ -201,13 +216,13 @@ Eigen::Vector3d EKFSurface2D::getAngularVelocity() const
 }
 Eigen::Matrix3d EKFSurface2D::getPositionUncertainty() const
 {
-  Eigen::Matrix3d cov = 0.1 * Eigen::Matrix3d::Identity();
+  Eigen::Matrix3d cov = 0.01 * Eigen::Matrix3d::Identity();
   cov.topLeftCorner(2, 2) = P_.topLeftCorner(2, 2);
   return cov;
 }
 Eigen::Matrix3d EKFSurface2D::getVelocityUncertainty() const
 {
-  Eigen::Matrix3d cov = 0.1 * Eigen::Matrix3d::Identity();
+  Eigen::Matrix3d cov = 0.01 * Eigen::Matrix3d::Identity();
   cov.topLeftCorner(2, 2) = P_.block<2, 2>(3, 3);
   return cov;
 }

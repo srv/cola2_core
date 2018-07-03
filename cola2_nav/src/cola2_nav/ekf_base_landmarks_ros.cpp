@@ -157,8 +157,8 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
   cola2::rosutils::getParam("navigator/use_gps_data", config_.use_gps_data_, false);
   cola2::rosutils::getParam("navigator/use_usbl_data", config_.use_usbl_data_, false);
   cola2::rosutils::getParam("navigator/use_force_model", config_.use_force_model_, false);
-  cola2::rosutils::getParam("navigator/use_depth_data", config_.use_force_model_, true);
-  cola2::rosutils::getParam("navigator/use_dvl_data", config_.use_force_model_, true);
+  cola2::rosutils::getParam("navigator/use_depth_data", config_.use_depth_data_, true);
+  cola2::rosutils::getParam("navigator/use_dvl_data", config_.use_dvl_data_, true);
   cola2::rosutils::getParam("navigator/enable_debug", config_.enable_debug_, false);
   // NED
   cola2::rosutils::getParam("navigator/ned_latitude", config_.ned_latitude_, 0.0);
@@ -259,9 +259,9 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
       ROS_WARN("DVL too old");
     }
   }
-  // Check altitude data
+  // Check altitude data (if it was ever received)
   diag_help_.add("last_altitude_data", std::to_string(now - last_altitude_time_));
-  if (now - last_altitude_time_ > 5.0)
+  if ((last_altitude_time_ != 0.0) && (now - last_altitude_time_ > 5.0))
   {
     is_nav_data_ok = false;
     ROS_WARN("Altitude too old");
@@ -378,7 +378,7 @@ void EKFBaseLandmarksROS::updatePositionGPSMsg(const sensor_msgs::NavSatFix& msg
     return;
   }
   // Valid measurement
-  if ((msg.status.status >= msg.status.STATUS_FIX) && (msg.position_covariance[0] < 4.0))
+  if ((msg.status.status >= msg.status.STATUS_FIX) && (msg.position_covariance[0] < 10.0)) //TODO: 10.0 --> 4.0
   {
     // Diagnostics
     diag_help_.increaseFrequencyCounter();

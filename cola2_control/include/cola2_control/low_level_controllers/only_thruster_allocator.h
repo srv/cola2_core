@@ -13,36 +13,36 @@
 #include <cola2_control/low_level_controllers/request.h>
 #include <cola2_lib/utils/saturate.h>
 #include <algorithm>
+#include <vector>
 #include <eigen3/Eigen/Dense>
 #include <map>
-#include <sstream>
+#include <string>
+#include <cassert>
 
 class OnlyThrusterAllocator
 {
 private:
-  unsigned int n_thrusters_;
-  double max_force_thruster_positive_;
-  double max_force_thruster_negative_;
-  double thruster_distance_yaw_;
+  std::size_t n_thrusters_;
+  std::vector<double> max_force_thruster_positive_v_;
+  std::vector<double> max_force_thruster_negative_v_;
   Eigen::MatrixXd tcm_inv_;
-  Poly poly_positive_;
-  Poly poly_negative_;
+  std::vector<Poly> poly_positive_v_;
+  std::vector<Poly> poly_negative_v_;
   bool is_init_;
 
   /**
-   * Compute newtons to setpoints for each thruster
-   * @param wrench current force
+   * From newtons or newtons meter to setpoints for each thruster
+   * @param thruster_forces Forces for each thruster
    * @return setpoint for each thruster
    */
   Eigen::VectorXd forceToSetpoint(Eigen::VectorXd thruster_forces);
 
   /**
-   * Surge and yaw are controlled by the same thrusters. They must be merged with this function that prioritizes
-   * yaw over surge if both setpoints can not be achieved.
-   * @param surge force
-   * @param yaw torque
+   * Combine wrench request to acheive a force per thruster that preserves the most important DoFs
+   * @param wrench Force per DoF
+   * @return Force per thruster
    */
-  void mergeSurgeYaw(double&, double& yaw);
+  Eigen::VectorXd wrenchToThrusterForces(const Eigen::VectorXd& wrench);
 
 public:
   /**
@@ -53,9 +53,11 @@ public:
 
   ~OnlyThrusterAllocator();
 
-  void setParams(const double max_force_thruster_positive, const double max_force_thruster_negative,
-                 const double thruster_distance_yaw, const std::vector<double> thruster_poly_positive,
-                 const std::vector<double> thruster_poly_negative, const std::vector<double> tcm_values);
+  void setParams(const std::vector<double>& max_force_thruster_positive_v,
+                 const std::vector<double>& max_force_thruster_negative_v,
+                 const std::vector<std::vector<double> >& poly_positive_v,
+                 const std::vector<std::vector<double> >& poly_negative_v,
+                 const std::vector<double>& tcm_values);
 
   /**
    * Computes the setpoint for each thrusters taking into account the force + torque (wrench) to be
@@ -63,7 +65,7 @@ public:
    * @param wrench Desired force + troque (6DoFs)
    * @return setpoint for each thruster
    */
-  Eigen::VectorXd compute(Request wrench);
+  Eigen::VectorXd compute(const Request& wrench);
 };
 
 #endif  // __ONLYTHRUSTERALLOCATOR_CLASS__
