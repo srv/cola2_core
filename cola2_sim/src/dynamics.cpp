@@ -1,49 +1,85 @@
 // This node uses simulated data of the actuators to compute the AUV dynamic
-// behavior. This node can be used to simulate real AUV behavior and its
-// interaction
-// with the environtment. User can add currents and a preliminary version of
-// collision
-// detection has been implemented.
+// behavior
 
 #include <ros/ros.h>
-// import tf
-
-// Messages
-#include <auv_msgs/BodyForceReq.h>
+#include <cola2_msgs/BodyForceReq.h>
 #include <cola2_msgs/Setpoints.h>
 #include <gazebo_msgs/ModelState.h>
 #include <geometry_msgs/TransformStamped.h>
-#include <geometry_msgs/WrenchStamped.h>
+#include <geometry_msgs/Vector3Stamped.h>
 #include <nav_msgs/Odometry.h>
-
-// Services
-#include <cola2_msgs/SimulatedCurrents.h>
-
-// Other
-#include <cola2_lib/cola2_util.h>
+#include <std_srvs/Empty.h>
+#include <tf/transform_listener.h>
 #include <tf2_ros/transform_broadcaster.h>
+#include <cola2_lib/rosutils/param_loader.h>
+#include <cola2_lib/utils/angles.h>
+#include <cola2_lib/utils/saturate.h>
+#include <cola2_lib/rosutils/this_node.h>
+#include <cola2_control/low_level_controllers/poly.h>
 #include <Eigen/Dense>
+#include <iostream>
+#include <string>
 #include <cmath>
-#include <random>
+#include <cassert>
+#include <vector>
+#include <map>
+#include <algorithm>
 
-// # Custom libs
-// from cola2_lib import cola2_lib, cola2_ros_lib
+#define STD_GRAVITY 9.80665  // Gravity constant
 
+// Typedefs for common vector and matrices used in this node
 namespace Eigen
 {
-// using Vector6d = Matrix<double, 6, 1>;
-// using Matrix6d = Matrix<double, 6, 6>;
-typedef Matrix<double, 6, 1> Vector6d;
-typedef Matrix<double, 6, 6> Matrix6d;
+  typedef Matrix<double, 6, 1> Vector6d;
+  typedef Matrix<double, 6, 6> Matrix6d;
 }
 
-/*!
-   \brief Make the skew-symmetric matrix representation of the vector for
-   cross-product.
-   \param x The first vector of a cross product.
-   \return The skew-symmetric matrix for cross product.
-*/
-// Eigen::Matrix3d __s__(const Eigen::Vector3d &x) const
+// Helper function to read matrices from the param server
+void getParamVector3d(const std::string &tname, Eigen::Vector3d &v)
+{
+  std::vector<double> vec;
+  cola2::rosutils::getParam(tname, vec);
+  assert(vec.size() == 3);
+  for (std::size_t i = 0; i < 3; ++i) v(i) = vec[i];
+}
+void getParamVector6d(const std::string &tname, Eigen::Vector6d &v)
+{
+  std::vector<double> vec;
+  cola2::rosutils::getParam(tname, vec);
+  assert(vec.size() == 6);
+  for (std::size_t i = 0; i < 6; ++i) v(i) = vec[i];
+}
+void getParamMatrix3d(const std::string &tname, Eigen::Matrix3d &v)
+{
+  std::vector<double> vec;
+  cola2::rosutils::getParam(tname, vec);
+  assert(vec.size() == 9);
+  for (std::size_t i = 0; i < 3; ++i)
+  {
+    for (std::size_t j = 0; j < 3; ++j)
+    {
+      v(i, j) = vec[i * 3 + j];  // First row gets filled first
+    }
+  }
+}
+void getParamMatrixXd(const std::string &tname, Eigen::MatrixXd &v, std::size_t rows)
+{
+  std::vector<double> vec;
+  cola2::rosutils::getParam(tname, vec);
+  assert(!vec.empty());
+  assert(vec.size() % rows == 0);
+  std::size_t cols = vec.size() / rows;
+  v = Eigen::MatrixXd::Zero(rows, cols);
+  for (std::size_t i = 0; i < rows; ++i)
+  {
+    for (std::size_t j = 0; j < cols; ++j)
+    {
+      v(i, j) = vec[i * cols + j];
+    }
+  }
+}
+
+// Make the skew-symmetric matrix representation of the vector for cross-product
 Eigen::Matrix3d crossMatrix(const Eigen::Vector3d &x)
 {
   Eigen::Matrix3d x_hat;
@@ -51,963 +87,716 @@ Eigen::Matrix3d crossMatrix(const Eigen::Vector3d &x)
   return x_hat;
 }
 
-double randomNormal()
+// Bisection Poly solver. The polynomial must be monotonic between x1 and x2
+double bisectionPolySolver(Poly& poly, double x1, double x2, double ytarget)
 {
-  // Seed with a real random value, if available
-  static std::random_device r;
-  static std::default_random_engine e(r());
-  static std::normal_distribution<> normal_dist(0.0, 1.0);
-  return normal_dist(e);
-}
+  double y1 = poly.compute(0.0, x1, 0.0);
+  double y2 = poly.compute(0.0, x2, 0.0);
+  if (y2 < y1) std::swap(x1, x2);
 
-Eigen::Quaterniond euler2quaternion(const Eigen::Vector3d &rpy)
-{
-  return Eigen::AngleAxisd(rpy[2], Eigen::Vector3d::UnitZ()) * Eigen::AngleAxisd(rpy[1], Eigen::Vector3d::UnitY()) *
-         Eigen::AngleAxisd(rpy[0], Eigen::Vector3d::UnitX());
-}
-
-Eigen::Matrix3d euler2rotation(const Eigen::Vector3d &rpy)
-{
-  return Eigen::Matrix3d(euler2quaternion(rpy));
-}
-
-std::vector<double> getParamVector(const ros::NodeHandle &nh, const std::string &tname)
-{
-  std::vector<double> vec;
-  nh.getParam(tname, vec);
-  return vec;
-}
-
-void getParamVector3d(const ros::NodeHandle &nh, const std::string &tname, Eigen::Vector3d &v)
-{
-  // Get raw
-  std::vector<double> vec;
-  nh.getParam(tname, vec);
-  // Construct
-  assert(vec.size() == 3);
-  for (int i = 0; i < 3; i++)
+  double xm;
+  for (std::size_t i = 0; i < 30; ++i)
   {
-    v(i) = vec[i];
+    xm = 0.5 * (x1 + x2);
+    double ym = poly.compute(0.0, xm, 0.0);
+    if (ym < ytarget) x1 = xm;
+    else              x2 = xm;
   }
-}
-void getParamVector6d(const ros::NodeHandle &nh, const std::string &tname, Eigen::Vector6d &v)
-{
-  // Get raw
-  std::vector<double> vec;
-  nh.getParam(tname, vec);
-  // Construct
-  assert(vec.size() == 6);
-  for (int i = 0; i < 6; i++)
-  {
-    v(i) = vec[i];
-  }
-}
-void getParamMatrix3d(const ros::NodeHandle &nh, const std::string &tname, Eigen::Matrix3d &v)
-{
-  // Get raw
-  std::vector<double> vec;
-  nh.getParam(tname, vec);
-  // Construct
-  assert(vec.size() == 9);
-  for (int i = 0; i < 3; i++)
-  {
-    for (int j = 0; j < 3; j++)
-    {
-      v(i, j) = vec[i * 3 + j];
-    }
-  }
-}
-void getParamMatrixXd(const ros::NodeHandle &nh, const std::string &tname, Eigen::MatrixXd &v, int rows)
-{
-  // Get raw
-  std::cout << "getMatrix " << std::endl;
-  std::cout << tname << std::endl;
-  std::vector<double> vec;
-  std::cout << "getMatrix " << std::endl;
-  nh.getParam(tname, vec);
-  std::cout << "getMatrix " << std::endl;
-  std::cout << vec.size() << std::endl;
-  // Construct
-  assert(vec.size() % rows == 0);
-  int cols = vec.size() / rows;
-  v = Eigen::MatrixXd::Zero(rows, cols);
-  for (int i = 0; i < rows; i++)
-  {
-    for (int j = 0; j < cols; j++)
-    {
-      v(i, j) = vec[i * cols + j];
-    }
-  }
+  return xm;
 }
 
 /*!
-   \brief Simulates the dynamics of an AUV from thrusters rpm and fins angles.
+   \brief Simulates the dynamics of an AUV from thrusters setpoint and fins angles
 */
 class Dynamics
 {
-private:
-  struct Config
-  {
-    // Force
-    std::string force_topic_;
-    bool use_force_topic_ = false;
-    // Thrusters
-    std::string thrusters_topic_;
-    int thrusters_num_ = 0;
-    Eigen::MatrixXd thrusters_matrix_;
-    double max_thrusters_rpm_;
-    // Forward and backward thrusters coeff
-    double ctf_;
-    double ctb_;
-    double dzv_;
-    double dv_;
-    double dh_;
-    // Fins
-    std::string fins_topic_;
-    int fins_num_ = 0;
-    double a_fins_;
-    double k_cd_fins_;
-    double k_cl_fins_;
-    double max_fins_angle_;
-    // Other
-    double period_;
-    double rate_;
-    std::string frame_id_;
-    std::string world_frame_id_;
-    // Contact sensor
-    std::string collisions_topic_;
-    bool contact_sensor_available_ = false;
-    // Body
-    std::string odom_topic_;
-    double mass_;
-    double buoyancy_;
-    double g_;
-    double radius_;
-    double water_density_;  // water density
-    Eigen::Matrix3d tensor_;
-    Eigen::Vector3d gravity_center_;
-    Eigen::Vector6d damping_;
-    Eigen::Vector6d quadratic_damping_;
-    Eigen::Vector6d p0_;
-    Eigen::Vector6d v0_;
-    double sea_bottom_depth_ = 10.0;
-    // Currents
-    Eigen::Vector3d current_mean_ = Eigen::Vector3d::Zero();
-    Eigen::Vector3d current_sigma_ = Eigen::Vector3d::Zero();
-    Eigen::Vector3d current_min_ = Eigen::Vector3d::Zero();
-    Eigen::Vector3d current_max_ = Eigen::Vector3d::Zero();
-    bool current_enabled_ = false;
-  };
+ private:
+  // ROS variables
+  ros::NodeHandle nh_;
+  ros::Publisher pub_odom_, pub_odom_gazebo_;
+  ros::Subscriber sub_force_, sub_thrusters_, sub_fins_, sub_current_, sub_pose_overwrite_;
+  ros::ServiceServer srv_reload_params_;
+  tf2_ros::TransformBroadcaster tf_broadcaster_;
+  ros::Timer timer_check_actuators_;
 
-  // Config
-  Config config_;
-  // Eigen
+  // Internal state
   Eigen::Vector6d p_, p_dot_;
   Eigen::Vector6d v_, v_dot_;
-  Eigen::Vector6d collision_force_;
   Eigen::Matrix6d M_, IM_;
   Eigen::VectorXd u_, old_u_;
-  Eigen::VectorXd f_, old_f_;
-  // Messages
-  auv_msgs::BodyForceReq force_;
-  // Node handler
-  ros::NodeHandle nh_;
+  Eigen::Vector2d f_, old_f_;
+  Eigen::Vector3d current_;
+  cola2_msgs::BodyForceReq force_;
+  double last_thrusters_setpoint_sec_, last_fins_setpoint_sec_;
+
+  struct Config
+  {
+    // Frames
+    std::string frame_id;
+    std::string world_frame_id;
+
+    // Period and rate
+    double period;
+    double rate;
+
+    // Topics
+    std::string thrusters_topic;
+    std::string fins_topic;
+    std::string force_topic;
+    std::string odom_topic;
+    std::string pose_overwrite_topic;
+    std::string current_topic;
+
+    // Initial pose and velocity
+    Eigen::Vector6d p0;
+    Eigen::Vector6d v0;
+
+    // Vehicle properties
+    double mass;
+    double buoyancy;
+    double radius;
+    double water_density;
+    Eigen::Matrix3d tensor;
+    Eigen::Vector3d buoyancy_center;
+    Eigen::Vector6d damping;
+    Eigen::Vector6d quadratic_damping;
+
+    // Thrusters
+    std::size_t thrusters_num;
+    double thrusters_tau;
+    Eigen::MatrixXd thrusters_matrix;
+    std::vector<double> thrusters_limiter;
+    double thrusters_max_step;
+    bool thrusters_symmetric;
+    std::vector<double> thrusters_max_force_positive, thrusters_max_force_negative;
+    std::vector<Poly> thrusters_poly_positive, thrusters_poly_negative;
+
+    // Fins
+    double a_fins;
+    double k_cd_fins;
+    double k_cl_fins;
+    double max_fins_angle;
+
+    // Force
+    bool use_force_topic;
+  } config_;
+
+  // Methods
+  void initializeMassMatrix();
+  void thrustersCallback(const cola2_msgs::Setpoints&);
+  void finsCallback(const cola2_msgs::Setpoints&);
+  void forceCallback(const cola2_msgs::BodyForceReq&);
+  void currentCallback(const geometry_msgs::Vector3Stamped&);
+  void poseOverwriteCallback(const nav_msgs::Odometry&);
+  void checkActuatorsCallback(const ros::TimerEvent&);
+  bool reloadConfigServiceCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+  Eigen::Vector6d computeThrustersForce(const Eigen::VectorXd&);
+  Eigen::Vector6d computeFinsForce(const Eigen::Vector2d&, const Eigen::Vector6d&);
+  Eigen::Vector6d gravityAndBuoyancyForce(const Eigen::Vector6d&);
+  Eigen::Matrix6d dampingMatrix(const Eigen::Vector6d&);
+  Eigen::Matrix6d coriolisMatrix(const Eigen::Vector6d&);
+  Eigen::Vector6d kinematics(const Eigen::Vector6d&, const Eigen::Vector6d&);
+  Eigen::Vector6d inverseDynamic(const Eigen::Vector6d&, const Eigen::Vector6d&,
+                                 const Eigen::VectorXd&, const Eigen::Vector2d&);
+  void getStaticConfig();
+  void getVariableConfig();
+  void publishOdometry();
+
+ public:
+  Dynamics();
+  void iterate();
+  double getRate() const;
+};
+
+/*!
+   \brief Dynamics constructor. Loads config, calls initialization method and creates the ROS interface
+*/
+Dynamics::Dynamics(): nh_("~")
+{
+  // Load parameters
+  getStaticConfig();
+  getVariableConfig();
+
+  // Initialize internal data
+  p_ = config_.p0;                                    // Initial position
+  p_dot_ = Eigen::Vector6d::Zero();                   // Derivative of initial position is zero
+  v_ = config_.v0;                                    // Initial velocity
+  v_dot_ = Eigen::Vector6d::Zero();                   // Derivative of initial velocity is zero
+  current_ = Eigen::Vector3d::Zero();                 // Initial water current is zero
+  force_ = cola2_msgs::BodyForceReq();                // Initial force is zero
+  u_ = Eigen::VectorXd::Zero(config_.thrusters_num);  // Initial thrusters setpoint is zero
+  old_u_ = u_;                                        // Previous thrusters setpoint is zero
+  f_ = Eigen::Vector2d::Zero();                       // Initial fins setpoint is zero
+  old_f_ = f_;                                        // Previous fins setpoint is zero
+
+  // Initialize mass matrix
+  initializeMassMatrix();
+
+  // Initialize last setpoints times
+  last_thrusters_setpoint_sec_ = ros::Time::now().toSec();
+  last_fins_setpoint_sec_ = last_thrusters_setpoint_sec_;
+
   // Publishers
-  ros::Publisher pub_odom_;
-  ros::Publisher pub_odom_gazebo_;
+  pub_odom_ = nh_.advertise<nav_msgs::Odometry>(config_.odom_topic, 2);
+  pub_odom_gazebo_ = nh_.advertise<gazebo_msgs::ModelState>("/gazebo/set_model_state", 2);
+
   // Subscribers
-  ros::Subscriber sub_collision_;
-  ros::Subscriber sub_fins_;
-  ros::Subscriber sub_force_;
-  ros::Subscriber sub_thrusters_;
-  // Transforms
-  tf2_ros::TransformBroadcaster tfbr_;
+  sub_thrusters_ = nh_.subscribe(config_.thrusters_topic, 1, &Dynamics::thrustersCallback, this);
+  if (!config_.fins_topic.empty())
+  {
+    sub_fins_ = nh_.subscribe(config_.fins_topic, 1, &Dynamics::finsCallback, this);
+  }
+  sub_force_ = nh_.subscribe(config_.force_topic, 1, &Dynamics::forceCallback, this);
+  sub_current_ = nh_.subscribe(config_.current_topic, 1, &Dynamics::currentCallback, this);
+  sub_pose_overwrite_ = nh_.subscribe(config_.pose_overwrite_topic, 1, &Dynamics::poseOverwriteCallback, this);
+
+  // Timers
+  timer_check_actuators_ = nh_.createTimer(ros::Duration(1.0), &Dynamics::checkActuatorsCallback, this);
+
   // Services
-  ros::ServiceServer srv_current_;
+  srv_reload_params_ = nh_.advertiseService("reload_params", &Dynamics::reloadConfigServiceCallback, this);
 
-public:
-  Dynamics()
+  ROS_INFO_STREAM("initialized");
+}
+
+/*!
+   \brief Initialize mass matrix
+*/
+void Dynamics::initializeMassMatrix()
+{
+  // Mass and inertia matrix of the rigid body when computed from the center of gravity
+  // Mrb=[m,      0,      0,      0,      0,      0,
+  //      0,      m,      0,      0,      0,      0,
+  //      0,      0,      m,      0,      0,      0,
+  //      0,      0,      0,    Ixx,    Ixy,    Ixz,
+  //      0,      0,      0,    Iyx,    Iyy,    Iyz,
+  //      0,      0,      0,    Izx,    Izy,    Izz]
+  Eigen::Matrix6d Mrb = Eigen::Matrix6d::Zero();
+  Mrb.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity() * config_.mass;
+  Mrb.block<3, 3>(3, 3) = config_.tensor;
+
+  // Added mass matrix. We estimate to be half of the vehicle weight
+  // Ma=[m/2,      0,      0,      0,      0,      0,
+  //       0,    m/2,      0,      0,      0,      0,
+  //       0,      0,    m/2,      0,      0,      0,
+  //       0,      0,      0,      0,      0,      0,
+  //       0,      0,      0,      0,      0,      0,
+  //       0,      0,      0,      0,      0,      0]
+  Eigen::Matrix6d Ma = Eigen::Matrix6d::Zero();
+  Ma.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity() * config_.mass * 0.5;
+
+  // Total mass matrix: Mrb + Ma
+  M_ = Mrb + Ma;
+  IM_ = M_.inverse();
+}
+
+/*!
+   \brief Thruster callback, input in range [-1, 1]
+*/
+void Dynamics::thrustersCallback(const cola2_msgs::Setpoints& msg)
+{
+  if (msg.setpoints.size() != config_.thrusters_num)
   {
-    std::cout << "Dynamics()" << std::endl;
-    // Load dynamic parameters
-    getConfig();
-    // Initialize vars and matrices. They are not init. in the constructor, but
-    // readability is improved
-    initialize();
-    // TODO: delete after debug
-    config_.odom_topic_ = "new_dynamics_odom";
-    config_.frame_id_ = "new_dynamics_frame";
-    // Create publishers
-    pub_odom_ = nh_.advertise<nav_msgs::Odometry>(config_.odom_topic_, 2);
-    pub_odom_gazebo_ = nh_.advertise<gazebo_msgs::ModelState>("/gazebo/set_model_state", 2);
-    // Create subscribers
-    sub_force_ = nh_.subscribe(config_.force_topic_, 1, &Dynamics::cbkForce, this);
-    sub_thrusters_ = nh_.subscribe(config_.thrusters_topic_, 1, &Dynamics::cbkThrusters, this);
-    // Create services
-    srv_current_ = nh_.advertiseService("cola2_sim/current_simulation", &Dynamics::srvCurrentSimulation, this);
-    // Optional subscribers
-    if (config_.fins_num_ > 0)
-    {
-      sub_fins_ = nh_.subscribe(config_.fins_topic_, 1, &Dynamics::cbkFins, this);
-    }
-    if (config_.contact_sensor_available_)
-    {
-      collision_force_ = Eigen::Vector6d::Zero();
-      sub_fins_ = nh_.subscribe(config_.collisions_topic_, 1, &Dynamics::cbkCollision, this);
-    }
-    // Show message
-    ROS_INFO("initialized");
+    ROS_ERROR_STREAM("Invalid thrusters setpoint length");
+    return;
   }
-
-  /*!
-     \brief Thruster callback, input in rpm.
-     \param msg The thrusters message received.
-  */
-  void cbkThrusters(const cola2_msgs::Setpoints &msg)
+  for (std::size_t i = 0; i < config_.thrusters_num; ++i)
   {
-    std::cout << "cbkThrusters()" << std::endl;
-    old_u_ = u_;
-    for (int i = 0; i < config_.thrusters_num_; i++)
+    // The following piece of code mimics the thrusters driver and response
+    double setpoint = msg.setpoints[i];
+
+    // Limiter
+    setpoint = std::min(setpoint, config_.thrusters_limiter[i]);
+    setpoint = std::max(setpoint, -config_.thrusters_limiter[i]);
+
+    // Derivative step filter
+    double max_allowed = u_(i) + config_.thrusters_max_step;
+    double min_allowed = u_(i) - config_.thrusters_max_step;
+    if (!config_.thrusters_symmetric)
     {
-      u_(i) = msg.setpoints[i];
-      if (u_(i) > +std::abs(config_.max_thrusters_rpm_))
-      {
-        u_(i) = +std::abs(config_.max_thrusters_rpm_);
-      }
-      else if (u_(i) < -std::abs(config_.max_thrusters_rpm_))
-      {
-        u_(i) = -std::abs(config_.max_thrusters_rpm_);
-      }
+        if (u_(i) > 0.0) min_allowed = -config_.thrusters_max_step;
+        else max_allowed = +config_.thrusters_max_step;
     }
-  }
+    setpoint = std::min(setpoint, max_allowed);
+    setpoint = std::max(setpoint, min_allowed);
 
-  /*!
-     \brief Thruster callback, input in rpm.
-     \param msg The thrusters message received.
-  */
-  void cbkForce(const auv_msgs::BodyForceReq &msg)
-  {
-    std::cout << "cbkForce()" << std::endl;
-    force_ = msg;
+    // Store setpoint
+    u_(i) = setpoint;
   }
+  last_thrusters_setpoint_sec_ = ros::Time::now().toSec();
+}
 
-  void cbkFins(const cola2_msgs::Setpoints &msg)
+/*!
+   \brief Fins callback, input in range [-max_angle, max_angle]
+*/
+void Dynamics::finsCallback(const cola2_msgs::Setpoints& msg)
+{
+  if (msg.setpoints.size() != 2)
   {
-    std::cout << "cbkFins()" << std::endl;
-    old_f_ = f_;
-    for (int i = 0; i < config_.fins_num_; i++)
-    {
-      f_(i) = msg.setpoints[i];
-      if (f_(i) > +std::abs(config_.max_fins_angle_))
-      {
-        f_(i) = +std::abs(config_.max_fins_angle_);
-      }
-      else if (f_(i) < -std::abs(config_.max_fins_angle_))
-      {
-        f_(i) = -std::abs(config_.max_fins_angle_);
-      }
-    }
+    ROS_ERROR_STREAM("Invalid fins setpoint length");
+    return;
   }
-
-  void cbkCollision(const geometry_msgs::WrenchStamped &msg)
+  for (std::size_t i = 0; i < 2; ++i)
   {
-    std::cout << "cbkCollision()" << std::endl;
-    collision_force_(0) = -msg.wrench.force.x / 10.0;
-    collision_force_(1) = -msg.wrench.force.z / 10.0;
-    collision_force_(2) = +msg.wrench.force.y / 10.0;
-    collision_force_(3) = -msg.wrench.torque.x / 10.;
-    collision_force_(4) = -msg.wrench.torque.z / 10.;
-    collision_force_(5) = +msg.wrench.torque.y / 10.;
+    f_(i) = cola2::utils::saturate(msg.setpoints[i], config_.max_fins_angle);
   }
+  last_fins_setpoint_sec_ = ros::Time::now().toSec();
+}
 
-  bool srvCurrentSimulation(cola2_msgs::SimulatedCurrentsRequest &request,
-                            cola2_msgs::SimulatedCurrentsResponse &response)
-  {
-    std::cout << "srvCurrentSimulation()" << std::endl;
-    config_.current_enabled_ = request.enabled;
-    for (int i = 0; i < 3; i++)
-    {
-      config_.current_mean_(i) = request.current_mean[i];
-      config_.current_sigma_(i) = request.current_sigma[i];
-      // check if any sigma is 0.0
-      if (config_.current_sigma_(i) <= 0.0)
-      {
-        config_.current_sigma_(i) = 0.1;
-      }
-    }
-    // Compute Max and min with Full with at half maximum FWHM
-    // sigma is not sigma^2
-    // FWHM = 2*np.sqrt(2*np.log(2))*sigma
-    Eigen::Vector3d fwhm_value = 2 * sqrt(2 * log(2)) * config_.current_sigma_;
-    config_.current_max_ = config_.current_mean_ + fwhm_value;
-    config_.current_min_ = config_.current_mean_ - fwhm_value;
+/*!
+   \brief Force callback
+*/
+void Dynamics::forceCallback(const cola2_msgs::BodyForceReq& msg)
+{
+  force_ = msg;
+}
+
+/*!
+   \brief Current callback
+*/
+void Dynamics::currentCallback(const geometry_msgs::Vector3Stamped& msg)
+{
+  current_(0) = msg.vector.x;
+  current_(1) = msg.vector.y;
+  current_(2) = msg.vector.z;
+}
+
+/*!
+   \brief Pose overwrite callback. It is useful when the dynamics node is used to simulate the DVL to avoid diverence
+          in the robot position over time
+*/
+void Dynamics::poseOverwriteCallback(const nav_msgs::Odometry& msg)
+{
+  p_(0) = msg.pose.pose.position.x;
+  p_(1) = msg.pose.pose.position.y;
+  p_(2) = msg.pose.pose.position.z;
+  tf::Quaternion quat;
+  tf::quaternionMsgToTF(msg.pose.pose.orientation, quat);
+  tf::Matrix3x3(quat).getRPY(p_(3), p_(4), p_(5));
+}
+
+/*!
+   \brief Timer to check continuity of thrusters and fins setpoints
+*/
+void Dynamics::checkActuatorsCallback(const ros::TimerEvent&)
+{
+  double now = ros::Time::now().toSec();
+  if (std::fabs(now - last_thrusters_setpoint_sec_) > 1.0) u_ = Eigen::VectorXd::Zero(config_.thrusters_num);
+  if (std::fabs(now - last_fins_setpoint_sec_     ) > 1.0) f_ = Eigen::Vector2d::Zero();
+}
+
+/*!
+   \brief Service callback to reload configuration
+*/
+bool Dynamics::reloadConfigServiceCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+{
+    getVariableConfig();
+    initializeMassMatrix();
     return true;
-  }
+}
 
-  double getRate() const
+/*!
+   \brief Thruster force in robot frame
+*/
+Eigen::Vector6d Dynamics::computeThrustersForce(const Eigen::VectorXd& u)
+{
+  Eigen::VectorXd thruster_forces(config_.thrusters_num);
+  for (std::size_t i = 0; i < config_.thrusters_num; ++i)
   {
-    std::cout << "getRate()" << std::endl;
-    return config_.rate_;
-  }
-
-  /*!
-     \brief Initialize vars and matrices.
-  */
-  void initialize()
-  {
-    std::cout << "initialize()" << std::endl;
-    // Init pose, velocity and rate
-    p_ = config_.p0_;
-    p_dot_ = Eigen::Vector6d::Zero();
-    v_ = config_.v0_;
-    v_dot_ = Eigen::Vector6d::Zero();
-
-    // Inertia Tensor. Principal moments of inertia, and products of inertia
-    // [kg*m*m]
-    // Ixx = self.tensor[0]
-    // Ixy = self.tensor[1]
-    // Ixz = self.tensor[2]
-    // Iyx = self.tensor[3]
-    // Iyy = self.tensor[4]
-    // Iyz = self.tensor[5]
-    // Izx = self.tensor[6]
-    // Izy = self.tensor[7]
-    // Izz = self.tensor[8]
-    // m = self.mass
-    // xg = self.gravity_center[0]
-    // yg = self.gravity_center[1]
-    // zg = self.gravity_center[2]
-    // Mrb=[m,     0,      0,      0,      m*zg,       -m*yg,
-    //      0,     m,      0,      -m*zg,  0,          m*xg,
-    //      0,     0,      m,      m*yg,   -m*xg,      0,
-    //      0,     -m*zg,  m*yg,   Ixx,    Ixy,        Ixz,
-    //      m*zg,  0,      -m*xg,  Iyx,    Iyy,        Iyz,
-    //      -m*yg, m*xg,   0,      Izx,    Izy,        Izz]
-    Eigen::Matrix6d Mrb = Eigen::Matrix6d::Zero();
-    Mrb.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity() * config_.mass_;
-    Mrb.block<3, 3>(3, 0) = crossMatrix(config_.gravity_center_) * config_.mass_;
-    Mrb.block<3, 3>(0, 3) = crossMatrix(config_.gravity_center_).transpose() * config_.mass_;
-    Mrb.block<3, 3>(3, 3) = config_.tensor_;
-
-    // Inertia matrix of the rigid body
-    // Added Mass derivative TODO: This is not a valid added mass matrix!
-    // Ma=[m/2,    0,      0,      0,      0,      0,
-    //     0,      m/2,    0,      0,      0,      0,
-    //     0,      0,      m/2,    0,      0,      0,
-    //     0,      0,      0,      0,      0,      0,
-    //     0,      0,      0,      0,      0,      0,
-    //     0,      0,      0,      0,      0,      0]
-    Eigen::Matrix6d Ma = Eigen::Matrix6d::Zero();
-    Ma.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity() * config_.mass_ * 0.5;
-
-    // Mass matrix: Mrb + Ma
-    M_ = Mrb + Ma;
-    IM_ = M_.inverse();
-
-    // Init currents
-    // np.random.seed()
-    // #self.e_vc = np.random.normal(self.current_mean, self.current_sigma)
-
-    // Force message
-    force_ = auv_msgs::BodyForceReq();
-
-    // Initial thrusters setpoint
-    u_ = Eigen::VectorXd::Zero(config_.thrusters_num_);
-    old_u_ = u_;  // Previous setpoints
-
-    // Initial fins setpoint
-    // f_ = Eigen::VectorXd::Zero(config_.fins_num_);
-    f_ = Eigen::Vector2d::Zero();
-    old_f_ = f_;  // Previous setpoints
-  }
-
-  /*!
-     \brief Water currents, returns a velocity.
-  */
-  Eigen::Vector6d computeCurrents()
-  {
-    std::cout << "computeCurrents()" << std::endl;
-    // Compute random currents
-    Eigen::Vector6d ans = Eigen::Vector6d::Zero();
-    if (config_.current_enabled_)
+    if (u(i) >= 0.0)
     {
-      // Current random values
-      Eigen::Vector3d t;
-      for (int i = 0; i < 3; i++)
-      {
-        double vc = randomNormal() * config_.current_sigma_(i) + config_.current_mean_(i);
-        if (vc > config_.current_max_(i))
-        {
-          vc = config_.current_max_(i);
-        }
-        else if (vc < config_.current_min_(i))
-        {
-          vc = config_.current_min_(i);
-        }
-        t(i) = vc;
-      }
-      // Transform to vehicle
-      Eigen::Matrix3d rot = euler2rotation(p_.tail(3));
-      ans.head(3) = rot.transpose() * t;
+      thruster_forces(i) = bisectionPolySolver(config_.thrusters_poly_positive[i], 0.0,
+                                               config_.thrusters_max_force_positive[i], u(i));
     }
-    return ans;
-  }
-
-  Eigen::Matrix6d dampingMatrix(const Eigen::Vector6d &vel)
-  {
-    std::cout << "dampingMatrix()" << std::endl;
-    Eigen::Matrix6d damp = Eigen::Matrix6d::Zero();
-    for (int i = 0; i < 6; i++)
+    else
     {
-      damp(i, i) = config_.damping_(i) + config_.quadratic_damping_(i) * std::abs(vel(i));
+      thruster_forces(i) = -bisectionPolySolver(config_.thrusters_poly_negative[i], 0.0,
+                                                config_.thrusters_max_force_positive[i], -u(i));
     }
-    return damp;
   }
+  return config_.thrusters_matrix * thruster_forces;
+}
 
-  /*!
-     \brief Compute the force of each thruster from rpm.
-  */
-  Eigen::Vector6d generalizedForce(const Eigen::Vector6d &du) const
+/*!
+   \brief Fins force from velocity and fins orientation
+*/
+Eigen::Vector6d Dynamics::computeFinsForce(const Eigen::Vector2d& fins, const Eigen::Vector6d& vel)
+{
+  Eigen::Vector6d f = Eigen::Vector6d::Zero();
+  if (!config_.fins_topic.empty())
   {
-    std::cout << "generalizedForce()" << std::endl;
-    // Build the signed (lineal/quadratic) thruster coeficient array
-    // Signed square of each thruster setpoint
-    Eigen::Vector6d duu = du.array() * du.array().abs();
-    Eigen::Matrix6d ct = Eigen::Matrix6d::Zero();
-    for (int i = 0; i < duu.rows(); i++)
-    {
-      if (duu(i) >= 0.0)
-      {
-        // Forward
-        ct(i, i) = config_.ctf_;
-      }
-      else
-      {
-        // Backward
-        ct(i, i) = config_.ctb_;
-      }
-    }
-    Eigen::Matrix6d b = config_.thrusters_matrix_ * ct;
-
-    // # Example of g500
-    // #   b2 = [-ct[0],        -ct[1],         .0,             .0, .0,
-    // #        .0,             .0,             .0,             .0, ct[4],
-    // #        .0,             .0,             -ct[2],         -ct[3], .0,
-    // #        .0,             .0,             .0,             .0, .0,
-    // #        .0,             .0,             -ct[2]*self.dv, ct[3]*self.dv,
-    // .0,
-    // #        -ct[0]*self.dh, ct[1]*self.dh,  .0,             .0, .0]
-    // #   b2 = np.array(b2).reshape(6,5)
-
-    // The value of t is the generalized force
-    return b * duu;
-  }
-
-  Eigen::Vector6d computeFins(const Eigen::Vector6d &vel, const Eigen::Vector2d &fins) const
-  {
-    std::cout << "computeFins()" << std::endl;
-    // # New fins model
-    // # fins[0] -> left fin
-    // # fins[1] -> right fin
-    // # February of 2015
-
     // Water velocity on the fins
     double water_vel = vel(0);
     if (water_vel > 0)
     {
-      water_vel = sqrt(vel(0) * vel(0) + (25.0 * vel(0) / (config_.water_density_ * 3.141592 * 0.049 * 0.049)));
+      water_vel = std::sqrt(std::pow(vel(0), 2) + (25.0 * vel(0) / (config_.water_density * 3.141592 * 0.049 * 0.049)));
     }
-    // Compute force
-    Eigen::Vector6d f = Eigen::Vector6d::Zero();
-    if (config_.fins_num_ > 0)
-    {
-      f(0) = -(0.5 * config_.water_density_ * config_.a_fins_ * water_vel * std::abs(water_vel) * config_.k_cd_fins_) *
-             (std::abs(cos(1 * fins(0))) + std::abs(cos(1 * fins(1))));
-      f(1) = 0.0;
-      f(2) = +(0.5 * config_.water_density_ * config_.a_fins_ * water_vel * std::abs(water_vel) * config_.k_cl_fins_) *
-             (sin(4.5 * fins(0)) + sin(4.5 * fins(1)));
-      f(3) = +(0.5 * config_.water_density_ * config_.a_fins_ * water_vel * std::abs(water_vel) * config_.k_cl_fins_) *
-             (sin(4.5 * fins(0)) - sin(4.5 * fins(1))) * 0.14;
-      f(4) = +(0.5 * config_.water_density_ * config_.a_fins_ * water_vel * std::abs(water_vel) * config_.k_cl_fins_) *
-             (sin(4.5 * fins(0)) + sin(4.5 * fins(1))) * 0.65;
-      f(5) = 0.0;
-    }
-    return f;
-  }
 
-  Eigen::Matrix6d coriolisMatrix(const Eigen::Vector6d &vel) const
+    // Compute force using new fins model (February of 2015). fins[0] -> left fin, fins[1] -> right fin
+    f(0) = -(0.5 * config_.water_density * config_.a_fins * water_vel * std::fabs(water_vel) * config_.k_cd_fins) *
+           (std::fabs(std::cos(1 * fins(0))) + std::fabs(std::cos(1 * fins(1))));
+    f(1) = 0.0;
+    f(2) = +(0.5 * config_.water_density * config_.a_fins * water_vel * std::fabs(water_vel) * config_.k_cl_fins) *
+           (std::sin(4.5 * fins(0)) + std::sin(4.5 * fins(1)));
+    f(3) = +(0.5 * config_.water_density * config_.a_fins * water_vel * std::fabs(water_vel) * config_.k_cl_fins) *
+           (std::sin(4.5 * fins(0)) - std::sin(4.5 * fins(1))) * 0.14;
+    f(4) = +(0.5 * config_.water_density * config_.a_fins * water_vel * std::fabs(water_vel) * config_.k_cl_fins) *
+           (std::sin(4.5 * fins(0)) + std::sin(4.5 * fins(1))) * 0.65;
+    f(5) = 0.0;
+  }
+  return f;
+}
+
+/*!
+   \brief Gravity and weight matrix
+*/
+Eigen::Vector6d Dynamics::gravityAndBuoyancyForce(const Eigen::Vector6d& pos)
+{
+  // Weight and buoyancy from [Kg] to [N]
+  double W = STD_GRAVITY * config_.mass;
+  double B = STD_GRAVITY * config_.buoyancy;
+
+  // If the vehicle moves out of the water the flotability decreases
+  double corr_pos = pos(2) + config_.radius;  // Corrected z position
+  double F = 0.0;
+  if (corr_pos >= config_.radius)
   {
-    std::cout << "coriolisMatrix()" << std::endl;
-    Eigen::Matrix3d s1 = crossMatrix(M_.block<3, 3>(0, 0) * vel.head(3) + M_.block<3, 3>(0, 3) * vel.tail(3));
-    Eigen::Matrix3d s2 = crossMatrix(M_.block<3, 3>(3, 0) * vel.head(3) + M_.block<3, 3>(3, 3) * vel.tail(3));
-    Eigen::Matrix6d c = Eigen::Matrix6d::Zero();
-    c.block<3, 3>(0, 3) = -s1;
-    c.block<3, 3>(3, 0) = -s1;
-    c.block<3, 3>(3, 3) = -s2;
-    return c;
+    F = B;
   }
-
-  /*!
-     \brief Gravity and weight matrix.
-  */
-  Eigen::Vector6d gravity(const Eigen::Vector6d &pos) const
+  else if (corr_pos > -config_.radius)
   {
-    std::cout << "gravity()" << std::endl;
-    // Weight and buoyancy from [Kg] to [N]
-    double W = config_.mass_ * config_.g_;
-    double B = config_.buoyancy_ * config_.g_;
-
-    // If the vehicle moves out of the water the flotability decreases
-    double corr_pos = pos(2) + config_.radius_;  // Corrected z position
-    double F = 0.0;
-    if (corr_pos >= config_.radius_)
-    {
-      F = B;
-    }
-    else if (corr_pos <= -config_.radius_)
-    {
-      F = 0.0;
-    }
-    else
-    {
-      double r2 = pow(config_.radius_, 2.0);
-      double total_area = M_PI * r2;
-      double c = sqrt(r2 - pow(corr_pos, 2.0));
-      double area_segment = atan2(c, corr_pos) * r2;
-      double area_triangle = corr_pos * c;
-      double area_outside = area_segment - area_triangle;
-      F = B * (1.0 - area_outside / total_area);
-    }
-
-    // Gravity center position in the robot fixed frame (x',y',z') [m]
-    double zg = config_.gravity_center_(2);
-    Eigen::Vector6d g;
-    g << (W - F) * sin(pos(4)), -(W - F) * cos(pos(4)) * sin(pos(3)), -(W - F) * cos(pos(4)) * cos(pos(3)),
-        zg * W * cos(pos(4)) * sin(pos(3)), zg * W * sin(pos(4)), 0.0;
-    return g;
+    double r2 = std::pow(config_.radius, 2);
+    double total_area = M_PI * r2;
+    double c = std::sqrt(r2 - std::pow(corr_pos, 2));
+    double area_segment = std::atan2(c, corr_pos) * r2;
+    double area_triangle = corr_pos * c;
+    double area_outside = area_segment - area_triangle;
+    F = B * (1.0 - area_outside / total_area);
   }
 
-  /*!
-     \brief Given the setpoint for each thruster, the previous velocity and the
-     previous position computes the v_dot.
-  */
-  Eigen::Vector6d inverseDynamic(const Eigen::Vector6d &pos, const Eigen::Vector6d &vel, const Eigen::VectorXd &u,
-                                 const Eigen::Vector2d &fins, const Eigen::Vector6d &current)
+  // Gravity center position in the robot fixed frame (x',y',z') [m]
+  double cr = std::cos(pos(3));
+  double sr = std::sin(pos(3));
+  double cp = std::cos(pos(4));
+  double sp = std::sin(pos(4));
+  double xb = config_.buoyancy_center(0);
+  double yb = config_.buoyancy_center(1);
+  double zb = config_.buoyancy_center(2);
+  Eigen::Vector6d g;
+  g << (W - F) * sp,
+      -(W - F) * cp * sr,
+      -(W - F) * cp * cr,
+        F * (yb * cp * cr - zb * cp * sr),
+       -F * (zb * sp + xb * cp * cr),
+        F * (xb * cp * sr + yb * sp);
+  return g;
+}
+
+/*!
+   \brief Damping matrix computed from the velocity and damping coefficients
+*/
+Eigen::Matrix6d Dynamics::dampingMatrix(const Eigen::Vector6d& vel)
+{
+  Eigen::Matrix6d damp = Eigen::Matrix6d::Zero();
+  for (std::size_t i = 0; i < 6; ++i)
   {
-    std::cout << "inverseDynamic()" << std::endl;
-    Eigen::Vector6d a;
-    if (config_.use_force_topic_)
-    {
-      a << force_.wrench.force.x, force_.wrench.force.y, force_.wrench.force.z, force_.wrench.torque.x,
-          force_.wrench.torque.y, force_.wrench.torque.z;
-    }
-    else
-    {
-      Eigen::Vector6d t = generalizedForce(u);
-      Eigen::Vector6d f = computeFins(vel, fins);
-      a = t + f;
-    }
-    Eigen::Matrix6d c = coriolisMatrix(vel);
-    Eigen::Matrix6d d = dampingMatrix(vel + current);
-    Eigen::Vector6d g = gravity(pos);
-    Eigen::Vector6d c_v = (c - d) * (vel + current);
-    Eigen::Vector6d v_dot;
-    if (config_.contact_sensor_available_)
-    {
-      v_dot = IM_ * (a - c_v - g - collision_force_);
-    }
-    else
-    {
-      v_dot = IM_ * (a - c_v - g);
-    }
-
-    if (config_.contact_sensor_available_)
-    {
-      for (int i = 0; i < 3; i++)
-      {
-        if (((collision_force_(i) > 0) && (v_dot(i) > 0)) || ((collision_force_(i) < 0) && (v_dot(i) < 0)))
-        {
-          // Same sign
-          v_dot(i) = 0;
-        }
-        if (((collision_force_(i) > 0) && (v_(i) > 0)) || ((collision_force_(i) < 0) && (v_(i) < 0)))
-        {
-          // Same sign
-          v_(i) = 0;
-        }
-      }
-    }
-    return v_dot;
+    damp(i, i) = config_.damping(i) + config_.quadratic_damping(i) * std::fabs(vel(i));
   }
+  return damp;
+}
 
-  /*!
-     \brief Given the current velocity and the previous position computes the
-     p_dot.
-  */
-  Eigen::Vector6d kinematics(const Eigen::Vector6d &pos, const Eigen::Vector6d &vel)
+/*!
+   \brief Coriolis matrix computed from the velocity and mass matrix
+*/
+Eigen::Matrix6d Dynamics::coriolisMatrix(const Eigen::Vector6d& vel)
+{
+  Eigen::Matrix3d s1 = crossMatrix(M_.block<3, 3>(0, 0) * vel.head(3) + M_.block<3, 3>(0, 3) * vel.tail(3));
+  Eigen::Matrix3d s2 = crossMatrix(M_.block<3, 3>(3, 0) * vel.head(3) + M_.block<3, 3>(3, 3) * vel.tail(3));
+  Eigen::Matrix6d c = Eigen::Matrix6d::Zero();
+  c.block<3, 3>(0, 3) = -s1;
+  c.block<3, 3>(3, 0) = -s1;
+  c.block<3, 3>(3, 3) = -s2;
+  return c;
+}
+
+/*!
+   \brief Given the velocity and position computes the derivative of the position
+*/
+Eigen::Vector6d Dynamics::kinematics(const Eigen::Vector6d& pos, const Eigen::Vector6d& vel)
+{
+  double cr = std::cos(pos(3));  // Compute cos, sin and tan only once
+  double sr = std::sin(pos(3));
+  double cp = std::cos(pos(4));
+  if (std::fabs(cp) < 1e-5) cp = 1e-5;  // Avoid division by zero and infinite tangent below
+  double sp = std::sin(pos(4));
+  double tp = sp / cp;
+  double cy = std::cos(pos(5));
+  double sy = std::sin(pos(5));
+
+  Eigen::Matrix3d rec;
+  rec << cy * cp,    -sy * cr + cy * sp * sr,     sy * sr + cy * cr * sp,
+         sy * cp,     cy * cr + sr * sp * sy,    -cy * sr + sp * sy * cr,
+             -sp,                    cp * sr,                    cp * cr;
+
+  Eigen::Matrix3d to;
+  to << 1.0,    sr * tp,    cr * tp,
+        0.0,         cr,        -sr,
+        0.0,    sr / cp,    cr / cp;
+
+  Eigen::Vector6d p_dot;
+  p_dot.head(3) = rec * vel.head(3);
+  p_dot.tail(3) = to * vel.tail(3);
+  return p_dot;
+}
+
+/*!
+   \brief Given the setpoint for each thruster, the previous velocity and the
+   previous position computes the v_dot
+*/
+Eigen::Vector6d Dynamics::inverseDynamic(const Eigen::Vector6d& pos, const Eigen::Vector6d& vel,
+                                         const Eigen::VectorXd& u, const Eigen::Vector2d& f)
+{
+  // Compute current in vehicle frame
+  Eigen::Vector6d current = Eigen::Vector6d::Zero();
+  Eigen::Matrix3d rot = cola2::utils::euler2rotation(pos.tail(3));
+  current.head(3) = rot.transpose() * current_;
+
+  // Forces from thrusters and fins
+  Eigen::Vector6d uf;
+  if (config_.use_force_topic)
   {
-    std::cout << "kinematics()" << std::endl;
-    std::cout << "  pos" << std::endl << pos << std::endl;
-    std::cout << "  vel" << std::endl << vel << std::endl;
-    double roll = pos(3);
-    double pitch = pos(4);
-    double yaw = pos(5);
-    double cr = cos(roll);
-    double sr = sin(roll);
-    double cp = cos(pitch);
-    double sp = sin(pitch);
-    double cy = cos(yaw);
-    double sy = sin(yaw);
-
-    Eigen::Matrix3d rec;
-    rec << cy * cp, -sy * cr + cy * sp * sr, sy * sr + cy * cr * sp, sy * cp, cy * cr + sr * sp * sy,
-        -cy * sr + sp * sy * cr, -sp, cp * sr, cp * cr;
-    std::cout << "  rec" << std::endl << rec << std::endl;
-
-    Eigen::Matrix3d to;
-    to << 1.0, sr * tan(pitch), cr * tan(pitch), 0.0, cr, -sr, 0.0, sr / cp, cr / cp;
-    std::cout << "  to" << std::endl << to << std::endl;
-
-    Eigen::Vector6d p_dot;
-    p_dot.head(3) = rec * vel.head(3);
-    p_dot.tail(3) = to * vel.tail(3);
-    std::cout << "  p_dot" << std::endl << p_dot << std::endl;
-    return p_dot;
+    uf << force_.wrench.force.x,  force_.wrench.force.y,  force_.wrench.force.z,
+          force_.wrench.torque.x, force_.wrench.torque.y, force_.wrench.torque.z;
+  }
+  else
+  {
+    uf = computeThrustersForce(u) + computeFinsForce(f, vel);
   }
 
-  /*!
-     \brief Main loop operations
-  */
-  void iterate()
+  // Gravity force
+  Eigen::Vector6d g = gravityAndBuoyancyForce(pos);
+
+  // Damping and coriolis forces
+  Eigen::Vector6d cd_v = coriolisMatrix(vel) * vel - dampingMatrix(vel - current) * (vel - current);
+
+  return IM_ * (uf - g - cd_v);  // v_dot
+}
+
+/*!
+   \brief Main loop operations
+*/
+void Dynamics::iterate()
+{
+  // Simulate tau for thrusters input
+  Eigen::VectorXd u_after_tau = (config_.period * u_ + config_.thrusters_tau * old_u_) /
+                                (config_.period + config_.thrusters_tau);
+
+  // Runge-Kutta, fixed 4th order
+  Eigen::Vector6d k1_pos = kinematics(p_, v_);
+  Eigen::Vector6d k1_vel = inverseDynamic(p_, v_, old_u_, old_f_);
+  Eigen::Vector6d k2_pos = kinematics(p_ + config_.period * 0.5 * k1_pos, v_ + config_.period * 0.5 * k1_vel);
+  Eigen::Vector6d k2_vel = inverseDynamic(p_ + config_.period * 0.5 * k1_pos, v_ + config_.period * 0.5 * k1_vel,
+                                          0.5 * (old_u_ + u_after_tau), 0.5 * (old_f_ + f_));
+  Eigen::Vector6d k3_pos = kinematics(p_ + config_.period * 0.5 * k2_pos, v_ + config_.period * 0.5 * k2_vel);
+  Eigen::Vector6d k3_vel = inverseDynamic(p_ + config_.period * 0.5 * k2_pos, v_ + config_.period * 0.5 * k2_vel,
+                                          0.5 * (old_u_ + u_after_tau), 0.5 * (old_f_ + f_));
+  Eigen::Vector6d k4_pos = kinematics(p_ + config_.period * k3_pos, v_ + config_.period * k3_vel);
+  Eigen::Vector6d k4_vel = inverseDynamic(p_ + config_.period * k3_pos, v_ + config_.period * k3_vel, u_after_tau, f_);
+
+  p_ += config_.period / 6.0 * (k1_pos + 2.0 * k2_pos + 2.0 * k3_pos + k4_pos);
+  v_ += config_.period / 6.0 * (k1_vel + 2.0 * k2_vel + 2.0 * k3_vel + k4_vel);
+
+  p_(3) = cola2::utils::wrapAngle(p_(3));  // WARN: pitch and roll could go out of the convention here
+  p_(4) = cola2::utils::wrapAngle(p_(4));
+  p_(5) = cola2::utils::wrapAngle(p_(5));
+
+  old_u_ = u_after_tau;  // This used to be in the thrusters and fins callbacks, which is incorrect
+  old_f_ = f_;
+
+  // Publish odometry
+  publishOdometry();
+}
+
+/*!
+   \brief Publish odometry, tf and position for Gazebo
+*/
+void Dynamics::publishOdometry()
+{
+  // Header
+  nav_msgs::Odometry odom;
+  odom.header.stamp = ros::Time::now();
+  odom.header.frame_id = config_.world_frame_id;
+  odom.child_frame_id = config_.frame_id;
+
+  // Position
+  odom.pose.pose.position.x = p_(0);
+  odom.pose.pose.position.y = p_(1);
+  odom.pose.pose.position.z = p_(2);
+
+  // Orientation
+  Eigen::Quaterniond quat = cola2::utils::euler2quaternion(p_.tail(3));
+  odom.pose.pose.orientation.x = quat.x();
+  odom.pose.pose.orientation.y = quat.y();
+  odom.pose.pose.orientation.z = quat.z();
+  odom.pose.pose.orientation.w = quat.w();
+
+  // Velocities
+  odom.twist.twist.linear.x  = v_(0);
+  odom.twist.twist.linear.y  = v_(1);
+  odom.twist.twist.linear.z  = v_(2);
+  odom.twist.twist.angular.x = v_(3);
+  odom.twist.twist.angular.y = v_(4);
+  odom.twist.twist.angular.z = v_(5);
+
+  // Publish
+  pub_odom_.publish(odom);
+
+  // Broadcast transform
+  geometry_msgs::TransformStamped tfmsg;
+  tfmsg.header = odom.header;
+  tfmsg.child_frame_id = odom.child_frame_id;
+  tfmsg.transform.translation.x = odom.pose.pose.position.x;
+  tfmsg.transform.translation.y = odom.pose.pose.position.y;
+  tfmsg.transform.translation.z = odom.pose.pose.position.z;
+  tfmsg.transform.rotation = odom.pose.pose.orientation;
+  tf_broadcaster_.sendTransform(tfmsg);
+
+  // Publish position for Gazebo
+  gazebo_msgs::ModelState gazebo_msg;  // No header in this one
+  gazebo_msg.model_name = cola2::rosutils::getNamespace();
+  gazebo_msg.pose = odom.pose.pose;
+  gazebo_msg.reference_frame = "world";
+  pub_odom_gazebo_.publish(gazebo_msg);
+}
+
+/*!
+   \brief Get static config from param server. This config is read at the beginning only
+*/
+void Dynamics::getStaticConfig()
+{
+  // World frame
+  cola2::rosutils::getParam("~world_frame_id", config_.world_frame_id, std::string("/world_ned"));
+
+  // Period
+  cola2::rosutils::getParam("~period", config_.period, 0.1);
+  assert(config_.period > 0.0);
+  config_.rate = 1.0 / config_.period;
+
+  // Topics
+  cola2::rosutils::getParam("~thrusters_topic", config_.thrusters_topic, std::string(""));
+  cola2::rosutils::getParam("~fins_topic", config_.fins_topic, std::string(""));
+  cola2::rosutils::getParam("~force_topic", config_.force_topic, std::string(""));
+  cola2::rosutils::getParam("~odom_topic", config_.odom_topic, std::string(""));
+  cola2::rosutils::getParam("~current_topic", config_.current_topic, std::string(""));
+  cola2::rosutils::getParam("~pose_overwrite_topic", config_.pose_overwrite_topic, std::string(""));
+
+  // Initial pose and velocity
+  getParamVector6d("~initial_pose", config_.p0);
+  getParamVector6d("~initial_velocity", config_.v0);
+
+  // Number of thrusters
+  int thrusters_num;
+  cola2::rosutils::getParam("~number_of_thrusters", thrusters_num, 0);
+  assert(thrusters_num >= 0);
+  config_.thrusters_num = static_cast<std::size_t>(thrusters_num);
+}
+
+/*!
+   \brief Get variable config from param server. This config can be changed at runtime
+*/
+void Dynamics::getVariableConfig()
+{
+  // Frame
+  cola2::rosutils::getParam("~frame_id", config_.frame_id, std::string("/vehicle/dynamics/odometry"));
+
+  // Vehicle properties
+  cola2::rosutils::getParam("~mass", config_.mass, 0.0);
+  cola2::rosutils::getParam("~buoyancy", config_.buoyancy, 0.0);
+  cola2::rosutils::getParam("~radius", config_.radius, 0.0);
+  cola2::rosutils::getParam("~density", config_.water_density, 1030.0);
+  getParamMatrix3d("~tensor", config_.tensor);
+  getParamVector3d("~buoyancy_center", config_.buoyancy_center);
+  getParamVector6d("~damping", config_.damping);
+  getParamVector6d("~quadratic_damping", config_.quadratic_damping);
+
+  // Thrusters
+  getParamMatrixXd("~thrusters_matrix", config_.thrusters_matrix, 6);
+  cola2::rosutils::getParam("~thrusters_tau", config_.thrusters_tau, 0.0);
+  config_.thrusters_limiter.clear();
+  config_.thrusters_limiter.resize(config_.thrusters_num, 1.0);
+  cola2::rosutils::getParamVector("~thrusters_limiter", config_.thrusters_limiter);
+  cola2::rosutils::getParam("~thrusters_max_step", config_.thrusters_max_step, 1.0);
+  cola2::rosutils::getParam("~thrusters_symmetric", config_.thrusters_symmetric, true);
+  config_.thrusters_max_force_positive.clear();
+  config_.thrusters_max_force_negative.clear();
+  config_.thrusters_poly_positive.clear();
+  config_.thrusters_poly_negative.clear();
+  for (std::size_t i = 0; i < config_.thrusters_num; ++i)
   {
-    std::cout << "iterate()" << std::endl;
-    std::cout << "  p_" << std::endl << p_ << std::endl;
-    std::cout << "  v_" << std::endl << v_ << std::endl;
-    std::cout << "  old_u_" << std::endl << old_u_ << std::endl;
-    std::cout << "  old_f_" << std::endl << old_f_ << std::endl;
-    // Compute current
-    Eigen::Vector6d current = computeCurrents();
-    std::cout << "  current" << std::endl << current << std::endl;
+    // Max forces
+    double max_force_positive, max_force_negative;
+    cola2::rosutils::getParam(std::string("~thruster_") + std::to_string(i + 1) +
+                              std::string("_max_force_positive"), max_force_positive, 0.0);
+    cola2::rosutils::getParam(std::string("~thruster_") + std::to_string(i + 1) +
+                              std::string("_max_force_negative"), max_force_negative, 0.0);
+    config_.thrusters_max_force_positive.push_back(max_force_positive);
+    config_.thrusters_max_force_negative.push_back(max_force_negative);
 
-    // Runge-Kutta, 4th order
-    Eigen::Vector6d k1_pos = kinematics(p_, v_);
-    Eigen::Vector6d k1_vel = inverseDynamic(p_, v_, old_u_, old_f_, current);
-    Eigen::Vector6d k2_pos = kinematics(p_ + config_.period_ * 0.5 * k1_pos, v_ + config_.period_ * 0.5 * k1_vel);
-    Eigen::Vector6d k2_vel = inverseDynamic(p_ + config_.period_ * 0.5 * k1_pos, v_ + config_.period_ * 0.5 * k1_vel,
-                                            0.5 * (old_u_ + u_), 0.5 * (old_f_ + f_), current);
-    Eigen::Vector6d k3_pos = kinematics(p_ + config_.period_ * 0.5 * k2_pos, v_ + config_.period_ * 0.5 * k2_vel);
-    Eigen::Vector6d k3_vel = inverseDynamic(p_ + config_.period_ * 0.5 * k2_pos, v_ + config_.period_ * 0.5 * k2_vel,
-                                            0.5 * (old_u_ + u_), 0.5 * (old_f_ + f_), current);
-    Eigen::Vector6d k4_pos = kinematics(p_ + config_.period_ * k3_pos, v_ + config_.period_ * k3_vel);
-    Eigen::Vector6d k4_vel =
-        inverseDynamic(p_ + config_.period_ * k3_pos, v_ + config_.period_ * k3_vel, u_, f_, current);
+    // Force to setpoint polys
+    std::vector<double> thruster_poly_positive, thruster_poly_negative;
+    cola2::rosutils::getParamVector(std::string("~thruster_") + std::to_string(i + 1) +
+                                    std::string("_poly_positive"), thruster_poly_positive);
+    cola2::rosutils::getParamVector(std::string("~thruster_") + std::to_string(i + 1) +
+                                    std::string("_poly_negative"), thruster_poly_negative);
 
-    p_ += config_.period_ / 6.0 * (k1_pos + 2.0 * k2_pos + 2.0 * k3_pos + k4_pos);
-    v_ += config_.period_ / 6.0 * (k1_vel + 2.0 * k2_vel + 2.0 * k3_vel + k4_vel);
-
-    p_(3) = cola2::util::normalizeAngle(p_(3));
-    p_(4) = cola2::util::normalizeAngle(p_(4));
-    p_(5) = cola2::util::normalizeAngle(p_(5));
-
-    // Publish odometry
-    pubOdometry();
-  }
-
-  void pubOdometry()
-  {
-    std::cout << "pubOdometry()" << std::endl;
-    // Header
-    nav_msgs::Odometry odom;
-    odom.header.stamp = ros::Time::now();
-    odom.header.frame_id = config_.world_frame_id_;
-    odom.child_frame_id = config_.frame_id_;
-    // Position
-    odom.pose.pose.position.x = p_(0);
-    odom.pose.pose.position.y = p_(1);
-    odom.pose.pose.position.z = p_(2);
-    // Orientation
-    Eigen::Quaterniond quat = euler2quaternion(p_.tail(3));
-    odom.pose.pose.orientation.x = quat.x();
-    odom.pose.pose.orientation.y = quat.y();
-    odom.pose.pose.orientation.z = quat.z();
-    odom.pose.pose.orientation.w = quat.w();
-    // Velocities
-    odom.twist.twist.linear.x = v_(0);
-    odom.twist.twist.linear.y = v_(1);
-    odom.twist.twist.linear.z = v_(2);
-    odom.twist.twist.angular.x = v_(3);
-    odom.twist.twist.angular.y = v_(4);
-    odom.twist.twist.angular.z = v_(5);
-    // Publish
-    pub_odom_.publish(odom);
-
-    // Broadcast transform
-    geometry_msgs::TransformStamped tfmsg;
-    tfmsg.header = odom.header;
-    tfmsg.child_frame_id = odom.child_frame_id;
-    tfmsg.transform.translation.x = odom.pose.pose.position.x;
-    tfmsg.transform.translation.y = odom.pose.pose.position.y;
-    tfmsg.transform.translation.z = odom.pose.pose.position.z;
-    tfmsg.transform.rotation = odom.pose.pose.orientation;
-    tfbr_.sendTransform(tfmsg);
-
-    // ################################################################
-    // ###########     Publish position for gazebo     ################
-    // ################################################################
-    // gazebo_odom = ModelState()
-    //
-    // ###### TODO: WARNING! Gazebo uses Z up configuraton!!!  ###
-    // # I've created a custom rotation that rotates the position 180 degress
-    // # in roll, but the orientation transformation is only yaw = -yaw.
-    // # CHECK WHAT HAPPENS WHITH ROLL AND PITCH!
-    // """rot = tf.transformations.euler_matrix(math.pi, 0.0, 0.0)
-    // position = np.matrix([odom.pose.pose.position.x,
-    //                   odom.pose.pose.position.y,
-    //                   odom.pose.pose.position.z,
-    //                   1.0]).reshape(4, 1)
-    //
-    // new_position = rot * position
-    // eulr =
-    // tf.transformations.euler_from_quaternion([odom.pose.pose.orientation.x,
-    //                                                  odom.pose.pose.orientation.y,
-    //                                                  odom.pose.pose.orientation.z,
-    //                                                  odom.pose.pose.orientation.w])
-    // new_quat = tf.transformations.quaternion_from_euler(eulr[0], eulr[1],
-    // -eulr[2])
-    //
-    // gazebo_odom.model_name = 'girona500'
-    // gazebo_odom.pose.position.x = float(new_position[0])
-    // gazebo_odom.pose.position.y = float(new_position[1])
-    // gazebo_odom.pose.position.z = float(new_position[2]) +
-    // self.sea_bottom_depth
-    // gazebo_odom.pose.orientation = odom.pose.pose.orientation
-    // gazebo_odom.pose.orientation.x = new_quat[0]
-    // gazebo_odom.pose.orientation.y = new_quat[1]
-    // gazebo_odom.pose.orientation.z = new_quat[2]
-    // gazebo_odom.pose.orientation.w = new_quat[3]
-    // gazebo_odom.reference_frame = 'world'
-    // self.pub_odom_gazebo.publish(gazebo_odom)
-    //
-    // # Brodcast world to girona50000_gazebo_link
-    // br = tf.TransformBroadcaster()
-    // br.sendTransform((gazebo_odom.pose.position.x,
-    //                   gazebo_odom.pose.position.y,
-    //                   gazebo_odom.pose.position.z),
-    //                  new_quat,
-    //                  odom.header.stamp,
-    //                  "girona500_gazebo_link",
-    //                  self.world_frame_id) """
-    //
-    // ##################################################################
-    // #       ALTERNATIVE WITH NO ROTATIONS                       #####
-    // gazebo_odom.model_name = 'girona500'
-    // gazebo_odom.pose = odom.pose.pose
-    // gazebo_odom.reference_frame = 'world'
-    // self.pub_odom_gazebo.publish(gazebo_odom)
-    //
-    // ##################################################################
-  }
-
-  /*!
-     \brief Get config from param server.
-  */
-  void getConfig()
-  {
-    std::cout << "getConfig()" << std::endl;
-    // Get name
-    std::string vehicle_name;
-    nh_.getParam("vehicle_name", vehicle_name);
-    // Get other params
-    char temp[200];
-    // Force
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/force_topic", vehicle_name.c_str());
-    nh_.getParam(temp, config_.force_topic_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/use_force_topic", vehicle_name.c_str());
-    nh_.getParam(temp, config_.use_force_topic_);
-    // Thrusters
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/thrusters_topic", vehicle_name.c_str());
-    nh_.getParam(temp, config_.thrusters_topic_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/number_of_thrusters", vehicle_name.c_str());
-    nh_.getParam(temp, config_.thrusters_num_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/thrusters_matrix", vehicle_name.c_str());
-    getParamMatrixXd(nh_, temp, config_.thrusters_matrix_, 6);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/max_thrusters_rpm", vehicle_name.c_str());
-    nh_.getParam(temp, config_.max_thrusters_rpm_);
-    // Thrusters coeff
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/ctf", vehicle_name.c_str());
-    nh_.getParam(temp, config_.ctf_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/ctb", vehicle_name.c_str());
-    nh_.getParam(temp, config_.ctb_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/dzv", vehicle_name.c_str());
-    nh_.getParam(temp, config_.dzv_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/dv", vehicle_name.c_str());
-    nh_.getParam(temp, config_.dv_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/dh", vehicle_name.c_str());
-    nh_.getParam(temp, config_.dh_);
-    // Fins
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/fins_topic", vehicle_name.c_str());
-    nh_.getParam(temp, config_.fins_topic_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/number_of_fins", vehicle_name.c_str());
-    nh_.getParam(temp, config_.fins_num_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/a_fins", vehicle_name.c_str());
-    nh_.getParam(temp, config_.a_fins_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/k_cd_fins", vehicle_name.c_str());
-    nh_.getParam(temp, config_.k_cd_fins_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/k_cl_fins", vehicle_name.c_str());
-    nh_.getParam(temp, config_.k_cl_fins_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/max_fins_angle", vehicle_name.c_str());
-    nh_.getParam(temp, config_.max_fins_angle_);
-    // Other
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/period", vehicle_name.c_str());
-    nh_.getParam(temp, config_.period_);
-    config_.rate_ = 1.0 / config_.period_;
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/frame_id", vehicle_name.c_str());
-    nh_.getParam(temp, config_.frame_id_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/world_frame_id", vehicle_name.c_str());
-    nh_.getParam(temp, config_.world_frame_id_);
-    // Collsions
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/uwsim_contact_sensor", vehicle_name.c_str());
-    nh_.getParam(temp, config_.collisions_topic_);
-    if (config_.collisions_topic_.size() > 0)
+    std::map<std::string, double> params_positive;
+    params_positive["n_dof"] = thruster_poly_positive.size();
+    for (std::size_t j = 0; j < thruster_poly_positive.size(); ++j)
     {
-      config_.contact_sensor_available_ = true;
-      // config_.thrusters_matrix = np.array(self.thrusters_matrix).reshape(6, self.thrusters);
+      params_positive[std::to_string(j)] = thruster_poly_positive[j];
     }
-    // Body
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/odom_topic_name", vehicle_name.c_str());
-    nh_.getParam(temp, config_.odom_topic_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/mass", vehicle_name.c_str());
-    nh_.getParam(temp, config_.mass_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/buoyancy", vehicle_name.c_str());
-    nh_.getParam(temp, config_.buoyancy_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/g", vehicle_name.c_str());
-    nh_.getParam(temp, config_.g_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/radius", vehicle_name.c_str());
-    nh_.getParam(temp, config_.radius_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/density", vehicle_name.c_str());
-    nh_.getParam(temp, config_.water_density_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/tensor", vehicle_name.c_str());
-    getParamMatrix3d(nh_, temp, config_.tensor_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/gravity_center", vehicle_name.c_str());
-    getParamVector3d(nh_, temp, config_.gravity_center_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/damping", vehicle_name.c_str());
-    getParamVector6d(nh_, temp, config_.damping_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/quadratic_damping", vehicle_name.c_str());
-    getParamVector6d(nh_, temp, config_.quadratic_damping_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/initial_pose", vehicle_name.c_str());
-    getParamVector6d(nh_, temp, config_.p0_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/initial_velocity", vehicle_name.c_str());
-    getParamVector6d(nh_, temp, config_.v0_);
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/sea_bottom_depth", vehicle_name.c_str());
-    nh_.getParam(temp, config_.sea_bottom_depth_);
-    // Currents
-    std::snprintf(temp, sizeof(temp), "dynamics/%s/current_mean", vehicle_name.c_str());
-    if (nh_.hasParam(temp))
+    config_.thrusters_poly_positive.push_back(Poly("dynamics_positive_poly"));
+    config_.thrusters_poly_positive[i].setParameters(params_positive);
+
+    std::map<std::string, double> params_negative;
+    params_negative["n_dof"] = thruster_poly_negative.size();
+    for (std::size_t j = 0; j < thruster_poly_negative.size(); ++j)
     {
-      getParamVector3d(nh_, temp, config_.current_mean_);
-      std::cout << "getConfig curr sigma" << std::endl;
-      std::snprintf(temp, sizeof(temp), "dynamics/%s/current_sigma", vehicle_name.c_str());
-      getParamVector3d(nh_, temp, config_.current_sigma_);
-      std::cout << "getConfig curr min" << std::endl;
-      std::snprintf(temp, sizeof(temp), "dynamics/%s/current_min", vehicle_name.c_str());
-      getParamVector3d(nh_, temp, config_.current_min_);
-      std::cout << "getConfig curr max" << std::endl;
-      std::snprintf(temp, sizeof(temp), "dynamics/%s/current_max", vehicle_name.c_str());
-      getParamVector3d(nh_, temp, config_.current_max_);
-      std::snprintf(temp, sizeof(temp), "dynamics/%s/current_enabled", vehicle_name.c_str());
-      nh_.getParam(temp, config_.current_enabled_);
+      params_negative[std::to_string(j)] = thruster_poly_negative[j];
     }
-    // Show params
-    showConfig();
+    config_.thrusters_poly_negative.push_back(Poly("dynamics_negative_poly"));
+    config_.thrusters_poly_negative[i].setParameters(params_negative);
   }
 
-  void showConfig()
+  // Fins
+  if (!config_.fins_topic.empty())
   {
-    // Force
-    std::cout << "=====" << std::endl;
-    std::cout << "Force" << std::endl;
-    std::cout << "=====" << std::endl;
-    std::cout << "force_topic = " << config_.force_topic_ << std::endl;
-    std::cout << "use_force_topic = " << config_.use_force_topic_ << std::endl;
-    // Thrusters
-    std::cout << "=========" << std::endl;
-    std::cout << "Thrusters" << std::endl;
-    std::cout << "=========" << std::endl;
-    std::cout << "thrusters_topic = " << config_.thrusters_topic_ << std::endl;
-    std::cout << "thrusters_num_ = " << config_.thrusters_num_ << std::endl;
-    std::cout << "thrusters_matrix = " << std::endl << config_.thrusters_matrix_ << std::endl;
-    std::cout << "max_thrusters_rpm = " << config_.max_thrusters_rpm_ << std::endl;
-    // Forward and backward thrusters coeff
-    std::cout << "===============" << std::endl;
-    std::cout << "Thrusters coeff" << std::endl;
-    std::cout << "===============" << std::endl;
-    std::cout << "ctf = " << config_.ctf_ << std::endl;
-    std::cout << "ctb = " << config_.ctb_ << std::endl;
-    std::cout << "dzv = " << config_.dzv_ << std::endl;
-    std::cout << "dv = " << config_.dv_ << std::endl;
-    std::cout << "dh = " << config_.dh_ << std::endl;
-    // Fins
-    std::cout << "====" << std::endl;
-    std::cout << "Fins" << std::endl;
-    std::cout << "====" << std::endl;
-    std::cout << "fins_topic = " << config_.fins_topic_ << std::endl;
-    std::cout << "fins_num = " << config_.fins_num_ << std::endl;
-    std::cout << "a_fins = " << config_.a_fins_ << std::endl;
-    std::cout << "k_cd_fins = " << config_.k_cd_fins_ << std::endl;
-    std::cout << "k_cl_fins = " << config_.k_cl_fins_ << std::endl;
-    std::cout << "max_fins_angle = " << config_.max_fins_angle_ << std::endl;
-    // Other
-    std::cout << "=====" << std::endl;
-    std::cout << "Other" << std::endl;
-    std::cout << "=====" << std::endl;
-    std::cout << "period = " << config_.period_ << std::endl;
-    std::cout << "rate = " << config_.rate_ << std::endl;
-    std::cout << "frame_id = " << config_.frame_id_ << std::endl;
-    std::cout << "world_frame_id = " << config_.world_frame_id_ << std::endl;
-    // Contact sensor
-    std::cout << "==========" << std::endl;
-    std::cout << "Collisions" << std::endl;
-    std::cout << "==========" << std::endl;
-    std::cout << "collisions_topic = " << config_.collisions_topic_ << std::endl;
-    std::cout << "contact_sensor_available = " << config_.contact_sensor_available_ << std::endl;
-    // Body
-    std::cout << "====" << std::endl;
-    std::cout << "Body" << std::endl;
-    std::cout << "====" << std::endl;
-    std::cout << "odom_topic = " << config_.odom_topic_ << std::endl;
-    std::cout << "mass = " << config_.mass_ << std::endl;
-    std::cout << "buoyancy = " << config_.buoyancy_ << std::endl;
-    std::cout << "g = " << config_.g_ << std::endl;
-    std::cout << "radius = " << config_.radius_ << std::endl;
-    std::cout << "water_density = " << config_.water_density_ << std::endl;
-    std::cout << "tensor = " << std::endl << config_.tensor_ << std::endl;
-    std::cout << "gravity_center = " << std::endl << config_.gravity_center_ << std::endl;
-    std::cout << "damping = " << std::endl << config_.damping_ << std::endl;
-    std::cout << "quadratic_damping = " << std::endl << config_.quadratic_damping_ << std::endl;
-    std::cout << "p0 = " << std::endl << config_.p0_ << std::endl;
-    std::cout << "v0 = " << std::endl << config_.v0_ << std::endl;
-    std::cout << "sea_bottom_depth = " << config_.sea_bottom_depth_ << std::endl;
-    // Currents
-    std::cout << "========" << std::endl;
-    std::cout << "Currents" << std::endl;
-    std::cout << "========" << std::endl;
-    std::cout << "current_mean = " << std::endl << config_.current_mean_ << std::endl;
-    std::cout << "current_sigma = " << std::endl << config_.current_sigma_ << std::endl;
-    std::cout << "current_max = " << std::endl << config_.current_max_ << std::endl;
-    std::cout << "current_min = " << std::endl << config_.current_min_ << std::endl;
-    std::cout << "current_enabled = " << config_.current_enabled_ << std::endl;
-    std::cout << "========" << std::endl;
+    cola2::rosutils::getParam("~a_fins", config_.a_fins, 0.0);
+    cola2::rosutils::getParam("~k_cd_fins", config_.k_cd_fins, 0.0);
+    cola2::rosutils::getParam("~k_cl_fins", config_.k_cl_fins, 0.0);
+    cola2::rosutils::getParam("~max_fins_angle", config_.max_fins_angle, 0.0);
   }
-};  // class Dynamics
+
+  // Force
+  cola2::rosutils::getParam("~use_force_topic", config_.use_force_topic, false);
+}
+
+// Returns the rate. Used in the main while loop that calls iterate()
+double Dynamics::getRate() const
+{
+  return config_.rate;
+}
+
 
 int main(int argc, char *argv[])
 {
-  ros::init(argc, argv, "dynamics_new");
+  ros::init(argc, argv, "dynamics");
   Dynamics node;
   ros::Rate rate(node.getRate());
   while (ros::ok())
   {
     node.iterate();
     rate.sleep();
+    ros::spinOnce();
   }
 }

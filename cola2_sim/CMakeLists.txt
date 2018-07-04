@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(cola2_sim)
 
+add_compile_options(-std=c++11 -Wall -Wextra)
+
 find_package(catkin REQUIRED COMPONENTS
   # ROS Dependencies
   rospy
@@ -17,7 +19,14 @@ find_package(catkin REQUIRED COMPONENTS
   # COLA2 Dependencies
   cola2_lib
   cola2_msgs
+  cola2_control
 )
+
+# System dependencies
+find_package(Eigen3 REQUIRED)
+
+# TODO: why is this required?
+set(Eigen3_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIR})
 
 # Generate services in the 'srv' folder
 add_service_files(
@@ -35,5 +44,17 @@ generate_messages(
                cola2_msgs
 )
 
+# Specify locations of header files. Your package locations should be listed
+# before other locations
+include_directories(
+  include
+  ${catkin_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIR}
+)
+
 # Declare things to be passed to dependent projects
 catkin_package()
+
+add_executable(dynamics_cpp src/dynamics.cpp)
+target_link_libraries(dynamics_cpp ${catkin_LIBRARIES})
+add_dependencies(dynamics_cpp ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
