@@ -115,12 +115,13 @@ protected:
   ros::NodeHandle nh_ = ros::NodeHandle("~");  // ROS node handler
 
   // Init flags
-  bool init_gps_ = false;    //!< init sensor gps
-  bool init_depth_ = false;  //!< init sensor depth
-  bool init_dvl_ = false;    //!< init sensor dvl
-  bool init_imu_ = false;    //!< init sensor imu
-  bool init_ned_ = false;    //!< init NED
-  bool ned_error_ = false;   //!< not enough good smaples to init NED from GPS
+  bool init_depth_offset_ = false;  //!< init depth offset
+  bool init_gps_ = false;           //!< init sensor gps
+  bool init_depth_ = false;         //!< init sensor depth
+  bool init_dvl_ = false;           //!< init sensor dvl
+  bool init_imu_ = false;           //!< init sensor imu
+  bool init_ned_ = false;           //!< init NED
+  bool ned_error_ = false;          //!< not enough good smaples to init NED from GPS
 
   // Diagnostics
   cola2::rosutils::DiagnosticHelper diag_help_;  //!< ease publishing diagnostics
