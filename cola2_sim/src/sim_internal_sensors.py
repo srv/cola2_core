@@ -128,7 +128,7 @@ class SimSensorsGirona500:
 
         battery_msg = BatteryState()
         battery_msg.header.stamp = rospy.Time.now()
-        battery_msg.voltage = 15.6
+        battery_msg.voltage = 30.6
         battery_msg.current = -30.02
         battery_msg.charge = self.battery_level
         battery_msg.capacity = float('nan')

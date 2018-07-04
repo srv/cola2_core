@@ -86,6 +86,7 @@ void EKFBaseLandmarksROS::resetFilter()
 {
   // Reset flags
   // general
+  init_depth_offset_ = false;
   init_ekf_ = false;
   init_ned_ = false;
   diag_help_.add("ekf_init", false);
@@ -378,7 +379,7 @@ void EKFBaseLandmarksROS::updatePositionGPSMsg(const sensor_msgs::NavSatFix& msg
     return;
   }
   // Valid measurement
-  if ((msg.status.status >= msg.status.STATUS_FIX) && (msg.position_covariance[0] < 10.0)) //TODO: 10.0 --> 4.0
+  if ((msg.status.status >= msg.status.STATUS_FIX) && (msg.position_covariance[0] < 10.0))  // TODO: 10.0 --> 4.0
   {
     // Diagnostics
     diag_help_.increaseFrequencyCounter();
@@ -389,11 +390,12 @@ void EKFBaseLandmarksROS::updatePositionGPSMsg(const sensor_msgs::NavSatFix& msg
     if (gps_samples_ >= static_cast<size_t>(config_.gps_samples_to_init_))
     {
       // Init depth offset
-      if (!init_ned_ && config_.initialize_depth_sensor_offset_)
+      if (!init_depth_offset_ && config_.initialize_depth_sensor_offset_)
       {
         std_srvs::Empty::Request req;
         std_srvs::Empty::Response res;
         srvSetDepthSensorOffset(req, res);
+        init_depth_offset_ = true;
       }
       // Init NED if necessary
       if (!init_ned_ && config_.initialize_ned_from_gps_)
