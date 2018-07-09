@@ -132,7 +132,6 @@ class Dynamics
   struct Config
   {
     // Frames
-    std::string frame_id;
     std::string world_frame_id;
 
     // Period and rate
@@ -140,12 +139,7 @@ class Dynamics
     double rate;
 
     // Topics
-    std::string thrusters_topic;
     std::string fins_topic;
-    std::string force_topic;
-    std::string odom_topic;
-    std::string pose_overwrite_topic;
-    std::string current_topic;
 
     // Initial pose and velocity
     Eigen::Vector6d p0;
@@ -237,18 +231,18 @@ Dynamics::Dynamics(): nh_("~")
   last_fins_setpoint_sec_ = last_thrusters_setpoint_sec_;
 
   // Publishers
-  pub_odom_ = nh_.advertise<nav_msgs::Odometry>(config_.odom_topic, 2);
+  pub_odom_ = nh_.advertise<nav_msgs::Odometry>("odometry", 2);
   pub_odom_gazebo_ = nh_.advertise<gazebo_msgs::ModelState>("/gazebo/set_model_state", 2);
 
   // Subscribers
-  sub_thrusters_ = nh_.subscribe(config_.thrusters_topic, 1, &Dynamics::thrustersCallback, this);
+  sub_thrusters_ = nh_.subscribe(cola2::rosutils::getNamespace() + "/controller/thruster_setpoints", 1, &Dynamics::thrustersCallback, this);
   if (!config_.fins_topic.empty())
   {
     sub_fins_ = nh_.subscribe(config_.fins_topic, 1, &Dynamics::finsCallback, this);
   }
-  sub_force_ = nh_.subscribe(config_.force_topic, 1, &Dynamics::forceCallback, this);
-  sub_current_ = nh_.subscribe(config_.current_topic, 1, &Dynamics::currentCallback, this);
-  sub_pose_overwrite_ = nh_.subscribe(config_.pose_overwrite_topic, 1, &Dynamics::poseOverwriteCallback, this);
+  sub_force_ = nh_.subscribe(cola2::rosutils::getNamespace() + "/controller/merged_body_force_req", 1, &Dynamics::forceCallback, this);
+  sub_current_ = nh_.subscribe("current", 1, &Dynamics::currentCallback, this);
+  sub_pose_overwrite_ = nh_.subscribe("pose_overwrite", 1, &Dynamics::poseOverwriteCallback, this);
 
   // Timers
   timer_check_actuators_ = nh_.createTimer(ros::Duration(1.0), &Dynamics::checkActuatorsCallback, this);
@@ -626,7 +620,7 @@ void Dynamics::publishOdometry()
   nav_msgs::Odometry odom;
   odom.header.stamp = ros::Time::now();
   odom.header.frame_id = config_.world_frame_id;
-  odom.child_frame_id = config_.frame_id;
+  odom.child_frame_id = cola2::rosutils::getNamespace() + "/" + cola2::rosutils::getUnresolvedNodeName();
 
   // Position
   odom.pose.pose.position.x = p_(0);
@@ -683,12 +677,7 @@ void Dynamics::getStaticConfig()
   config_.rate = 1.0 / config_.period;
 
   // Topics
-  cola2::rosutils::getParam("~thrusters_topic", config_.thrusters_topic, std::string(""));
   cola2::rosutils::getParam("~fins_topic", config_.fins_topic, std::string(""));
-  cola2::rosutils::getParam("~force_topic", config_.force_topic, std::string(""));
-  cola2::rosutils::getParam("~odom_topic", config_.odom_topic, std::string(""));
-  cola2::rosutils::getParam("~current_topic", config_.current_topic, std::string(""));
-  cola2::rosutils::getParam("~pose_overwrite_topic", config_.pose_overwrite_topic, std::string(""));
 
   // Initial pose and velocity
   getParamVector6d("~initial_pose", config_.p0);
@@ -706,9 +695,6 @@ void Dynamics::getStaticConfig()
 */
 void Dynamics::getVariableConfig()
 {
-  // Frame
-  cola2::rosutils::getParam("~frame_id", config_.frame_id, std::string("/vehicle/dynamics/odometry"));
-
   // Vehicle properties
   cola2::rosutils::getParam("~mass", config_.mass, 0.0);
   cola2::rosutils::getParam("~buoyancy", config_.buoyancy, 0.0);
