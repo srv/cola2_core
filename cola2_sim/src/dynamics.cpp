@@ -235,12 +235,14 @@ Dynamics::Dynamics(): nh_("~")
   pub_odom_gazebo_ = nh_.advertise<gazebo_msgs::ModelState>("/gazebo/set_model_state", 2);
 
   // Subscribers
-  sub_thrusters_ = nh_.subscribe(cola2::rosutils::getNamespace() + "/controller/thruster_setpoints", 1, &Dynamics::thrustersCallback, this);
+  sub_thrusters_ = nh_.subscribe(cola2::rosutils::getNamespace() + "/controller/thruster_setpoints", 1,
+                                 &Dynamics::thrustersCallback, this);
   if (!config_.fins_topic.empty())
   {
     sub_fins_ = nh_.subscribe(config_.fins_topic, 1, &Dynamics::finsCallback, this);
   }
-  sub_force_ = nh_.subscribe(cola2::rosutils::getNamespace() + "/controller/merged_body_force_req", 1, &Dynamics::forceCallback, this);
+  sub_force_ = nh_.subscribe(cola2::rosutils::getNamespace() + "/controller/merged_body_force_req", 1,
+                             &Dynamics::forceCallback, this);
   sub_current_ = nh_.subscribe("current", 1, &Dynamics::currentCallback, this);
   sub_pose_overwrite_ = nh_.subscribe("pose_overwrite", 1, &Dynamics::poseOverwriteCallback, this);
 
