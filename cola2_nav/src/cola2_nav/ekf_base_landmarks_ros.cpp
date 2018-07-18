@@ -525,7 +525,7 @@ void EKFBaseLandmarksROS::updatePositionDepthMsg(const sensor_msgs::FluidPressur
     // Construct measurement
     Eigen::Vector3d xyz(0.0, 0.0, meters + config_.depth_sensor_offset_);
     Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
-    cov(2, 2) = msg.variance;
+    cov(2, 2) = msg.variance / (config_.water_density_ * 9.81);  // variance pascals to meters
     // Transform to vehicle frame
     Eigen::Affine3d trans;
     if (!tf_handler_.getTransform(msg.header.frame_id, trans))
