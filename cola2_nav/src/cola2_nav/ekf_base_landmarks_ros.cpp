@@ -421,7 +421,7 @@ void EKFBaseLandmarksROS::updatePositionGPSMsg(const sensor_msgs::NavSatFix& msg
       cov = transforms::positionCovariance(cov, getOrientationUncertainty(), getOrientation(), trans.translation());
       // Predict and update
       const double tim = msg.header.stamp.toSec();
-      if (!init_ekf_ || makePrediction(tim))
+      if (makePrediction(tim) || !init_ekf_)
       {
         // Debug
         if (config_.enable_debug_)
@@ -471,7 +471,7 @@ void EKFBaseLandmarksROS::updatePositionUSBLMsg(const geometry_msgs::PoseWithCov
     if (position_increment(0) >= 0.0)
     {
       // Current time
-      const ros::Time current_time = msg.header.stamp + ros::Duration(position_increment[0]);
+      const ros::Time current_time(msg.header.stamp.toSec() + position_increment(0));
       // Construct measurement
       const Eigen::Vector3d latlonh(msg.pose.pose.position.x, msg.pose.pose.position.y, 0.0);
       Eigen::Vector3d ned = ned_.geodetic2Ned(latlonh);
@@ -496,7 +496,7 @@ void EKFBaseLandmarksROS::updatePositionUSBLMsg(const geometry_msgs::PoseWithCov
       cov = transforms::positionCovariance(cov, getOrientationUncertainty(), getOrientation(), trans.translation());
       // Predict and update
       const double tim = current_time.toSec();
-      if (!init_ekf_ || makePrediction(tim))
+      if (makePrediction(tim) || !init_ekf_)
       {
         // Debug
         if (config_.enable_debug_)
@@ -536,7 +536,7 @@ void EKFBaseLandmarksROS::updatePositionDepthMsg(const sensor_msgs::FluidPressur
     cov = transforms::positionCovariance(cov, getOrientationUncertainty(), getOrientation(), trans.translation());
     // Predict and update
     const double tim = msg.header.stamp.toSec();
-    if (!init_ekf_ || makePrediction(tim))
+    if (makePrediction(tim) || !init_ekf_)
     {
       // Debug
       if (config_.enable_debug_)
@@ -583,7 +583,7 @@ void EKFBaseLandmarksROS::updateVelocityDVLMsg(const cola2_msgs::DVL& msg)
     cov = transforms::positionCovariance(cov, getAngularVelocityUncertainty(), quat, trans.translation());
     // Predict and update
     const double tim = msg.header.stamp.toSec();
-    if (!init_ekf_ || makePrediction(tim))
+    if (makePrediction(tim) || !init_ekf_)
     {
       // Debug
       if (config_.enable_debug_)
@@ -631,7 +631,7 @@ void EKFBaseLandmarksROS::updateIMUMsg(const sensor_msgs::Imu& msg)
   ang_vel = transforms::angularVelocity(ang_vel, quat);  // transform angular velocity
   // Predict and update
   const double tim = msg.header.stamp.toSec();
-  if (!init_ekf_ || makePrediction(tim))
+  if (makePrediction(tim) || !init_ekf_)
   {
     // Debug
     if (config_.enable_debug_)
