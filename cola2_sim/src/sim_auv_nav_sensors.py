@@ -266,9 +266,9 @@ class SimAUVNavSensors(object):
         # Measurement
         rot = tf.transformations.euler_matrix(*self.rpy)[:3, :3]
         depth_xyz = rot.dot(self.tf_depth[0])
-        depth = self.odom.pose.pose.position.z - depth_xyz[2] + np.random.normal(0.0, self.depth_pressure_covariance)
+        depth = self.odom.pose.pose.position.z - depth_xyz[2]
         depth = max(depth, 0.01)
-        pressure = depth * self.water_density * 9.81  # pascals
+        pressure = depth * self.water_density * 9.80665 + np.random.normal(0.0, self.depth_pressure_covariance)
         # Pressure
         msg = FluidPressure()
         msg.header.stamp = event.current_real
