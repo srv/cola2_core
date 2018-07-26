@@ -9,21 +9,17 @@
 
 """@@>Publishes all parameters in a topic for logging/debugging purposes.<@@"""
 
+import os
 import rospy
 import rosparam
 from std_msgs.msg import String
-import os
-import sys
 
 
 class ParamLoggerNode(object):
     """Log all parameters in rosparam to a topic or to a file."""
 
-    def __init__(self, path):
+    def __init__(self):
         """Constructor."""
-        # save path
-        self.path = path
-        rospy.loginfo("save params path: " + self.path)
         # init node
         rospy.init_node('param_logger')
         # publisher, timer and service
@@ -45,11 +41,7 @@ class ParamLoggerNode(object):
 
 
 if __name__ == '__main__':
-    # check imput arguments
-    path = "."
-    if len(sys.argv) > 1:
-        path = sys.argv[1]
     # init node
-    ParamLoggerNode(path)
+    ParamLoggerNode()
     # keep running
     rospy.spin()
