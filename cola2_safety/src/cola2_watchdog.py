@@ -6,8 +6,7 @@
 
 
 """
-@@>Node to keep track of the cola2 running time, used by the safety supervisor to check it against the safety timeout.
-<@@
+@@>Node to keep track of the cola2 running time, used by the safety supervisor to check it against the safety timeout.<@@
 """
 
 import rospy
@@ -20,7 +19,6 @@ class Watchdog(object):
     """ This node keeps track of the cola2 running time. Counts the elapsed time since the architecture started
         (actually since the start of this node) or since the last time reset, which can be done through a provided
         service. Publishes the current elapsed time. """
-
 
     def __init__(self, name):
         """ Constructor """
@@ -44,7 +42,6 @@ class Watchdog(object):
         # Show message
         rospy.loginfo("%s: initialized", self.name)
 
-
     def check_timeout(self, event):
         """ Callback of the watchdog timer """
         self.diagnostic.add("elapsed_time", str(rospy.Time.now().to_sec() - self.init_time))
@@ -60,7 +57,6 @@ class Watchdog(object):
         rospy.loginfo("%s: Reset Timeout!", self.name)
         self.init_time = rospy.Time.now().to_sec()
         return EmptyResponse()
-
 
 if __name__ == '__main__':
     try:

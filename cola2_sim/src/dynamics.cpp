@@ -1,5 +1,4 @@
-// This node uses simulated data of the actuators to compute the AUV dynamic
-// behavior
+/*@@>This node takes as inputs the thrusters setpoints and simulates the AUV dynamics. The outputs are the vehicle's pose and velocity.<@@*/
 
 #include <ros/ros.h>
 #include <cola2_msgs/BodyForceReq.h>

@@ -7,8 +7,7 @@
 
 
 """
-@@>If the robot is below a configured depth and teleoperation is giving only disabled setpoints,this node tells the
- vehicle to keep velocities at zero.<@@
+@@>If the robot is below a configured depth and teleoperation is giving only disabled setpoints, this node tells the vehicle to keep velocities at zero.<@@
 """
 
 """

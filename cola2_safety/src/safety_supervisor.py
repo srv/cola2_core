@@ -4,11 +4,7 @@
 # This file is subject to the terms and conditions defined in file
 # 'LICENSE.txt', which is part of this source code package.
 
-"""@@> The diagnostics supervisor receives the vehicle status message and applies a set of rules aimed at detecting
-    errors in the system (low battery level, detection from water leak sensors, etc.).
-    These rules are based on the configuration values set on the safety.yaml file of the vehicles.
-    If any of the rule checks is triggered, the diagnostics supervisor calls a recovery action,
-    which acts appropriately depending on the type of error.<@@"""
+"""@@> The diagnostics supervisor receives the vehicle status message and applies a set of rules aimed at detecting errors in the system (low battery level, detection from water leak sensors, etc.). These rules are based on the configuration values set on the safety.yaml file of the vehicles. If any of the rule checks is triggered, the diagnostics supervisor calls a recovery action, which acts appropriately depending on the type of error.<@@"""
 """
 Created on 02/19/2015
 Modified 11/2016

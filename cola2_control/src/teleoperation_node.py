@@ -5,8 +5,7 @@
 # 'LICENSE.txt', which is part of this source code package.
 
 """
-@@>This nodes takes the data coming from a joystick device and generates a World Waypoint Request
-or a Body Velocity Request. <@@
+@@>This nodes takes the data coming from a joystick device and generates a World Waypoint Request or a Body Velocity Request.<@@
 """
 
 # ROS imports
@@ -146,7 +145,7 @@ class Teleoperation(object):
         """ This is a callback for a timer. It publishes ack safety message
             and pose and velocity safety messages if map_ack is lost """
         if self.map_ack_init:
-            # If there is a mission running, update last_map_ack so last_ack will be 0 
+            # If there is a mission running, update last_map_ack so last_ack will be 0
             # and will start counting again once the mission finishes.
             if self.mission_active:
                 self.last_map_ack = rospy.Time.now().to_sec()

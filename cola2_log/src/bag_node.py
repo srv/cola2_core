@@ -5,9 +5,8 @@
 # 'LICENSE.txt', which is part of this source code package.
 
 
-
 """
-@@>Provides services to run and stop the launch file launch/bag.launch <@@
+@@>Provides services to run and stop the launch file launch_bag.launch.<@@
 """
 
 import rospy
@@ -16,10 +15,9 @@ from std_srvs.srv import TriggerResponse
 import subprocess
 import time
 
-
 class LogBag:
     """LogBag class."""
- 
+
     def __init__(self):
         """Class constructor."""
         self.start_bag = rospy.Service('~enable_logs', Trigger, self.enable_logs)

@@ -5,8 +5,8 @@
 # 'LICENSE.txt', which is part of this source code package.
 
 
-"""@@>This node checks if the vehicle moves beyond some given virtual limits defined in NED coordinates<@@"""
-
+"""
+@@>This node checks if the vehicle moves beyond some given virtual limits defined in NED coordinates.<@@"""
 """
 Created on 02/13/2014
 

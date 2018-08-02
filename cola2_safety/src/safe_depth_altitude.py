@@ -21,8 +21,7 @@ from dynamic_reconfigure.server import Server
 from diagnostic_msgs.msg import DiagnosticStatus
 
 """
- @@> Prevents the vehicle to go behind a maximum depth or a minimum altitude
-by sending a BodyVelocityReq asking a negative heave with maximum priority.<@@
+ @@>Prevents the vehicle to go behind a maximum depth or a minimum altitude by sending a BodyVelocityReq asking a negative heave with maximum priority.<@@
 """
 """
 Created on Fri Mar 22 2013

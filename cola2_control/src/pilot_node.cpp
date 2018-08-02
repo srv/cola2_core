@@ -6,8 +6,7 @@
  * 'LICENSE.txt', which is part of this source code package.
  */
 
-/*@@>Directed by the captain, publishes position and velocity
-setpoints to the position and velocity controllers.<@@*/
+/*@@>Directed by the captain, publishes position and velocity setpoints to the position and velocity controllers.<@@*/
 
 #include <ros/ros.h>
 #include <string>
