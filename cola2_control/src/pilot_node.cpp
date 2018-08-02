@@ -21,6 +21,7 @@
 #include <cola2_msgs/WorldWaypointReq.h>
 #include <cola2_msgs/BodyVelocityReq.h>
 #include <std_srvs/Empty.h>
+#include <std_srvs/Trigger.h>
 #include <visualization_msgs/Marker.h>
 #include <cola2_control/controllers/types.h>
 #include <cola2_control/controllers/los_cte.h>
@@ -36,7 +37,6 @@
 
 const unsigned int SECTION_MODE = 0;
 const unsigned int WAYPOINT_MODE = 1;
-const unsigned int PATH_MODE = 2;
 
 class Pilot
 {
@@ -51,6 +51,7 @@ private:
   ros::Publisher pub_marker_;
   ros::Publisher pub_goal_;
   ros::ServiceServer srv_reload_params_;
+  ros::ServiceClient srv_publish_params_;
 
   // Actionlib servers
   boost::shared_ptr<actionlib::SimpleActionServer<cola2_msgs::WorldSectionAction> > section_server_;
@@ -156,6 +157,15 @@ Pilot::Pilot(): nh_("~")
   holonomic_goto_controller_ = std::unique_ptr<HolonomicGotoController>(new HolonomicGotoController(config_.holonomic_goto_config));
   // Anchor controller (for keep position in non holonomic vehicles)
   anchor_controller_ = std::unique_ptr<AnchorController>(new AnchorController(config_.anchor_config));
+
+  // Service client to publish parameters
+  std::string publish_params_srv_name = cola2::rosutils::getNamespace() + "/param_logger/publish_params";
+  srv_publish_params_ = nh_.serviceClient<std_srvs::Trigger>(publish_params_srv_name);
+  while (ros::ok())
+  {
+    if (srv_publish_params_.waitForExistence(ros::Duration(5.0))) break;
+    ROS_INFO_STREAM("Waiting for client to service " << publish_params_srv_name);
+  }
 
   // Reload parameters service
   srv_reload_params_ = nh_.advertiseService("reload_params", &Pilot::reloadConfigServiceCallback, this);
@@ -604,6 +614,15 @@ bool Pilot::reloadConfigServiceCallback(std_srvs::Empty::Request&, std_srvs::Emp
     goto_controller_->setConfig(config_.goto_config);
     holonomic_goto_controller_->setConfig(config_.holonomic_goto_config);
     anchor_controller_->setConfig(config_.anchor_config);
+    ROS_INFO_STREAM("Params reloaded");
+
+    // Publish params after param reload
+    std_srvs::Trigger trigger;
+    srv_publish_params_.call(trigger);
+    if (!trigger.response.success)
+    {
+      ROS_WARN_STREAM("Publish params did not succeed -> " << trigger.response.message);
+    }
     return true;
 }
 

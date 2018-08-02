@@ -8,6 +8,7 @@
 #include <geometry_msgs/Vector3Stamped.h>
 #include <nav_msgs/Odometry.h>
 #include <std_srvs/Empty.h>
+#include <std_srvs/Trigger.h>
 #include <tf/transform_listener.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <cola2_lib/rosutils/param_loader.h>
@@ -115,6 +116,7 @@ class Dynamics
   ros::Publisher pub_odom_, pub_odom_gazebo_;
   ros::Subscriber sub_force_, sub_thrusters_, sub_fins_, sub_current_, sub_pose_overwrite_;
   ros::ServiceServer srv_reload_params_;
+  ros::ServiceClient srv_publish_params_;
   tf2_ros::TransformBroadcaster tf_broadcaster_;
   ros::Timer timer_check_actuators_;
 
@@ -247,6 +249,15 @@ Dynamics::Dynamics(): nh_("~")
 
   // Timers
   timer_check_actuators_ = nh_.createTimer(ros::Duration(1.0), &Dynamics::checkActuatorsCallback, this);
+
+  // Service client to publish parameters
+  std::string publish_params_srv_name = cola2::rosutils::getNamespace() + "/param_logger/publish_params";
+  srv_publish_params_ = nh_.serviceClient<std_srvs::Trigger>(publish_params_srv_name);
+  while (ros::ok())
+  {
+    if (srv_publish_params_.waitForExistence(ros::Duration(5.0))) break;
+    ROS_INFO_STREAM("Waiting for client to service " << publish_params_srv_name);
+  }
 
   // Services
   srv_reload_params_ = nh_.advertiseService("reload_params", &Dynamics::reloadConfigServiceCallback, this);
@@ -387,6 +398,15 @@ bool Dynamics::reloadConfigServiceCallback(std_srvs::Empty::Request&, std_srvs::
 {
     getVariableConfig();
     initializeMassMatrix();
+    ROS_INFO_STREAM("Params reloaded");
+
+    // Publish params after param reload
+    std_srvs::Trigger trigger;
+    srv_publish_params_.call(trigger);
+    if (!trigger.response.success)
+    {
+      ROS_WARN_STREAM("Publish params did not succeed -> " << trigger.response.message);
+    }
     return true;
 }
 

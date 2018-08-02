@@ -25,6 +25,7 @@ from cola2_lib.rosutils.diagnostic_helper import DiagnosticHelper
 from cola2_lib.rosutils import param_loader
 from cola2_lib.utils import angles
 from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
+from std_srvs.srv import Trigger, TriggerRequest, TriggerResponse
 
 
 class Teleoperation(object):
@@ -100,6 +101,16 @@ class Teleoperation(object):
                          self.update_mission_status,
                          queue_size=1)
 
+        # Service client to publish parameters
+        publish_params_srv_name = namespace + 'param_logger/publish_params'
+        while not rospy.is_shutdown():
+            try:
+                rospy.wait_for_service(publish_params_srv_name, 5)
+                self.publish_params_srv = rospy.ServiceProxy(publish_params_srv_name, Trigger)
+                break
+            except rospy.exceptions.ROSException:
+                rospy.loginfo('Waiting for client to service %s', publish_params_srv_name)
+
         # Create services
         self.set_joy_srv = rospy.Service(
             self.name+'/set_max_joy_velocity',
@@ -111,10 +122,10 @@ class Teleoperation(object):
             Empty,
             self.set_axes_velocity)
 
-        self.reload_config_srv = rospy.Service(
-            self.name+'/reload_joystick_config',
+        self.reload_params_srv = rospy.Service(
+            self.name+'/reload_params',
             Empty,
-            self.reload_joystick_config_srv)
+            self.reload_params_srv_callback)
 
         # Init periodic check timer
         rospy.Timer(rospy.Duration(1), self.check_map_ack)
@@ -157,7 +168,7 @@ class Teleoperation(object):
                 self.diagnostic.set_level(DiagnosticStatus.OK)
             else:
                 if not self.mission_active: # Do not generate the loginfo if mission is active
-                    rospy.loginfo("%s: we have lost map_ack!", self.name)
+                    rospy.loginfo("We have lost map_ack!")
                 self.diagnostic.set_level(
                     DiagnosticStatus.WARN,
                     'Communication with map_ack lost!')
@@ -193,7 +204,7 @@ class Teleoperation(object):
                 world_waypoint_req.header.frame_id = "/world_ned"
                 self.pub_world_waypoint_req.publish(world_waypoint_req)
         else:
-            rospy.loginfo("%s: waiting for map ack...", self.name)
+            rospy.loginfo("Waiting for map ack...")
 
         # Send ack message
         msg = String()
@@ -227,13 +238,13 @@ class Teleoperation(object):
                 self.pose_controlled_axis[b] = True
                 if self.actualize_base_pose:
                     self.base_pose[b] = self.last_pose[b]
-                rospy.loginfo("%s: axis %s now is pose", self.name, str(b))
+                rospy.loginfo("Axis %s now is pose", str(b))
 
         # Check if velocity controller is enabled
         for b in range(6, 12):
             if data.buttons[b] == 1:
                 self.pose_controlled_axis[b - 6] = False
-                rospy.loginfo("%s: axis %s now is velocity", self.name, str(b - 6))
+                rospy.loginfo("Axis %s now is velocity", str(b - 6))
 
         if self.nav_init:
             # Positions
@@ -256,7 +267,7 @@ class Teleoperation(object):
             world_waypoint_req.header.frame_id = "/world_ned"
 
             # if not world_waypoint_req.disable_axis.pitch:
-            #    rospy.logfatal("%s: PITCH IS NOT DISABLED!", self.name)
+            #    rospy.logfatal("PITCH IS NOT DISABLED!")
             #    world_waypoint_req.disable_axis.pitch = True
 
             if (world_waypoint_req.disable_axis.x and
@@ -342,7 +353,7 @@ class Teleoperation(object):
 
     def set_max_joy_vel(self, req):
         """ Change max/min joy velocity."""
-        rospy.loginfo("%s: change max/min joy velocity", self.name)
+        rospy.loginfo("Change max/min joy velocity")
         for i in range(6):
             self.max_vel[i] = req.max_joy_velocity[i]
             self.min_vel[i] = -req.max_joy_velocity[i]
@@ -352,7 +363,7 @@ class Teleoperation(object):
     def set_axes_velocity(self, req):
         """ Set all joystick axes to velocity control"""
         data = Joy()
-        rospy.loginfo("%s: Set all axis to velocity", self.name)
+        rospy.loginfo("Set all axis to velocity")
         # Set all axis at 0.0 and set control to velocity for all axes
         for i in range(12):
             data.axes.append(0.0)
@@ -365,10 +376,15 @@ class Teleoperation(object):
 
         return EmptyResponse()
 
-    def reload_joystick_config_srv(self, req):
+    def reload_params_srv_callback(self, req):
         """ Reload joystick config values."""
-        rospy.loginfo("%s: Reload teleopertion configurations.", self.name)
+        rospy.loginfo("Reload teleopertion params")
         self.get_config()
+
+        req = TriggerRequest()
+        res = self.publish_params_srv(req)
+        if not res.success:
+            rospy.logwarn('Publish params did not succeed -> %s', res.message)
         return EmptyResponse()
 
 

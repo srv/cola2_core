@@ -49,6 +49,15 @@ EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size)
   pub_landmarks_ = nh_.advertise<visualization_msgs::MarkerArray>("markers/landmarks", 1);
   pub_altitude_ = nh_.advertise<sensor_msgs::Range>("altitude_filtered", 1);
 
+  // Service client to publish parameters
+  std::string publish_params_srv_name = cola2::rosutils::getNamespace() + "/param_logger/publish_params";
+  srv_publish_params_ = nh_.serviceClient<std_srvs::Trigger>(publish_params_srv_name);
+  while (ros::ok())
+  {
+    if (srv_publish_params_.waitForExistence(ros::Duration(5.0))) break;
+    ROS_INFO_STREAM("Waiting for client to service " << publish_params_srv_name);
+  }
+
   // Init services
   // clang-format off
   srv_reload_params_ = nh_.advertiseService("reload_params", &EKFBaseLandmarksROS::srvResetNavigation, this);
@@ -1117,9 +1126,17 @@ bool EKFBaseLandmarksROS::srvResetLandmarks(std_srvs::Empty::Request&, std_srvs:
 
 bool EKFBaseLandmarksROS::srvResetNavigation(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-  ROS_INFO("Reset navigation service called");
+  ROS_INFO("Reset navigation or reload params service called");
   getConfig();
   resetFilter();
+
+  // Publish params after param reload
+  std_srvs::Trigger trigger;
+  srv_publish_params_.call(trigger);
+  if (!trigger.response.success)
+  {
+    ROS_WARN_STREAM("Publish params did not succeed -> " << trigger.response.message);
+  }
   return true;
 }
 
