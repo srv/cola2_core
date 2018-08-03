@@ -13,6 +13,7 @@ import rospy
 from std_srvs.srv import Trigger
 from std_srvs.srv import TriggerResponse
 import subprocess
+import os
 import time
 
 class LogBag:
@@ -36,7 +37,14 @@ class LogBag:
 
     def enable_logs(self, req):
         """Run launch/bag.launch file."""
-        command = "roslaunch cola2_log bag.launch robot_name:={:s}".format(self.robot_name)
+	# Check if bags folder exists
+        home_path = os.path.expanduser('~')
+        bags_path = os.path.join(home_path, 'bags')
+        if not os.path.isdir(bags_path):
+            os.makedirs(bags_path)
+
+        # Subprocess
+        command = ("roslaunch cola2_" + self.robot_name + " bag.launch robot_name:={:s}").format(self.robot_name)
         subprocess.Popen(command, stdin=subprocess.PIPE, shell=True, cwd="./")
         self.bag_enabled = True
         rospy.loginfo("Launched bag file")
