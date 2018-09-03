@@ -308,8 +308,8 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
   if (freq < config_.min_diagnostics_frequency_)
   {
     is_nav_data_ok = false;
-    ROS_FATAL_STREAM("Diagnostics frequency too low (" << freq << " lower than " <<
-                     config_.min_diagnostics_frequency_ << ")");
+    ROS_WARN_STREAM("Diagnostics frequency too low (" << freq << " lower than " <<
+                    config_.min_diagnostics_frequency_ << ")");
   }
   // If filter or NED not initialized set to Warning
   if (!init_ekf_)
