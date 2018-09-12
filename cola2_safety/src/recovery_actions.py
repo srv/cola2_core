@@ -6,7 +6,7 @@
 
 
 """
-@@>Used to handle requests for recovery actions coming from all nodes<@@
+@@>This node is used to handle requests for recovery actions coming from all nodes.<@@
 """
 
 import rospy

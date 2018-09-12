@@ -28,7 +28,7 @@ from cola2_lib.rosutils.param_loader import get_ros_params
 import numpy as np
 
 """
-@@>Simulates the Navigation sensors of an AUV.<@@
+@@>Simulates the navigation sensors of an AUV using the output of the dynamics node.<@@
 """
 
 
@@ -119,9 +119,10 @@ class SimAUVNavSensors(object):
                 # All ok
                 found = True
             except Exception as e:
-                rospy.logfatal("cannot find all transforms")
-                rospy.logfatal(e.message)
-                exit(1)
+                rospy.logwarn("cannot find all transforms")
+                rospy.logwarn(e.message)
+                rospy.sleep(2.0)
+                #exit(1) This should not exit as sometimes not all tfs are available on the first run
 
         # Init simulated sensors
         if self.gps_period > 0:
@@ -134,6 +135,9 @@ class SimAUVNavSensors(object):
             rospy.Timer(rospy.Duration(self.imu_period), self.publish_imu)
         if self.usbl_period > 0:
             rospy.Timer(rospy.Duration(self.usbl_period), self.publish_usbl)
+
+        # Display message
+        rospy.loginfo("initialized")
 
     def get_config(self):
         """Define and load all necessary parameters from ROS param server."""

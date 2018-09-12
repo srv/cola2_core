@@ -1,10 +1,11 @@
-
 /*
  * Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
  *
  * This file is subject to the terms and conditions defined in file
  * 'LICENSE.txt', which is part of this source code package.
  */
+
+/*@@>This node contains the pose and velocity low level controllers and the thruster allocator.<@@*/
 
 #include <dynamic_reconfigure/server.h>
 #include <ros/ros.h>

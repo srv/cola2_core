@@ -49,6 +49,15 @@ EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size)
   pub_landmarks_ = nh_.advertise<visualization_msgs::MarkerArray>("markers/landmarks", 1);
   pub_altitude_ = nh_.advertise<sensor_msgs::Range>("altitude_filtered", 1);
 
+  // Service client to publish parameters
+  std::string publish_params_srv_name = cola2::rosutils::getNamespace() + "/param_logger/publish_params";
+  srv_publish_params_ = nh_.serviceClient<std_srvs::Trigger>(publish_params_srv_name);
+  while (ros::ok())
+  {
+    if (srv_publish_params_.waitForExistence(ros::Duration(5.0))) break;
+    ROS_INFO_STREAM("Waiting for client to service " << publish_params_srv_name);
+  }
+
   // Init services
   // clang-format off
   srv_reload_params_ = nh_.advertiseService("reload_params", &EKFBaseLandmarksROS::srvResetNavigation, this);
@@ -295,16 +304,18 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
   // *****************************************
   // Check current freq
   diag_help_.add("freq", std::to_string(diag_help_.getCurrentFreq()));
-  if (diag_help_.getCurrentFreq() < config_.min_diagnostics_frequency_)
+  double freq = diag_help_.getCurrentFreq();
+  if (freq < config_.min_diagnostics_frequency_)
   {
     is_nav_data_ok = false;
-    ROS_FATAL("Diagnostics frequency too low");
+    ROS_WARN_STREAM("Diagnostics frequency too low (" << freq << " lower than " <<
+                    config_.min_diagnostics_frequency_ << ")");
   }
   // If filter or NED not initialized set to Warning
   if (!init_ekf_)
   {
     is_nav_data_ok = false;
-    ROS_FATAL("EKF not yet init");
+    //ROS_FATAL("EKF not yet init");
   }
   else
   {
@@ -313,7 +324,7 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
   if (!init_ned_)
   {
     is_nav_data_ok = false;
-    ROS_FATAL("NED not yet init");
+    //ROS_FATAL("NED not yet init");
   }
   else
   {
@@ -339,35 +350,44 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
   diag_help_.add("imu_init", init_imu_);
 
   // *****************************************
-  // Output to console
+  // Init console output
   // *****************************************
+  if (!init_ekf_)
+  {
+    ROS_WARN("EKF not initialized");
+  }
   if (config_.use_dvl_data_ && !init_dvl_)
   {
-    ROS_FATAL("DVL not initialized");
+    ROS_WARN("DVL not initialized");
   }
   if (config_.use_depth_data_ && !init_depth_)
   {
-    ROS_FATAL("Depth not initialized");
+    ROS_WARN("Depth not initialized");
   }
   if (config_.use_gps_data_ && !init_gps_)
   {
-    ROS_FATAL("GPS not initialized");
+    ROS_WARN("GPS not initialized");
   }
   if (!init_imu_)
   {
-    ROS_FATAL("IMU not initialized");
-  }
-  if (!init_ekf_)
-  {
-    ROS_FATAL("EKF not initialized");
+    ROS_WARN("IMU not initialized");
   }
   if (!init_ned_)
   {
-    ROS_FATAL("NED not initialized");
+    ROS_WARN("NED not initialized");
   }
+
+  // Nav data ok console output
   if (!is_nav_data_ok)
   {
-    ROS_FATAL("Missing NAV data");
+    if (init_ekf_)
+    {
+      ROS_FATAL("Missing NAV data");
+    }
+    else
+    {
+      ROS_WARN("Missing NAV data");
+    }
   }
 }
 
@@ -1117,9 +1137,17 @@ bool EKFBaseLandmarksROS::srvResetLandmarks(std_srvs::Empty::Request&, std_srvs:
 
 bool EKFBaseLandmarksROS::srvResetNavigation(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-  ROS_INFO("Reset navigation service called");
+  ROS_INFO("Reset navigation or reload params service called");
   getConfig();
   resetFilter();
+
+  // Publish params after param reload
+  std_srvs::Trigger trigger;
+  srv_publish_params_.call(trigger);
+  if (!trigger.response.success)
+  {
+    ROS_WARN_STREAM("Publish params did not succeed -> " << trigger.response.message);
+  }
   return true;
 }
 

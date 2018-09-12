@@ -5,6 +5,8 @@
  * 'LICENSE.txt', which is part of this source code package.
  */
 
+/*@@>This node merges data from different navigation sensors to estimate the robot position and velocity.<@@*/
+
 #include <cola2_nav/ekf_position_velocity_landmarks.h>
 #include <ros/ros.h>
 

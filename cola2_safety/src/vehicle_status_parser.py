@@ -4,6 +4,10 @@
 # This file is subject to the terms and conditions defined in file
 # 'LICENSE.txt', which is part of this source code package.
 
+"""
+@@>This node subscribes to the aggregated diagnostics and publishes a vehicle status message.<@@
+"""
+
 import rospy
 from std_msgs.msg import Bool
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus

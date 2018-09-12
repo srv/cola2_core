@@ -4,17 +4,18 @@
 # This file is subject to the terms and conditions defined in file
 # 'LICENSE.txt', which is part of this source code package.
 
+"""@@>This node converts joystic messages so that the teleoperation node can understand them. From this node it is also possible to call services or anything else reading the buttons.<@@"""
 
 import rospy
 from cola2_control.joystickbase import JoystickBase
 
 
 class KeyboardToTeleoperation(JoystickBase):
-    """ This class inherits from JoystickBase. It has to overload the 
-    method update_joy(self, joy) that receives a sensor_msgs/Joy 
+    """ This class inherits from JoystickBase. It has to overload the
+    method update_joy(self, joy) that receives a sensor_msgs/Joy
     message and fill the var self.joy_msg as described in the class
-    JoystickBase. 
-    From this class it is also possible to call services or anything 
+    JoystickBase.
+    From this class it is also possible to call services or anything
     else reading the buttons in the update_joy method."""
 
     # BUTTONS DEFINITION:
@@ -46,13 +47,13 @@ class KeyboardToTeleoperation(JoystickBase):
 
     def update_joy(self, joy):
         """ Transform keyboard joy data into 12 axis data (pose + twist)
-        and sets the buttons that especify if position or velocity 
+        and sets the buttons that especify if position or velocity
         commands are used in the teleoperation."""
 
         # rospy.loginfo("%s: Received:\n %s", self.name, joy)
         self.joy_msg.header = joy.header
 
-        # Transform discrete axis into 'analog' axis 
+        # Transform discrete axis into 'analog' axis
         if joy.buttons[self.KEY_W] == 1.0:
             self.desired_vel[self.TWIST_U] = self.desired_vel[self.TWIST_U] + 0.1
         elif joy.buttons[self.KEY_S] == 1.0:
