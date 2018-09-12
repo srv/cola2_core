@@ -196,7 +196,9 @@ class SimAUVNavSensors(object):
         east = self.odom.pose.pose.position.y + np.random.normal(0.0, self.gps_position_covariance[1])
         ned = np.array([[north, east, 0.0]]).T
         # Transform to sensor
-        ned = self.tf_gps[1].dot(ned) + self.tf_gps[0]
+        rot = tf.transformations.euler_matrix(*self.rpy)[:3, :3]
+        gps_xyz = rot.dot(self.tf_gps[0])
+        ned = ned - np.array([[gps_xyz[0], gps_xyz[1], 0.0]]).T
         # Transform to lat lon
         lat, lon, _ = self.ned.ned2geodetic([ned[0], ned[1], 0.0])
         # Create message
@@ -241,7 +243,9 @@ class SimAUVNavSensors(object):
         east = old.pose.pose.position.y + np.random.normal(0.0, self.usbl_position_covariance)
         ned = np.array([[north, east, 0.0]]).T
         # Transform to sensor
-        ned = self.tf_usbl[1].dot(ned) + self.tf_usbl[0]
+        rot = tf.transformations.euler_matrix(*self.rpy)[:3, :3]
+        usbl_xyz = rot.dot(self.usbl[0])
+        ned = ned - np.array([[usbl_xyz[0], usbl_xyz[1], 0.0]]).T
         # Transform to lat lon
         lat, lon, _ = self.ned.ned2geodetic([ned[0], ned[1], 0.0])
         # Create message
