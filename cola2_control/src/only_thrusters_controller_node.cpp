@@ -1,4 +1,3 @@
-
 /*
  * Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
  *
@@ -6,12 +5,15 @@
  * 'LICENSE.txt', which is part of this source code package.
  */
 
+/*@@>This node contains the pose and velocity low level controllers and the thruster allocator.<@@*/
+
 #include <dynamic_reconfigure/server.h>
 #include <ros/ros.h>
 #include <cola2_control/controller_only_thrustersConfig.h>
 #include <cola2_control/ros_controller/auv_ros_controller_base.h>
 #include <cola2_control/low_level_controllers/only_thrusters_controller.h>
 #include <cola2_lib/rosutils/param_loader.h>
+#include <string>
 
 class OnlyThrustersROSController : public IAUVROSController
 {
@@ -57,17 +59,6 @@ public:
    */
   void setParams(cola2_control::controller_only_thrustersConfig& config, uint32_t)
   {
-    std::vector<double> thruster_poly_positive, thruster_poly_negative;
-    cola2::rosutils::getParamVector("~thruster_poly_positive", thruster_poly_positive);
-    cola2::rosutils::getParamVector("~thruster_poly_negative", thruster_poly_negative);
-
-    std::vector<double> tcm;
-    cola2::rosutils::getParamVector("~TCM", tcm);
-
-    auv_controller_->thruster_allocator_.setParams(
-        config.max_force_thruster_positive, config.max_force_thruster_negative, config.thruster_distance_yaw,
-        thruster_poly_positive, thruster_poly_negative, tcm);
-
     std::vector<std::map<std::string, double> > p_params;
     std::vector<std::string> keys = { "kp", "ti", "td", "i_limit", "fff" };
     std::vector<double> values1 = { config.p_surge_kp, config.p_surge_ti, config.p_surge_td, config.p_surge_i_limit,
@@ -132,6 +123,32 @@ public:
     auv_controller_->setMaxVelocity(max_velocity);
     auv_controller_->setMaxWrench(max_wrench);
 
+    // Thruster allocator
+    std::vector<std::vector<double> > poly_positive_v, poly_negative_v;
+    std::vector<double> max_force_thruster_positive_v, max_force_thruster_negative_v;
+    for (std::size_t i = 0; i < auv_controller_->getNumberofThrusters(); ++i)
+    {
+        std::vector<double> thruster_poly_positive, thruster_poly_negative;
+        cola2::rosutils::getParamVector(std::string("~thruster_") + std::to_string(i + 1) +
+                                        std::string("_poly_positive"), thruster_poly_positive);
+        cola2::rosutils::getParamVector(std::string("~thruster_") + std::to_string(i + 1) +
+                                        std::string("_poly_negative"), thruster_poly_negative);
+        poly_positive_v.push_back(thruster_poly_positive);
+        poly_negative_v.push_back(thruster_poly_negative);
+
+        double max_force_positive, max_force_negative;
+        cola2::rosutils::getParam(std::string("~thruster_") + std::to_string(i + 1) +
+                                  std::string("_max_force_positive"), max_force_positive);
+        cola2::rosutils::getParam(std::string("~thruster_") + std::to_string(i + 1) +
+                                  std::string("_max_force_negative"), max_force_negative);
+        max_force_thruster_positive_v.push_back(max_force_positive);
+        max_force_thruster_negative_v.push_back(max_force_negative);
+    }
+    std::vector<double> tcm;
+    cola2::rosutils::getParamVector("~TCM", tcm);
+    auv_controller_->thruster_allocator_.setParams(
+            max_force_thruster_positive_v, max_force_thruster_negative_v, poly_positive_v, poly_negative_v, tcm);
+
     // Change Params in C++ Class
     auv_controller_->setControllerParams(p_params, t_params, poly_params);
 
@@ -169,7 +186,7 @@ int main(int argc, char** argv)
 
   // Init ROS node
   OnlyThrustersROSController _ros_controller(cola2::rosutils::getUnresolvedNodeName(),
-                                         cola2::rosutils::getNamespace() + "/base_link");
+                                             cola2::rosutils::getNamespace() + "/base_link");
 
   // Initialize controller pointer into ROS node
   _ros_controller.init(auv_ctrl_ptr, period);

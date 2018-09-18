@@ -22,4 +22,5 @@
   <!-- COLA2 Dependencies -->
   <depend>cola2_lib</depend>
   <depend>cola2_msgs</depend>
+  <depend>cola2_control</depend>
 </package>

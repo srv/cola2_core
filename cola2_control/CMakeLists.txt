@@ -87,7 +87,7 @@ add_library(mission_utils SHARED
   src/${PROJECT_NAME}/mission_utils/mission_step.cpp
   src/${PROJECT_NAME}/mission_utils/mission.cpp
 )
-target_link_libraries(mission_utils ${TinyXML_LIBRARIES})
+target_link_libraries(mission_utils ${catkin_LIBRARIES} ${TinyXML_LIBRARIES})
 add_dependencies(mission_utils ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 add_library(low_level_controllers SHARED
@@ -105,14 +105,15 @@ add_dependencies(low_level_controllers ${${PROJECT_NAME}_EXPORTED_TARGETS} ${cat
 add_library(ros_control_base SHARED
   src/${PROJECT_NAME}/ros_controller/auv_ros_controller.cpp
 )
-target_link_libraries(ros_control_base ${catkin_LIBRARIES})
+target_link_libraries(ros_control_base ${catkin_LIBRARIES} low_level_controllers)
 add_dependencies(ros_control_base ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-
 add_library(only_thrusters_controller_lib SHARED
-        src/${PROJECT_NAME}/low_level_controllers/only_thrusters_controller.cpp
-        src/${PROJECT_NAME}/low_level_controllers/only_thruster_allocator.cpp)
-target_link_libraries(only_thrusters_controller_lib ${catkin_LIBRARIES})
+  src/${PROJECT_NAME}/low_level_controllers/only_thrusters_controller.cpp
+  src/${PROJECT_NAME}/low_level_controllers/only_thruster_allocator.cpp
+)
+target_link_libraries(only_thrusters_controller_lib ${catkin_LIBRARIES} low_level_controllers)
+add_dependencies(only_thrusters_controller_lib ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 
 # Add executables
@@ -121,7 +122,7 @@ target_link_libraries(keyboard ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 add_dependencies(keyboard ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 add_executable(pilot src/pilot_node.cpp)
-target_link_libraries(pilot ${catkin_LIBRARIES} ${Boost_LIBRARIES} controllers)
+target_link_libraries(pilot ${catkin_LIBRARIES} ${Boost_LIBRARIES} controllers low_level_controllers)
 add_dependencies(pilot ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 add_executable(captain src/captain_node.cpp)
@@ -129,8 +130,8 @@ target_link_libraries(captain ${catkin_LIBRARIES} ${Boost_LIBRARIES} mission_uti
 add_dependencies(captain ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 add_executable(controller_only_thrusters src/only_thrusters_controller_node.cpp)
-target_link_libraries(controller_only_thrusters ${catkin_LIBRARIES} low_level_controllers ros_control_base only_thrusters_controller_lib)
-add_dependencies(controller_only_thrusters ${PROJECT_NAME}_gencfg cola2_msgs_gencpp)
+target_link_libraries(controller_only_thrusters ${catkin_LIBRARIES} controllers low_level_controllers ros_control_base only_thrusters_controller_lib)
+add_dependencies(controller_only_thrusters ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 # Mark executable scripts (Python etc.) for installation. In contrast to
 # setup.py, you can choose the destination

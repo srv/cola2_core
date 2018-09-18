@@ -6,9 +6,7 @@
  * 'LICENSE.txt', which is part of this source code package.
  */
 
-/*@@>High level controller that provides control actions and services to load and execute missions, reach waypoints,
- keep position,...
- This node mainly translates user requests to pilot action libs.<@@*/
+/*@@>This node provides control actions to reach waypoints, keep position or execute missions. This node mainly translates user requests to pilot action_libs.<@@*/
 
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/client/terminal_state.h>

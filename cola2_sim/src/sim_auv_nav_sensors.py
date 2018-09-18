@@ -28,7 +28,7 @@ from cola2_lib.rosutils.param_loader import get_ros_params
 import numpy as np
 
 """
-@@>Simulates the Navigation sensors of an AUV.<@@
+@@>Simulates the navigation sensors of an AUV using the output of the dynamics node.<@@
 """
 
 
@@ -48,7 +48,11 @@ class SimAUVNavSensors(object):
         # Get namespace and config
         self.ns = rospy.get_namespace()
         self.get_config()
-        self.simulate_altidude = True  # simulate until altitude received from simulator
+
+        # Initialize other vars
+        self.has_odom = False
+        self.has_old_odom = False
+        self.simulate_altidude = True  # Simulate until altitude received from simulator
         self.ned = NED(self.latitude, self.longitude, 0.0)  # NED frame
 
         # Set up diagnostics
@@ -57,22 +61,25 @@ class SimAUVNavSensors(object):
         self.diagnostic_dvl = DiagnosticHelper("dvl", "Simulated")
         self.diagnostic_imu = DiagnosticHelper("imu", "Simulated")
 
-        # Create publishers
-        self.pub_gps = rospy.Publisher(self.ns + 'navigator/gps', NavSatFix, queue_size=2)
-        self.pub_usbl = rospy.Publisher(self.ns + 'navigator/usbl', PoseWithCovarianceStamped, queue_size=2)
-        self.pub_depth = rospy.Publisher(self.ns + 'navigator/pressure', FluidPressure, queue_size=2)
-        self.pub_dvl = rospy.Publisher(self.ns + 'navigator/dvl', DVL, queue_size=2)
-        self.pub_altitude = rospy.Publisher(self.ns + 'navigator/altitude', Range, queue_size=2)
-        self.pub_imu = rospy.Publisher(self.ns + 'navigator/imu', Imu, queue_size=2)
-        self.pub_sound_vel = rospy.Publisher(self.ns + 'navigator/sound_velocity', Float32Stamped, queue_size=2)
-        self.pub_temperature = rospy.Publisher(
-            self.ns + 'valeport_sound_velocity/temperature', Temperature, queue_size=2)
+        # Create publishers according to period
+        if self.gps_period > 0:
+            self.pub_gps = rospy.Publisher(self.ns + 'navigator/gps', NavSatFix, queue_size=2)
+        if self.usbl_period > 0:
+            self.pub_usbl = rospy.Publisher(self.ns + 'navigator/usbl', PoseWithCovarianceStamped, queue_size=2)
+        if self.depth_period > 0:
+            self.pub_depth = rospy.Publisher(self.ns + 'navigator/pressure', FluidPressure, queue_size=2)
+            self.pub_sound_vel = rospy.Publisher(self.ns + 'navigator/sound_velocity', Float32Stamped, queue_size=2)
+            self.pub_temperature = rospy.Publisher(
+                self.ns + 'valeport_sound_velocity/temperature', Temperature, queue_size=2)
+        if self.dvl_period > 0:
+            self.pub_dvl = rospy.Publisher(self.ns + 'navigator/dvl', DVL, queue_size=2)
+            self.pub_altitude = rospy.Publisher(self.ns + 'navigator/altitude', Range, queue_size=2)
+        if self.imu_period > 0:
+            self.pub_imu = rospy.Publisher(self.ns + 'navigator/imu', Imu, queue_size=2)
 
-        # Create subscribers
-        # Odometry from dynamics to know where the vehicle is
-        self.has_odom = False
-        self.has_old_odom = False
+        # Odometry subscriber
         rospy.Subscriber(self.ns + 'dynamics/odometry', Odometry, self.update_odometry, queue_size=1)
+
         # Altitude from the simulator
         rospy.Subscriber(self.ns + 'dynamics/altitude', Range, self.update_altitude, queue_size=1)
 
@@ -112,9 +119,10 @@ class SimAUVNavSensors(object):
                 # All ok
                 found = True
             except Exception as e:
-                rospy.logfatal("cannot find all transforms")
-                rospy.logfatal(e.message)
-                exit(1)
+                rospy.logwarn("cannot find all transforms")
+                rospy.logwarn(e.message)
+                rospy.sleep(2.0)
+                #exit(1) This should not exit as sometimes not all tfs are available on the first run
 
         # Init simulated sensors
         if self.gps_period > 0:
@@ -128,13 +136,16 @@ class SimAUVNavSensors(object):
         if self.usbl_period > 0:
             rospy.Timer(rospy.Duration(self.usbl_period), self.publish_usbl)
 
+        # Display message
+        rospy.loginfo("initialized")
+
     def get_config(self):
         """Define and load all necessary parameters from ROS param server."""
         # Define params to load
         param_dict = {
             # absolutes
-            'latitude': (self.ns + "dynamics/ned_origin_latitude", 41.0),
-            'longitude': (self.ns + "dynamics/ned_origin_longitude", 3.0),
+            'latitude': (self.ns + "navigator/ned_latitude", 41.7777),
+            'longitude': (self.ns + "navigator/ned_longitude", 3.0333),
             'water_density': (self.ns + "navigator/water_density", 1030.0),
             # private
             'sea_bottom_depth': ("sea_bottom_depth", 1),
@@ -145,16 +156,16 @@ class SimAUVNavSensors(object):
             'imu_period': ("imu_period", 0.5),
             'usbl_period': ("usbl_period", 5.0),
             # cov
-            'gps_position_covariance': ("gps_position_covariance", 0.25),
+            'gps_position_covariance': ("gps_position_covariance", [0.25, 0.25]),
             'depth_pressure_covariance': ("depth_pressure_covariance", 0.01),
-            'dvl_velocity_covariance': ("dvl_velocity_covariance", 0.01),
-            'imu_orientation_covariance': ("imu_orientation_covariance", 0.01),
+            'dvl_velocity_covariance': ("dvl_velocity_covariance", [0.0015, 0.0015, 0.0015]),
+            'imu_orientation_covariance': ("imu_orientation_covariance", [0.0001, 0.0001, 0.0001]),
             'usbl_position_covariance': ("usbl_position_covariance", 0.5),
             # output cov
-            'output_gps_position_covariance': ("output_gps_position_covariance", 0.5),
+            'output_gps_position_covariance': ("output_gps_position_covariance", [0.5, 0.5]),
             'output_depth_pressure_covariance': ("output_depth_pressure_covariance", 0.1),
-            'output_dvl_velocity_covariance': ("output_dvl_velocity_covariance", 0.1),
-            'output_imu_orientation_covariance': ("output_imu_orientation_covariance", 0.1),
+            'output_dvl_velocity_covariance': ("output_dvl_velocity_covariance", [0.02, 0.02, 0.02]),
+            'output_imu_orientation_covariance': ("output_imu_orientation_covariance", [0.1, 0.1, 0.1]),
             'output_usbl_position_covariance': ("output_usbl_position_covariance", 3.0),
             # usbl start at depth bigger than
             'usbl_depth_start': ('usbl_depth_start', 4.0)}
@@ -163,12 +174,12 @@ class SimAUVNavSensors(object):
 
     def update_odometry(self, msg):
         """Get odometry from dynamics to know where the vehicle is."""
-        self.has_odom = True
         self.odom = msg
         self.rpy = tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x,
                                                              msg.pose.pose.orientation.y,
                                                              msg.pose.pose.orientation.z,
                                                              msg.pose.pose.orientation.w])
+        self.has_odom = True
 
     def update_altitude(self, msg):
         """If altitude is computed outside, stop computing our own."""
@@ -189,7 +200,9 @@ class SimAUVNavSensors(object):
         east = self.odom.pose.pose.position.y + np.random.normal(0.0, self.gps_position_covariance[1])
         ned = np.array([[north, east, 0.0]]).T
         # Transform to sensor
-        ned = self.tf_gps[1].dot(ned) + self.tf_gps[0]
+        rot = tf.transformations.euler_matrix(*self.rpy)[:3, :3]
+        gps_xyz = rot.dot(self.tf_gps[0])
+        ned = ned - np.array([[gps_xyz[0], gps_xyz[1], 0.0]]).T
         # Transform to lat lon
         lat, lon, _ = self.ned.ned2geodetic([ned[0], ned[1], 0.0])
         # Create message
@@ -230,11 +243,13 @@ class SimAUVNavSensors(object):
         if old.pose.pose.position.z < self.usbl_depth_start:
             return
         # Compute position with noise
-        north = old.pose.pose.position.x + np.random.normal(0.0, self.usbl_position_covariance[0])
-        east = old.pose.pose.position.y + np.random.normal(0.0, self.usbl_position_covariance[1])
+        north = old.pose.pose.position.x + np.random.normal(0.0, self.usbl_position_covariance)
+        east = old.pose.pose.position.y + np.random.normal(0.0, self.usbl_position_covariance)
         ned = np.array([[north, east, 0.0]]).T
         # Transform to sensor
-        ned = self.tf_usbl[1].dot(ned) + self.tf_usbl[0]
+        rot = tf.transformations.euler_matrix(*self.rpy)[:3, :3]
+        usbl_xyz = rot.dot(self.usbl[0])
+        ned = ned - np.array([[usbl_xyz[0], usbl_xyz[1], 0.0]]).T
         # Transform to lat lon
         lat, lon, _ = self.ned.ned2geodetic([ned[0], ned[1], 0.0])
         # Create message
@@ -244,8 +259,8 @@ class SimAUVNavSensors(object):
         usbl.pose.pose.position.x = lat
         usbl.pose.pose.position.y = lon
         usbl.pose.pose.position.z = 0.0
-        usbl.pose.covariance[0] = self.output_usbl_position_covariance[0]
-        usbl.pose.covariance[7] = self.output_usbl_position_covariance[1]
+        usbl.pose.covariance[0] = self.output_usbl_position_covariance
+        usbl.pose.covariance[7] = self.output_usbl_position_covariance
         # Publish
         self.pub_usbl.publish(usbl)
         # Diagnostic message
@@ -259,9 +274,9 @@ class SimAUVNavSensors(object):
         # Measurement
         rot = tf.transformations.euler_matrix(*self.rpy)[:3, :3]
         depth_xyz = rot.dot(self.tf_depth[0])
-        depth = self.odom.pose.pose.position.z - depth_xyz[2] + np.random.normal(0.0, self.depth_pressure_covariance)
+        depth = self.odom.pose.pose.position.z - depth_xyz[2]
         depth = max(depth, 0.01)
-        pressure = depth * self.water_density * 9.81  # pascals
+        pressure = depth * self.water_density * 9.80665 + np.random.normal(0.0, self.depth_pressure_covariance)
         # Pressure
         msg = FluidPressure()
         msg.header.stamp = event.current_real

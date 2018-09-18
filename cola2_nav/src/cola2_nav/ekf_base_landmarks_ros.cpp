@@ -49,6 +49,15 @@ EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size)
   pub_landmarks_ = nh_.advertise<visualization_msgs::MarkerArray>("markers/landmarks", 1);
   pub_altitude_ = nh_.advertise<sensor_msgs::Range>("altitude_filtered", 1);
 
+  // Service client to publish parameters
+  std::string publish_params_srv_name = cola2::rosutils::getNamespace() + "/param_logger/publish_params";
+  srv_publish_params_ = nh_.serviceClient<std_srvs::Trigger>(publish_params_srv_name);
+  while (ros::ok())
+  {
+    if (srv_publish_params_.waitForExistence(ros::Duration(5.0))) break;
+    ROS_INFO_STREAM("Waiting for client to service " << publish_params_srv_name);
+  }
+
   // Init services
   // clang-format off
   srv_reload_params_ = nh_.advertiseService("reload_params", &EKFBaseLandmarksROS::srvResetNavigation, this);
@@ -86,6 +95,7 @@ void EKFBaseLandmarksROS::resetFilter()
 {
   // Reset flags
   // general
+  init_depth_offset_ = false;
   init_ekf_ = false;
   init_ned_ = false;
   diag_help_.add("ekf_init", false);
@@ -294,16 +304,18 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
   // *****************************************
   // Check current freq
   diag_help_.add("freq", std::to_string(diag_help_.getCurrentFreq()));
-  if (diag_help_.getCurrentFreq() < config_.min_diagnostics_frequency_)
+  double freq = diag_help_.getCurrentFreq();
+  if (freq < config_.min_diagnostics_frequency_)
   {
     is_nav_data_ok = false;
-    ROS_FATAL("Diagnostics frequency too low");
+    ROS_WARN_STREAM("Diagnostics frequency too low (" << freq << " lower than " <<
+                    config_.min_diagnostics_frequency_ << ")");
   }
   // If filter or NED not initialized set to Warning
   if (!init_ekf_)
   {
     is_nav_data_ok = false;
-    ROS_FATAL("EKF not yet init");
+    //ROS_FATAL("EKF not yet init");
   }
   else
   {
@@ -312,7 +324,7 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
   if (!init_ned_)
   {
     is_nav_data_ok = false;
-    ROS_FATAL("NED not yet init");
+    //ROS_FATAL("NED not yet init");
   }
   else
   {
@@ -338,35 +350,44 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
   diag_help_.add("imu_init", init_imu_);
 
   // *****************************************
-  // Output to console
+  // Init console output
   // *****************************************
+  if (!init_ekf_)
+  {
+    ROS_WARN("EKF not initialized");
+  }
   if (config_.use_dvl_data_ && !init_dvl_)
   {
-    ROS_FATAL("DVL not initialized");
+    ROS_WARN("DVL not initialized");
   }
   if (config_.use_depth_data_ && !init_depth_)
   {
-    ROS_FATAL("Depth not initialized");
+    ROS_WARN("Depth not initialized");
   }
   if (config_.use_gps_data_ && !init_gps_)
   {
-    ROS_FATAL("GPS not initialized");
+    ROS_WARN("GPS not initialized");
   }
   if (!init_imu_)
   {
-    ROS_FATAL("IMU not initialized");
-  }
-  if (!init_ekf_)
-  {
-    ROS_FATAL("EKF not initialized");
+    ROS_WARN("IMU not initialized");
   }
   if (!init_ned_)
   {
-    ROS_FATAL("NED not initialized");
+    ROS_WARN("NED not initialized");
   }
+
+  // Nav data ok console output
   if (!is_nav_data_ok)
   {
-    ROS_FATAL("Missing NAV data");
+    if (init_ekf_)
+    {
+      ROS_FATAL("Missing NAV data");
+    }
+    else
+    {
+      ROS_WARN("Missing NAV data");
+    }
   }
 }
 
@@ -378,7 +399,7 @@ void EKFBaseLandmarksROS::updatePositionGPSMsg(const sensor_msgs::NavSatFix& msg
     return;
   }
   // Valid measurement
-  if ((msg.status.status >= msg.status.STATUS_FIX) && (msg.position_covariance[0] < 4.0))
+  if ((msg.status.status >= msg.status.STATUS_FIX) && (msg.position_covariance[0] < 10.0))  // TODO: 10.0 --> 4.0
   {
     // Diagnostics
     diag_help_.increaseFrequencyCounter();
@@ -389,11 +410,12 @@ void EKFBaseLandmarksROS::updatePositionGPSMsg(const sensor_msgs::NavSatFix& msg
     if (gps_samples_ >= static_cast<size_t>(config_.gps_samples_to_init_))
     {
       // Init depth offset
-      if (!init_ned_ && config_.initialize_depth_sensor_offset_)
+      if (!init_depth_offset_ && config_.initialize_depth_sensor_offset_)
       {
         std_srvs::Empty::Request req;
         std_srvs::Empty::Response res;
         srvSetDepthSensorOffset(req, res);
+        init_depth_offset_ = true;
       }
       // Init NED if necessary
       if (!init_ned_ && config_.initialize_ned_from_gps_)
@@ -419,7 +441,7 @@ void EKFBaseLandmarksROS::updatePositionGPSMsg(const sensor_msgs::NavSatFix& msg
       cov = transforms::positionCovariance(cov, getOrientationUncertainty(), getOrientation(), trans.translation());
       // Predict and update
       const double tim = msg.header.stamp.toSec();
-      if (!init_ekf_ || makePrediction(tim))
+      if (makePrediction(tim) || !init_ekf_)
       {
         // Debug
         if (config_.enable_debug_)
@@ -469,7 +491,7 @@ void EKFBaseLandmarksROS::updatePositionUSBLMsg(const geometry_msgs::PoseWithCov
     if (position_increment(0) >= 0.0)
     {
       // Current time
-      const ros::Time current_time = msg.header.stamp + ros::Duration(position_increment[0]);
+      const ros::Time current_time(msg.header.stamp.toSec() + position_increment(0));
       // Construct measurement
       const Eigen::Vector3d latlonh(msg.pose.pose.position.x, msg.pose.pose.position.y, 0.0);
       Eigen::Vector3d ned = ned_.geodetic2Ned(latlonh);
@@ -494,7 +516,7 @@ void EKFBaseLandmarksROS::updatePositionUSBLMsg(const geometry_msgs::PoseWithCov
       cov = transforms::positionCovariance(cov, getOrientationUncertainty(), getOrientation(), trans.translation());
       // Predict and update
       const double tim = current_time.toSec();
-      if (!init_ekf_ || makePrediction(tim))
+      if (makePrediction(tim) || !init_ekf_)
       {
         // Debug
         if (config_.enable_debug_)
@@ -523,7 +545,7 @@ void EKFBaseLandmarksROS::updatePositionDepthMsg(const sensor_msgs::FluidPressur
     // Construct measurement
     Eigen::Vector3d xyz(0.0, 0.0, meters + config_.depth_sensor_offset_);
     Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
-    cov(2, 2) = msg.variance;
+    cov(2, 2) = msg.variance / (config_.water_density_ * 9.81);  // variance pascals to meters
     // Transform to vehicle frame
     Eigen::Affine3d trans;
     if (!tf_handler_.getTransform(msg.header.frame_id, trans))
@@ -534,7 +556,7 @@ void EKFBaseLandmarksROS::updatePositionDepthMsg(const sensor_msgs::FluidPressur
     cov = transforms::positionCovariance(cov, getOrientationUncertainty(), getOrientation(), trans.translation());
     // Predict and update
     const double tim = msg.header.stamp.toSec();
-    if (!init_ekf_ || makePrediction(tim))
+    if (makePrediction(tim) || !init_ekf_)
     {
       // Debug
       if (config_.enable_debug_)
@@ -581,7 +603,7 @@ void EKFBaseLandmarksROS::updateVelocityDVLMsg(const cola2_msgs::DVL& msg)
     cov = transforms::positionCovariance(cov, getAngularVelocityUncertainty(), quat, trans.translation());
     // Predict and update
     const double tim = msg.header.stamp.toSec();
-    if (!init_ekf_ || makePrediction(tim))
+    if (makePrediction(tim) || !init_ekf_)
     {
       // Debug
       if (config_.enable_debug_)
@@ -629,7 +651,7 @@ void EKFBaseLandmarksROS::updateIMUMsg(const sensor_msgs::Imu& msg)
   ang_vel = transforms::angularVelocity(ang_vel, quat);  // transform angular velocity
   // Predict and update
   const double tim = msg.header.stamp.toSec();
-  if (!init_ekf_ || makePrediction(tim))
+  if (makePrediction(tim) || !init_ekf_)
   {
     // Debug
     if (config_.enable_debug_)
@@ -1115,9 +1137,17 @@ bool EKFBaseLandmarksROS::srvResetLandmarks(std_srvs::Empty::Request&, std_srvs:
 
 bool EKFBaseLandmarksROS::srvResetNavigation(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
 {
-  ROS_INFO("Reset navigation service called");
+  ROS_INFO("Reset navigation or reload params service called");
   getConfig();
   resetFilter();
+
+  // Publish params after param reload
+  std_srvs::Trigger trigger;
+  srv_publish_params_.call(trigger);
+  if (!trigger.response.success)
+  {
+    ROS_WARN_STREAM("Publish params did not succeed -> " << trigger.response.message);
+  }
   return true;
 }
 

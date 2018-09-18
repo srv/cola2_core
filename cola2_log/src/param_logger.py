@@ -9,31 +9,28 @@
 
 """@@>Publishes all parameters in a topic for logging/debugging purposes.<@@"""
 
+import os
 import rospy
 import rosparam
 from std_msgs.msg import String
-import os
-import sys
+from std_srvs.srv import Trigger, TriggerResponse
 
 
 class ParamLoggerNode(object):
     """Log all parameters in rosparam to a topic or to a file."""
 
-    def __init__(self, path):
+    def __init__(self):
         """Constructor."""
-        # save path
-        self.path = path
-        rospy.loginfo("save params path: " + self.path)
         # init node
         rospy.init_node('param_logger')
-        # publisher, timer and service
+        # publisher and service
         self.pub = rospy.Publisher('~params_string', String, queue_size=1, latch=True)
-        self.tim = rospy.Timer(rospy.Duration(10.0 * 60.0), self.callback)
+        self.srv = rospy.Service('~publish_params', Trigger, self.srv_publish)
         # call it once at begining
-        self.callback(None)
+        self.publish()
 
-    def callback(self, dummy_event):
-        """Callback to collect all parameters."""
+    def publish(self):
+        """Publish all collected parameters."""
         # Dump to temp file
         rosparam.dump_params("temp.yaml", "/")
         # Read file into a string message
@@ -43,13 +40,20 @@ class ParamLoggerNode(object):
         # Delete temp file
         os.remove("temp.yaml")
 
+    def srv_publish(self, req):
+        """Publish params when service is called."""
+        # debug info
+        srv = req._connection_header['service']
+        who = req._connection_header['callerid']
+        rospy.loginfo("service: '{:s}' called from '{:s}'".format(srv, who))
+        # publish
+        self.publish()
+        # return response
+        return TriggerResponse(True, "parameters published")
+
 
 if __name__ == '__main__':
-    # check imput arguments
-    path = "."
-    if len(sys.argv) > 1:
-        path = sys.argv[1]
     # init node
-    ParamLoggerNode(path)
+    ParamLoggerNode()
     # keep running
     rospy.spin()

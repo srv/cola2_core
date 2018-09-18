@@ -30,6 +30,7 @@
 #include <visualization_msgs/MarkerArray.h>    // landmark visualization
 // services
 #include <std_srvs/Empty.h>
+#include <std_srvs/Trigger.h>
 // all
 #include <cola2_lib/rosutils/diagnostic_helper.h>
 #include <cola2_lib/rosutils/param_loader.h>
@@ -84,6 +85,7 @@ private:
   ros::ServiceServer srv_reset_navigation_;         //!< realoads params and sets the filter to initial state
   ros::ServiceServer srv_reset_landmarks_;          //!< deteletes all landmarks from filter
   ros::ServiceServer srv_set_depth_sensor_offset_;  //!< compute the depth sensor offset
+  ros::ServiceClient srv_publish_params_;
 
   // Status
   double pressure_meters_ = 0.0;    //!< last measured pressure
@@ -115,12 +117,13 @@ protected:
   ros::NodeHandle nh_ = ros::NodeHandle("~");  // ROS node handler
 
   // Init flags
-  bool init_gps_ = false;    //!< init sensor gps
-  bool init_depth_ = false;  //!< init sensor depth
-  bool init_dvl_ = false;    //!< init sensor dvl
-  bool init_imu_ = false;    //!< init sensor imu
-  bool init_ned_ = false;    //!< init NED
-  bool ned_error_ = false;   //!< not enough good smaples to init NED from GPS
+  bool init_depth_offset_ = false;  //!< init depth offset
+  bool init_gps_ = false;           //!< init sensor gps
+  bool init_depth_ = false;         //!< init sensor depth
+  bool init_dvl_ = false;           //!< init sensor dvl
+  bool init_imu_ = false;           //!< init sensor imu
+  bool init_ned_ = false;           //!< init NED
+  bool ned_error_ = false;          //!< not enough good smaples to init NED from GPS
 
   // Diagnostics
   cola2::rosutils::DiagnosticHelper diag_help_;  //!< ease publishing diagnostics

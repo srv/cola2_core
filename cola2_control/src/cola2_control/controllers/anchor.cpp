@@ -105,4 +105,8 @@ void AnchorController::compute(const control::State& current_state, const contro
   else
     final_point.z = waypoint.position.depth;
   marker.points_list.push_back(final_point);
+
+  // Set success to false so that the pilot does not stop keeping position
+  // until the timeout expires
+  feedback.success = false;
 }

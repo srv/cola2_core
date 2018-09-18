@@ -4,6 +4,10 @@
 # This file is subject to the terms and conditions defined in file
 # 'LICENSE.txt', which is part of this source code package.
 
+"""
+@@>This node subscribes to the aggregated diagnostics and publishes a vehicle status message.<@@
+"""
+
 import rospy
 from std_msgs.msg import Bool
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus
@@ -39,6 +43,23 @@ class VehicleStatusParser:
         # Create Publisher
         self.pub_vehicle_sts = rospy.Publisher(namespace + "vehicle_status", VehicleStatus, queue_size=1)
 
+        # Initialize battery data
+        self.status.battery_charge  = 100.0
+        self.status.battery_voltage = 32.0  # Which value do I put? This should not be here...
+        self.last_battery_charge  = rospy.Time.now()
+        self.last_battery_voltage = rospy.Time.now()
+
+        # Check time since last water inside data
+        self.last_water_inside = rospy.Time.now()
+
+        # Initialize temperature vector
+        self.status.temperature = [-1000.0] * len(self.temperature_name)
+        t = rospy.Time.now()
+        self.last_temperature = [t] * len(self.temperature_name)
+
+        # Initialize water vector
+        self.water = [False] * len(self.diag_water)
+
         # Subscriber
         rospy.Subscriber(namespace + "diagnostics_agg",
                          DiagnosticArray,
@@ -59,14 +80,6 @@ class VehicleStatusParser:
                          NavSts,
                          self.update_nav_sts,
                          queue_size=1)
-
-        # Initialize temperature vector
-        self.status.temperature = [-1000.0] * len(self.temperature_name)
-        t = rospy.Time.now()
-        self.last_temperature = [t] * len(self.temperature_name)
-
-        # Initialize water vector
-        self.water = [False] * len(self.diag_water)
 
     def update_timeout(self, watchdog_msg):
         """Update timeout in vehicle status."""
@@ -103,8 +116,8 @@ class VehicleStatusParser:
 
     def update_diagnostics(self, diagnostics):
         """ Check diagnostics messages to fill vehicle status."""
+        dt = rospy.Duration(secs=20.0)
         for status in diagnostics.status:
-
             # Get thrusters status
             if __getDiagnostic__(status, self.diag_thrusters_enabled[0]):
                 if __getDiagnostic__(status, self.diag_thrusters_enabled[0], self.diag_thrusters_enabled[1], 'False') == 'True':
@@ -121,13 +134,17 @@ class VehicleStatusParser:
 
             # Get battery charge
             if __getDiagnostic__(status, self.diag_battery_charge[0]):
-                charge = float(__getDiagnostic__(status, self.diag_battery_charge[0], self.diag_battery_charge[1], 100.0))
-                self.status.battery_charge = charge
+                self.status.battery_charge = float(__getDiagnostic__(status, self.diag_battery_charge[0], self.diag_battery_charge[1], 100.0))
+                self.last_battery_charge = rospy.Time.now()
+            if (rospy.Time.now() - self.last_battery_charge) > dt:
+                self.status.battery_charge = 0.0
 
             # Get battery voltage
             if __getDiagnostic__(status, self.diag_battery_voltage[0]):
-                voltage = float(__getDiagnostic__(status, self.diag_battery_voltage[0], self.diag_battery_voltage[1], 100.0))
-                self.status.battery_voltage = voltage
+                self.status.battery_voltage = float(__getDiagnostic__(status, self.diag_battery_voltage[0], self.diag_battery_voltage[1], 100.0))
+                self.last_battery_voltage = rospy.Time.now()
+            if (rospy.Time.now() - self.last_battery_voltage) > dt:
+                self.status.battery_charge = 0.0
 
             # Get IMU data age
             if __getDiagnostic__(status, self.diag_imu_data_age[0]):
@@ -193,25 +210,24 @@ class VehicleStatusParser:
                 self.status.modem_data_age = modem_age
 
             # Temperatures
-            dt = rospy.Duration(secs=20.0)
             for i in range(0, len(self.diag_temperature)):
                 if __getDiagnostic__(status, self.diag_temperature[i][0]):
-                    temp = float(__getDiagnostic__(status, self.diag_temperature[i][0], self.diag_temperature[i][1], 0.0))
-                    if (rospy.Time.now() - self.last_temperature[i]) > dt:
-                        self.status.temperature[i] = -1000
-                    else:
-                        self.status.temperature[i] = temp
+                    self.status.temperature[i] = float(__getDiagnostic__(status, self.diag_temperature[i][0], self.diag_temperature[i][1], 0.0))
                     self.last_temperature[i] = rospy.Time.now()
+	        if (rospy.Time.now() - self.last_temperature[i]) > dt:
+	            self.status.temperature[i] = -1000
 
             # Water inside
             for i in range(0, len(self.diag_water)):
                 if __getDiagnostic__(status, self.diag_water[i][0]):
                     self.water[i] = __getDiagnostic__(status, self.diag_water[i][0], self.diag_water[i][1], 'False') == 'True'
-
+                    self.last_water_inside = rospy.Time.now()
             if any(self.water):
                 self.status.water_detected = True
             else:
                 self.status.water_detected = False
+            if (rospy.Time.now() - self.last_water_inside) > dt:
+                self.status.water_detected = True
 
         # Publish status message
         self.status.header.stamp = rospy.Time.now()
@@ -247,6 +263,8 @@ class VehicleStatusParser:
 
 
 def __getDiagnostic__(status, name, key='none', default=0.0):
+    if status.level == DiagnosticStatus.STALE:
+        return False
     if status.name == name:
         if key != 'none':
             return __getValue__(status.values, key, default)

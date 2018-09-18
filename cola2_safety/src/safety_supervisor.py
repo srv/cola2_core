@@ -4,11 +4,7 @@
 # This file is subject to the terms and conditions defined in file
 # 'LICENSE.txt', which is part of this source code package.
 
-"""@@> The diagnostics supervisor receives the vehicle status message and applies a set of rules aimed at detecting
-    errors in the system (low battery level, detection from water leak sensors, etc.).
-    These rules are based on the configuration values set on the safety.yaml file of the vehicles.
-    If any of the rule checks is triggered, the diagnostics supervisor calls a recovery action,
-    which acts appropriately depending on the type of error.<@@"""
+"""@@> The diagnostics supervisor receives the vehicle status message and applies a set of rules aimed at detecting errors in the system (low battery level, detection from water leak sensors, etc.). These rules are based on the configuration values set on the safety.yaml file of the vehicles. If any of the rule checks is triggered, the diagnostics supervisor calls a recovery action, which acts appropriately depending on the type of error.<@@"""
 """
 Created on 02/19/2015
 Modified 11/2016
@@ -20,6 +16,7 @@ Modified 11/2017
 import rospy
 import dynamic_reconfigure.client
 from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
+from std_srvs.srv import Trigger, TriggerRequest, TriggerResponse
 from diagnostic_msgs.msg import DiagnosticStatus
 from cola2_msgs.msg import RecoveryAction, VehicleStatus, SafetySupervisorStatus
 from cola2_msgs.srv import Recovery, RecoveryRequest
@@ -75,22 +72,24 @@ class SafetySupervisor(object):
         self.pub_safety_supervisor_state = rospy.Publisher(rospy.get_name() + '/status',
                                                            SafetySupervisorStatus, queue_size=2)
 
-        # Init Service Clients
+        # Service client for recovery actions
         ns = rospy.get_namespace()
         try:
             rospy.wait_for_service(ns + 'recovery_actions/recover', 20)
             self.recover_action_srv = rospy.ServiceProxy(ns + 'recovery_actions/recover', Recovery)
         except rospy.exceptions.ROSException:
-            rospy.logerr('%s, Error creating client to recovery action.', self.name)
+            rospy.logerr('Error creating client to recovery action.')
             rospy.signal_shutdown('Error creating recover action client')
 
-        try:
-            rospy.wait_for_service(ns + 'cola2_watchdog/reset_timeout', 20)
-            self.reset_timeout_srv = rospy.ServiceProxy(
-                        ns + 'cola2_watchdog/reset_timeout', Empty)
-        except rospy.exceptions.ROSException:
-            rospy.logerr('%s, Error creating client to reset timeout.', self.name)
-            rospy.signal_shutdown('Error creating reset timeout client')
+        # Service client to publish parameters
+        publish_params_srv_name = ns + 'param_logger/publish_params'
+        while not rospy.is_shutdown():
+            try:
+                rospy.wait_for_service(publish_params_srv_name, 5)
+                self.publish_params_srv = rospy.ServiceProxy(publish_params_srv_name, Trigger)
+                break
+            except rospy.exceptions.ROSException:
+                rospy.loginfo('Waiting for client to service %s', publish_params_srv_name)
 
         # Subscriber
         rospy.Subscriber(ns + "vehicle_status",
@@ -105,15 +104,20 @@ class SafetySupervisor(object):
                          queue_size=1)
 
         # Create service to reload safety parameters
-        self.reload_params_srv = rospy.Service(rospy.get_name() + '/reload_safety_params',
+        self.reload_params_srv = rospy.Service(rospy.get_name() + '/reload_params',
                                                Empty,
                                                self.reload_params_srv)
-        rospy.loginfo('%s: initialized', self.name)
+        rospy.loginfo('Initialized')
 
     def reload_params_srv(self, req):
         """ Callback of reload params service """
-        rospy.loginfo('%s: received reload params service', self.name)
+        rospy.loginfo('Received reload params service')
         self.get_config()
+
+        req = TriggerRequest()
+        res = self.publish_params_srv(req)
+        if not res.success:
+            rospy.logwarn('Publish params did not succeed -> %s', res.message)
         return EmptyResponse()
 
     def compute_error_byte(self, current_step):
@@ -128,7 +132,7 @@ class SafetySupervisor(object):
 
     def external_recovery_action(self, recovery_action):
         """ Callback for external recovery action subscriber """
-        rospy.loginfo("%s: external recovery action received", self.name)
+        rospy.loginfo("External recovery action received")
         self.ra_msg = recovery_action
         self.old_level = recovery_action.error_level
         self.old_str_err = recovery_action.error_string
@@ -165,7 +169,7 @@ class SafetySupervisor(object):
         last_imu = vehicle_status.imu_data_age
         self.diagnostic.add('last_imu_data', str(last_imu))
         if last_imu > self.min_imu_update:
-            rospy.logerr("%s: No IMU data since %s", self.name, str(last_imu))
+            rospy.logerr("No IMU data since %s", str(last_imu))
             self.error_code[ErrorCode.NAV_STS_ERROR] = '1'
             self.call_recovery_action("No IMU data!", RecoveryAction.ABORT_AND_SURFACE)
 
@@ -180,7 +184,7 @@ class SafetySupervisor(object):
         last_altitude = vehicle_status.altitude_data_age
         self.diagnostic.add('last_altitude_data', str(last_altitude))
         if last_altitude > self.min_altitude_update:
-            rospy.logerr("%s: last_altiude %s/%s", self.name, str(last_altitude), str(self.min_altitude_update))
+            rospy.logerr("last_altiude %s/%s", str(last_altitude), str(self.min_altitude_update))
             self.error_code[ErrorCode.NAV_STS_ERROR] = '1'
             self.call_recovery_action("No Altitude data!", RecoveryAction.ABORT_AND_SURFACE)
 
@@ -213,7 +217,7 @@ class SafetySupervisor(object):
                 self.error_code[ErrorCode.INTERNAL_SENSORS_WARNING] = '0'
                 self.call_recovery_action("No WiFi data!", RecoveryAction.ABORT_AND_SURFACE)
         else:
-            #rospy.loginfo("%s: A mission is active. WiFi timeout disabled.", self.name)
+            #rospy.loginfo("A mission is active. WiFi timeout disabled.")
             self.diagnostic.add('last_ack', 'Mission active')
 
         # Rule: No Modem data
@@ -323,7 +327,7 @@ class SafetySupervisor(object):
                                           "max_depth": self.max_depth})
 
         except rospy.exceptions.ROSException:
-            rospy.logerr('%s, Error modifying safe_depth_altitude params.', self.name)
+            rospy.logerr('Error modifying safe_depth_altitude params.')
 
         # Dynamic reconfigure for defining virtual cage limits
         try:
@@ -334,8 +338,7 @@ class SafetySupervisor(object):
                                           "east_longitude": self.working_area_east_length,
                                           "enable": True})
         except rospy.exceptions.ROSException:
-            rospy.logerr('%s, Error modifying virtual_cage params.',
-                         self.name)
+            rospy.logerr('Error modifying virtual_cage params.')
 
     def call_recovery_action(self, str_err="Error!", level=RecoveryAction.INFORMATIVE):
         """
@@ -350,13 +353,13 @@ class SafetySupervisor(object):
                 self.ra_msg.header.stamp = rospy.Time.now()
                 self.ra_msg.error_level = level
                 self.ra_msg.error_string = str_err
-            rospy.logerr("%s: %s", self.name, str_err)
+            rospy.logerr("%s", str_err)
             req = RecoveryRequest()
             ra = RecoveryAction()
             ra.error_level = level
             req.requested_action = ra
             ans = self.recover_action_srv(req)
-            rospy.logerr("%s: Recovery action called --> %s", self.name, ans)
+            rospy.logerr("Recovery action called --> %s", ans)
             # Save last called action
             self.old_level = level
             self.old_str_err = str_err

@@ -183,7 +183,12 @@ bool EKFSurface2D::updateOrientationRate(const double t, const Eigen::Vector3d& 
   // Update (used as true reading)
   ang_vel_ = rate;
   ang_vel_cov_ = cov;
-  return true;
+  // Üpdate
+  const unsigned int size = state_vector_size_;
+  const Eigen::Vector1d h = x_.tail(1);
+  Eigen::MatrixXd H = Eigen::MatrixXd::Zero(1, size);
+  H(0, 5) = 1;
+  return applyUpdate(rate.tail(1) - h, H, cov.bottomRightCorner(1, 1), Eigen::Matrix1d::Identity(), 16.0);
 }
 
 bool EKFSurface2D::updateLandmarkMeasure(const double, const Eigen::Vector3d&, const Eigen::Vector3d&,

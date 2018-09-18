@@ -13,7 +13,7 @@
  *      Author: Eduard
  */
 
-/*@@>This node is used to drive the AUV from a linux terminal using keyboard commands.<@@*/
+/*@@>This node is used to drive the AUV from a unix terminal using keyboard commands.<@@*/
 
 #include "ros/ros.h"
 #include "std_msgs/String.h"

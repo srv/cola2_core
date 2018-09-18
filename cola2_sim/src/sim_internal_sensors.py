@@ -4,6 +4,10 @@
 # This file is subject to the terms and conditions defined in file
 # 'LICENSE.txt', which is part of this source code package.
 
+"""
+@@>This node simulates the batteries (e.g. decaying battery charge) and different diagnostics from internal sensors (water sensors, temperature, etc).<@@
+"""
+
 # ROS imports
 import rospy
 
@@ -128,7 +132,7 @@ class SimSensorsGirona500:
 
         battery_msg = BatteryState()
         battery_msg.header.stamp = rospy.Time.now()
-        battery_msg.voltage = 15.6
+        battery_msg.voltage = 30.6
         battery_msg.current = -30.02
         battery_msg.charge = self.battery_level
         battery_msg.capacity = float('nan')
