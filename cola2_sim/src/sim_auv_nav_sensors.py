@@ -248,7 +248,7 @@ class SimAUVNavSensors(object):
         ned = np.array([[north, east, 0.0]]).T
         # Transform to sensor
         rot = tf.transformations.euler_matrix(*self.rpy)[:3, :3]
-        usbl_xyz = rot.dot(self.usbl[0])
+        usbl_xyz = rot.dot(self.tf_usbl[0])
         ned = ned - np.array([[usbl_xyz[0], usbl_xyz[1], 0.0]]).T
         # Transform to lat lon
         lat, lon, _ = self.ned.ned2geodetic([ned[0], ned[1], 0.0])
