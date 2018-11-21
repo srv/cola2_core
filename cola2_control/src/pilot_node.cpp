@@ -355,6 +355,7 @@ void Pilot::sectionServerCallback(const cola2_msgs::WorldSectionGoalConstPtr& da
   section.tolerance.y = data->tolerance.y;
   section.tolerance.z = data->tolerance.z;
   section.surge_velocity = data->surge_velocity;
+  section.timeout = data->timeout;
 
   // Main loop
   double init_time = ros::Time::now().toSec();

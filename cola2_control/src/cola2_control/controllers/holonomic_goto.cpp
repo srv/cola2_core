@@ -23,18 +23,32 @@ void HolonomicGotoController::compute(const control::State& current_state, const
                                       control::PointsList& marker)
 {
   // Set all axis as disabled by default
-  controller_output.pose.disable_axis.x = true;
-  controller_output.pose.disable_axis.y = true;
-  controller_output.pose.disable_axis.z = true;
-  controller_output.pose.disable_axis.roll = true;
+  controller_output.pose.disable_axis.x     = true;
+  controller_output.pose.disable_axis.y     = true;
+  controller_output.pose.disable_axis.z     = true;
+  controller_output.pose.disable_axis.roll  = true;
   controller_output.pose.disable_axis.pitch = true;
-  controller_output.pose.disable_axis.yaw = true;
-  controller_output.velocity.disable_axis.x = true;
-  controller_output.velocity.disable_axis.y = true;
-  controller_output.velocity.disable_axis.z = true;
-  controller_output.velocity.disable_axis.roll = true;
+  controller_output.pose.disable_axis.yaw   = true;
+  controller_output.velocity.disable_axis.x     = true;
+  controller_output.velocity.disable_axis.y     = true;
+  controller_output.velocity.disable_axis.z     = true;
+  controller_output.velocity.disable_axis.roll  = true;
   controller_output.velocity.disable_axis.pitch = true;
-  controller_output.velocity.disable_axis.yaw = true;
+  controller_output.velocity.disable_axis.yaw   = true;
+
+  // Set variables to zero
+  controller_output.pose.position.north    = 0.0;
+  controller_output.pose.position.east     = 0.0;
+  controller_output.pose.position.depth    = 0.0;
+  controller_output.pose.orientation.roll  = 0.0;
+  controller_output.pose.orientation.pitch = 0.0;
+  controller_output.pose.orientation.yaw   = 0.0;
+  controller_output.velocity.linear.x  = 0.0;
+  controller_output.velocity.linear.y  = 0.0;
+  controller_output.velocity.linear.z  = 0.0;
+  controller_output.velocity.angular.x = 0.0;
+  controller_output.velocity.angular.y = 0.0;
+  controller_output.velocity.angular.z = 0.0;
 
   // Take desired and current Z
   double desired_z = waypoint.position.depth;
@@ -44,24 +58,28 @@ void HolonomicGotoController::compute(const control::State& current_state, const
     desired_z = waypoint.altitude;
     current_z = current_state.pose.altitude;
   }
+
   // If necessary, check if final position X, Y is reached
   feedback.success = true;
   if (!waypoint.disable_axis.x)
-  {  // X-Y tolerance must be checked
-    if (fabs(current_state.pose.position.north - waypoint.position.north) >= waypoint.position_tolerance.x ||
-        fabs(current_state.pose.position.east - waypoint.position.east) >= waypoint.position_tolerance.y)
+  {
+    // X-Y tolerance must be checked
+    if (std::fabs(current_state.pose.position.north - waypoint.position.north) >= waypoint.position_tolerance.x ||
+        std::fabs(current_state.pose.position.east - waypoint.position.east) >= waypoint.position_tolerance.y)
     {
       feedback.success = false;
     }
   }
+
   // If necessary, check if final position Z is reached
-  if (!waypoint.disable_axis.z && fabs(current_z - desired_z) >= waypoint.position_tolerance.z)
+  if (!waypoint.disable_axis.z && std::fabs(current_z - desired_z) >= waypoint.position_tolerance.z)
   {
     feedback.success = false;
   }
+
   // If necessary, check if final angle yaw is reached
   if (!waypoint.disable_axis.yaw &&
-      fabs(cola2::utils::wrapAngle(current_state.pose.orientation.yaw - waypoint.orientation.yaw)) >=
+      std::fabs(cola2::utils::wrapAngle(current_state.pose.orientation.yaw - waypoint.orientation.yaw)) >=
           waypoint.orientation_tolerance.yaw)
   {
     feedback.success = false;
@@ -76,7 +94,6 @@ void HolonomicGotoController::compute(const control::State& current_state, const
     controller_output.pose.position.depth = waypoint.position.depth;
     controller_output.pose.disable_axis.z = false;
     feedback.desired_depth = desired_z;
-    // std::cout << "Desired Z: " << section.final_position.z << "\n";
   }
 
   // If X-Y motion is enabled
@@ -98,8 +115,8 @@ void HolonomicGotoController::compute(const control::State& current_state, const
   }
 
   // Fill additional feedback vars
-  feedback.distance_to_end = sqrt(pow(current_state.pose.position.north - waypoint.position.north, 2) +
-                                  pow(current_state.pose.position.east - waypoint.position.east, 2));
+  feedback.distance_to_end = std::sqrt(std::pow(current_state.pose.position.north - waypoint.position.north, 2) +
+                                       std::pow(current_state.pose.position.east - waypoint.position.east, 2));
 
   // Fill marker
   control::Point initial_point;
@@ -114,4 +131,3 @@ void HolonomicGotoController::compute(const control::State& current_state, const
   final_point.z = waypoint.position.depth;
   marker.points_list.push_back(final_point);
 }
-

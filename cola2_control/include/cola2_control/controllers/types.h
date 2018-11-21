@@ -96,12 +96,12 @@ namespace control
     control::Point linear_velocity;
     control::RPY angular_velocity;
     unsigned int controller_type;
-    unsigned int timeout;
+    double timeout;
     control::Vector6d disable_axis;
     bool keep_position;
     Waypoint(): requester(d_string), priority(d_uint),
                 altitude_mode(d_bool), altitude(d_double),
-                controller_type(d_uint), timeout(d_uint),
+                controller_type(d_uint), timeout(d_double),
                 keep_position(d_bool) {}
   };
 
@@ -114,8 +114,9 @@ namespace control
     bool disable_z;
     control::Point tolerance;
     double surge_velocity;
+    double timeout;
     Section(): altitude_mode(d_bool), disable_z(d_bool),
-               surge_velocity(d_double) {}
+               surge_velocity(d_double), timeout(d_double) {}
   };
 
   class Pose

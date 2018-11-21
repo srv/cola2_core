@@ -4,11 +4,17 @@
  * This file is subject to the terms and conditions defined in file
  * 'LICENSE.txt', which is part of this source code package.
  */
+
 #include <cola2_control/controllers/goto.h>
 
 // Constructor
 GotoController::GotoController(GotoControllerConfig config) : config_(config)
 {
+}
+
+void GotoController::setConfig(const GotoControllerConfig& config)
+{
+  config_ = config;
 }
 
 // Compute Method
@@ -17,38 +23,52 @@ void GotoController::compute(const control::State& current_state, const control:
                              control::PointsList& marker)
 {
   // Set all axis as disabled by default
-  controller_output.pose.disable_axis.x = true;
-  controller_output.pose.disable_axis.y = true;
-  controller_output.pose.disable_axis.z = true;
-  controller_output.pose.disable_axis.roll = true;
+  controller_output.pose.disable_axis.x     = true;
+  controller_output.pose.disable_axis.y     = true;
+  controller_output.pose.disable_axis.z     = true;
+  controller_output.pose.disable_axis.roll  = true;
   controller_output.pose.disable_axis.pitch = true;
-  controller_output.pose.disable_axis.yaw = true;
-  controller_output.velocity.disable_axis.x = true;
-  controller_output.velocity.disable_axis.y = true;
-  controller_output.velocity.disable_axis.z = true;
-  controller_output.velocity.disable_axis.roll = true;
+  controller_output.pose.disable_axis.yaw   = true;
+  controller_output.velocity.disable_axis.x     = true;
+  controller_output.velocity.disable_axis.y     = true;
+  controller_output.velocity.disable_axis.z     = true;
+  controller_output.velocity.disable_axis.roll  = true;
   controller_output.velocity.disable_axis.pitch = true;
-  controller_output.velocity.disable_axis.yaw = true;
+  controller_output.velocity.disable_axis.yaw   = true;
+
+  // Set variables to zero
+  controller_output.pose.position.north    = 0.0;
+  controller_output.pose.position.east     = 0.0;
+  controller_output.pose.position.depth    = 0.0;
+  controller_output.pose.orientation.roll  = 0.0;
+  controller_output.pose.orientation.pitch = 0.0;
+  controller_output.pose.orientation.yaw   = 0.0;
+  controller_output.velocity.linear.x  = 0.0;
+  controller_output.velocity.linear.y  = 0.0;
+  controller_output.velocity.linear.z  = 0.0;
+  controller_output.velocity.angular.x = 0.0;
+  controller_output.velocity.angular.y = 0.0;
+  controller_output.velocity.angular.z = 0.0;
 
   // Compute YAW error
   double inc_x = waypoint.position.north - current_state.pose.position.north;
   double inc_y = waypoint.position.east - current_state.pose.position.east;
-  double desired_yaw = atan2(inc_y, inc_x);
+  double desired_yaw = std::atan2(inc_y, inc_x);
   double yaw_error = cola2::utils::wrapAngle(desired_yaw - current_state.pose.orientation.yaw);
-  double distance = sqrt(pow(inc_x, 2.0) + pow(inc_y, 2.0));
+  double distance = std::sqrt(std::pow(inc_x, 2.0) + std::pow(inc_y, 2.0));
 
   // Compute SURGE error
   // If current distance to wp > 1/vel_x_k and angle_error < max_error
   // then move to max vel
   double surge = 0.0;
-  if (fabs(yaw_error) < config_.max_angle_error)
+  if (std::fabs(yaw_error) < config_.max_angle_error)
   {
-    surge = sqrt(pow(inc_x, 2) + pow(inc_y, 2)) * config_.surge_proportional_gain;
+    surge = std::sqrt(std::pow(inc_x, 2) + std::pow(inc_y, 2)) * config_.surge_proportional_gain;
     surge = cola2::utils::saturate(surge, 1.0);
   }
 
   // Adjust Surge response depending on Yaw error
-  surge = surge * (1.0 - (fabs(yaw_error) / config_.max_angle_error));
+  surge = surge * (1.0 - (std::fabs(yaw_error) / config_.max_angle_error));
 
   // Move from 25% to 100% of surge max velocity, not less
   if (surge > 0.0 && surge < 0.25)
@@ -76,14 +96,14 @@ void GotoController::compute(const control::State& current_state, const control:
   feedback.success = true;
   if (!waypoint.disable_axis.x)
   {  // X-Y tolerance must be checked
-    if (fabs(current_state.pose.position.north - waypoint.position.north) > waypoint.position_tolerance.x ||
-        fabs(current_state.pose.position.east - waypoint.position.east) > waypoint.position_tolerance.y)
+    if (std::fabs(current_state.pose.position.north - waypoint.position.north) > waypoint.position_tolerance.x ||
+        std::fabs(current_state.pose.position.east - waypoint.position.east) > waypoint.position_tolerance.y)
     {
       feedback.success = false;
     }
   }
   // If necessary, check if final position Z is reached
-  if (!waypoint.disable_axis.z && fabs(current_z - desired_z) > waypoint.position_tolerance.z)
+  if (!waypoint.disable_axis.z && std::fabs(current_z - desired_z) > waypoint.position_tolerance.z)
   {
     feedback.success = false;
   }
@@ -97,7 +117,6 @@ void GotoController::compute(const control::State& current_state, const control:
     controller_output.pose.position.depth = waypoint.position.depth;
     controller_output.pose.disable_axis.z = false;
     feedback.desired_depth = desired_z;
-    // std::cout << "Desired Z: " << section.final_position.z << "\n";
   }
 
   // If X-Y motion is enabled
@@ -139,9 +158,4 @@ void GotoController::compute(const control::State& current_state, const control:
     final_point.z = waypoint.position.depth;
 
   marker.points_list.push_back(final_point);
-}
-
-void GotoController::setConfig(const GotoControllerConfig& config)
-{
-  config_ = config;
 }
