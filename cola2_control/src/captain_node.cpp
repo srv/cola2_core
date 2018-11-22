@@ -383,7 +383,7 @@ void Captain::updateNav(const cola2_msgs::NavSts& msg)
   }
 }
 
-bool Captain::enableGotoInternal(cola2_msgs::Goto::Request& req, cola2_msgs::Goto::Response&)
+bool Captain::enableGotoInternal(cola2_msgs::Goto::Request& req, cola2_msgs::Goto::Response& res)
 {
   // Create waypoint
   cola2_msgs::WorldWaypointGoal waypoint;
@@ -411,6 +411,7 @@ bool Captain::enableGotoInternal(cola2_msgs::Goto::Request& req, cola2_msgs::Got
   {
     ROS_ERROR_STREAM("Invalid GOTO reference. REFERENCE_VEHICLE not yet implemented");
     state_ = CaptainStates::Idle;
+    res.success = false;
     return false;
   }
 
@@ -426,6 +427,7 @@ bool Captain::enableGotoInternal(cola2_msgs::Goto::Request& req, cola2_msgs::Got
     ROS_ERROR_STREAM("Invalid request. Max distance to waypoint is " << max_distance_to_waypoint <<
                      " while requested waypoint distance is at " << distance_to_waypoint);
     state_ = CaptainStates::Idle;
+    res.success = false;
     return false;
   }
 
@@ -554,6 +556,7 @@ bool Captain::enableGotoInternal(cola2_msgs::Goto::Request& req, cola2_msgs::Got
     thread_wait_waypoint_ = new std::thread(&Captain::waitWaypoint, this);
   }
 
+  res.success = true;
   return true;
 }
 
@@ -890,18 +893,21 @@ bool Captain::park(const MissionPark &park)
 
 bool Captain::enableGotoSrv(cola2_msgs::Goto::Request& req, cola2_msgs::Goto::Response& res)
 {
+  // Initialize success to false
+  res.success = false;
+
   // Check navigation
   if (!nav_received_)
   {
     ROS_ERROR_STREAM("Impossible to enable goto. Navigation not received yet");
-    return false;
+    return true;
   }
 
   // Check current state
   if (state_ != CaptainStates::Idle)
   {
     ROS_ERROR_STREAM("Impossible to enable goto. Something is already running");
-    return false;
+    return true;
   }
 
   // Set captain state
@@ -934,7 +940,7 @@ bool Captain::disableGotoSrv(std_srvs::Empty::Request&, std_srvs::Empty::Respons
   if (state_ != CaptainStates::Goto)
   {
     ROS_WARN_STREAM("Impossible to disable goto. Captain not in goto state");
-    return false;
+    return true;
   }
 
   // Set captain state
@@ -962,14 +968,14 @@ bool Captain::enableMissionSrv(cola2_msgs::String::Request& req, cola2_msgs::Str
   if (!nav_received_)
   {
     ROS_ERROR_STREAM("Impossible to enable mission. Navigation not received yet");
-    return false;
+    return true;
   }
 
   // Check current state
   if (state_ != CaptainStates::Idle)
   {
     ROS_ERROR_STREAM("Impossible to enable mission. Something is already running");
-    return false;
+    return true;
   }
 
   // Set captain state
@@ -992,14 +998,14 @@ bool Captain::enableDefaultMissionNonBlockSrv(std_srvs::Empty::Request&, std_srv
   if (!nav_received_)
   {
     ROS_ERROR_STREAM("Impossible to enable default mission. Navigation not received yet");
-    return false;
+    return true;
   }
 
   // Check current state
   if (state_ != CaptainStates::Idle)
   {
     ROS_ERROR_STREAM("Impossible to enable default mission. Something is already running");
-    return false;
+    return true;
   }
 
   // Set captain state
@@ -1027,7 +1033,7 @@ bool Captain::disableMissionSrv(std_srvs::Empty::Request&, std_srvs::Empty::Resp
   if (state_ != CaptainStates::Mission)
   {
     ROS_WARN_STREAM("Impossible to disable mission. Captain not in mission state");
-    return false;
+    return true;
   }
 
   // Set captain state
@@ -1060,14 +1066,14 @@ bool Captain::enableKeepPositionHolonomicSrv(std_srvs::Empty::Request&, std_srvs
   if (!nav_received_)
   {
     ROS_ERROR_STREAM("Impossible to enable keep position. Navigation not received yet");
-    return false;
+    return true;
   }
 
   // Check current state
   if (state_ != CaptainStates::Idle)
   {
     ROS_ERROR_STREAM("Impossible to enable keep position. Something is already running");
-    return false;
+    return true;
   }
 
   // Set captain state
@@ -1117,14 +1123,14 @@ bool Captain::enableKeepPositionNonHolonomicSrv(std_srvs::Empty::Request&, std_s
   if (!nav_received_)
   {
     ROS_ERROR_STREAM("Impossible to enable keep position. Navigation not received yet");
-    return false;
+    return true;
   }
 
   // Check current state
   if (state_ != CaptainStates::Idle)
   {
     ROS_ERROR_STREAM("Impossible to enable keep position. Something is already running");
-    return false;
+    return true;
   }
 
   // Set captain state
@@ -1174,7 +1180,7 @@ bool Captain::disableKeepPositionSrv(std_srvs::Empty::Request&, std_srvs::Empty:
   if (state_ != CaptainStates::KeepPosition)
   {
     ROS_WARN_STREAM("Impossible to disable keep position. Captain not in keep position state");
-    return false;
+    return true;
   }
 
   // Set captain state
@@ -1203,7 +1209,7 @@ bool Captain::enableExternalMissionSrv(std_srvs::Empty::Request&, std_srvs::Empt
   if (state_ != CaptainStates::Idle)
   {
     ROS_ERROR_STREAM("Impossible to enable external mission. Something is already running");
-    return false;
+    return true;
   }
 
   // Set captain state
@@ -1224,7 +1230,7 @@ bool Captain::disableExternalMissionSrv(std_srvs::Empty::Request&, std_srvs::Emp
   if (state_ != CaptainStates::Backseat)
   {
     ROS_WARN_STREAM("Impossible to disable external mission. Captain not in external mission state");
-    return false;
+    return true;
   }
 
   // Set captain state
