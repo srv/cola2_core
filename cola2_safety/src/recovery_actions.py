@@ -4,113 +4,111 @@
 # This file is subject to the terms and conditions defined in file
 # 'LICENSE.txt', which is part of this source code package.
 
-
 """
 @@>This node is used to handle requests for recovery actions coming from all nodes.<@@
 """
 
 import rospy
 from std_srvs.srv import Empty, EmptyRequest
-from cola2_msgs.srv import Goto, GotoRequest
-from cola2_msgs.srv import Recovery, RecoveryRequest, RecoveryResponse
-from cola2_msgs.msg import Setpoints, RecoveryAction, NavSts, GoalDescriptor
+from std_srvs.srv import Trigger, TriggerRequest
+from cola2_msgs.srv import Goto
+from cola2_msgs.srv import Recovery, RecoveryResponse
+from cola2_msgs.msg import Setpoints, RecoveryAction
 from cola2_lib.rosutils import param_loader
 
 
 class RecoveryActions(object):
     """ This class is able to handle recovery requests coming from all the nodes """
 
-    def __init__(self, name):
+    def __init__(self):
         """ Init the class """
-        # Save node name
-        self.name = name
-
         # Get config
         self.get_config()
 
-        namespace = rospy.get_namespace()
+        ns = rospy.get_namespace()
 
         # Create publisher
-        self.pub_thrusters = rospy.Publisher(namespace + "controller/thruster_setpoints", Setpoints, queue_size = 2)
-
-        self.pub_external_ra = rospy.Publisher(self.name + "/external_recovery_action",
+        self.pub_thrusters = rospy.Publisher(ns + "controller/thruster_setpoints", Setpoints, queue_size = 2)
+        self.pub_external_ra = rospy.Publisher(rospy.get_name() + "/external_recovery_action",
                                                RecoveryAction, queue_size = 2)
-        # Subscriber
-        rospy.Subscriber(namespace + "navigator/navigation", NavSts, self.update_nav_sts, queue_size=1)
 
         # Init service clients
-        rospy.loginfo("%s: waiting for services", self.name)
+        rospy.loginfo("Waiting for services")
 
         try:
-            rospy.wait_for_service(namespace + 'teleoperation/set_joystick_axes_to_velocity', 20)
-            self.set_joy_to_vel_srv = rospy.ServiceProxy(namespace + 'teleoperation/set_joystick_axes_to_velocity', Empty)
+            rospy.wait_for_service(ns + 'teleoperation/set_joystick_axes_to_velocity', 20)
+            self.set_joy_to_vel_srv = rospy.ServiceProxy(ns + 'teleoperation/set_joystick_axes_to_velocity', Empty)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
-            rospy.logfatal("%s: set joystick axes to velocity service is not available!", self.name)
+            rospy.logfatal("Set joystick axes to velocity service is not available!")
 
         self.captain_clients = True
         try:
-            rospy.wait_for_service(namespace + 'captain/disable_external_mission', 20)
-            self.abort_external_mission_srv = rospy.ServiceProxy(namespace + 'captain/disable_external_mission', Empty)
+            rospy.wait_for_service(ns + 'captain/disable_external_mission', 20)
+            self.abort_external_mission_srv = rospy.ServiceProxy(ns + 'captain/disable_external_mission', Trigger)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
-            rospy.logfatal("%s: disable external mission service not available!", self.name)
+            rospy.logfatal("Disable external mission service not available!")
 
         try:
-            rospy.wait_for_service(namespace + 'captain/disable_mission', 20)
-            self.abort_mission_srv = rospy.ServiceProxy(namespace + 'captain/disable_mission', Empty)
+            rospy.wait_for_service(ns + 'captain/disable_mission', 20)
+            self.abort_mission_srv = rospy.ServiceProxy(ns + 'captain/disable_mission', Trigger)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
-            rospy.logfatal("%s: disable mission service not available!", self.name)
+            rospy.logfatal("Disable mission service not available!")
 
         try:
-            rospy.wait_for_service(namespace + 'captain/disable_keep_position', 2)
-            self.abort_keep_pose_srv = rospy.ServiceProxy(namespace + 'captain/disable_keep_position', Empty)
+            rospy.wait_for_service(ns + 'captain/disable_keep_position', 2)
+            self.abort_keep_position_srv = rospy.ServiceProxy(ns + 'captain/disable_keep_position', Trigger)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
-            rospy.logfatal("%s: disable keep position service not available!", self.name)
+            rospy.logfatal("Disable keep position service not available!")
 
         try:
-            rospy.wait_for_service(namespace + 'captain/disable_goto', 2)
-            self.abort_goto_srv = rospy.ServiceProxy(namespace + 'captain/disable_goto', Empty)
+            rospy.wait_for_service(ns + 'captain/disable_goto', 2)
+            self.abort_goto_srv = rospy.ServiceProxy(ns + 'captain/disable_goto', Trigger)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
-            rospy.logfatal("%s: disable goto service not available!", self.name)
+            rospy.logfatal("Disable goto service not available!")
 
         try:
-            rospy.wait_for_service(namespace + 'captain/enable_goto', 2)
-            self.goto_srv = rospy.ServiceProxy(namespace + 'captain/enable_goto', Goto)
+            rospy.wait_for_service(ns + 'captain/enable_goto', 2)
+            self.goto_srv = rospy.ServiceProxy(ns + 'captain/enable_goto', Goto)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
-            rospy.logfatal("%s: goto service not available!", self.name)
+            rospy.logfatal("Goto service not available!")
+
+        try:
+            rospy.wait_for_service(ns + 'captain/enable_keep_position_non_holonomic', 2)  # Should work for both robots
+            self.keep_position_srv = rospy.ServiceProxy(ns + 'captain/enable_keep_position_non_holonomic', Trigger)
+        except rospy.exceptions.ROSException:
+            self.captain_clients = False
+            rospy.logfatal("Keep position service not available!")
 
         if not self.captain_clients:
             self.no_captain_clients_timer = rospy.Timer(rospy.Duration(0.4), self.no_captain_clients_message)
 
         try:
-            rospy.wait_for_service(namespace + 'controller/disable_thrusters', 20)
-            self.abort_thrusters_srv = rospy.ServiceProxy( namespace + 'controller/disable_thrusters', Empty)
+            rospy.wait_for_service(ns + 'controller/disable_thrusters', 20)
+            self.disable_thrusters_srv = rospy.ServiceProxy(ns + 'controller/disable_thrusters', Empty)
         except rospy.exceptions.ROSException:
             self.no_disable_thrusters_service_timer = rospy.Timer(rospy.Duration(0.4),
                                                                   self.no_disable_thrusters_message)
 
         # Create service
-        self.recovery_srv = rospy.Service(self.name +'/recover', Recovery, self.recovery_action_srv)
+        self.recovery_srv = rospy.Service(rospy.get_name() + '/recover', Recovery, self.recovery_action_srv)
 
         # Show message
-        rospy.loginfo("%s: initialized", self.name)
+        rospy.loginfo("Initialized")
 
-    def update_nav_sts(self, nav):
-        """Navigation callback. It saves yaw."""
-        self.last_yaw = nav.orientation.yaw
 
     def recovery_action_srv(self, req):
         """ Callback of recovery action service """
-        rospy.loginfo('%s: received recovery action', self.name)
+        rospy.loginfo("Received recovery action")
         who = req._connection_header['callerid']
         if not "/safety_supervisor" in who:
-            rospy.loginfo("Recovery action requested by an external agent.")
-            # Timestamp might not be included if service call was from command line, repack recovery action to add it
+            rospy.loginfo("Recovery action requested by an external agent")
+            # Timestamp might not be included if service call was from command line. Repack recovery action to add it
             if req.requested_action.header.stamp.secs == 0:
                 ra = RecoveryAction()
                 ra.header.stamp = rospy.Time.now()
@@ -119,7 +117,7 @@ class RecoveryActions(object):
                 self.pub_external_ra.publish(ra)
             else:
                 self.pub_external_ra.publish(req.requested_action)
-        #Call to handle the requested action
+        # Call to handle the requested action
         self.recovery_action(req.requested_action.error_level)
         ret = RecoveryResponse()
         ret.attempted = True
@@ -128,135 +126,110 @@ class RecoveryActions(object):
 
     def recovery_action(self, error):
         """ This method calls the appropiate method to handle the input code """
+        # TODO: send message through modem?
         if error == RecoveryAction.INFORMATIVE:
-            rospy.loginfo("%s: recovery action %s: INFORMATIVE",
-                          self.name, error)
-            # TODO: send message through modem?
+            rospy.loginfo("Recovery action %s: INFORMATIVE", error)
         elif error == RecoveryAction.ABORT_MISSION:
-            rospy.loginfo("%s: recovery action %s: ABORT_MISSION",
-                          self.name, error)
-            self.abort_mission()
+            rospy.loginfo("Recovery action %s: ABORT_MISSION", error)
+            self.abort_mission_and_goto()
         elif error == RecoveryAction.ABORT_AND_SURFACE:
-            rospy.loginfo("%s: recovery action %s: ABORT_AND_SURFACE",
-                          self.name, error)
-            self.abort_mission()
-            self.surface()
+            rospy.loginfo("Recovery action %s: ABORT_AND_SURFACE", error)
+            self.abort_mission_and_goto()
+            self.keep_position()
         elif error == RecoveryAction.EMERGENCY_SURFACE:
-            rospy.loginfo("%s: recovery action %s: EMERGENCY_SURFACE",
-                          self.name, error)
-            self.abort_mission()
+            rospy.loginfo("Recovery action %s: EMERGENCY_SURFACE", error)
+            self.abort_mission_and_goto()
+            self.abort_keep_position()
+            self.disable_thrusters()
             self.emergency_surface()
         elif error == RecoveryAction.STOP_THRUSTERS:
-            rospy.loginfo("%s: recovery action %s: STOP_THRUSTERS",
-                          self.name, error)
-            # Disable thrusters
-            try:
-                self.abort_thrusters_srv(EmptyRequest())
-            except rospy.exceptions.ROSException:
-                rospy.logerr('%s: error disabling thrusters', self.name)
+            rospy.loginfo("Recovery action %s: STOP_THRUSTERS", error)
+            self.disable_thrusters()
         else:
-            rospy.loginfo("%s: recovery action %s: INVALID ERROR CODE",
-                          self.name, error)
+            rospy.loginfo("Recovery action %s: INVALID ERROR CODE", error)
 
 
-    def abort_mission(self):
-        """ This method handles abort mission """
-        rospy.loginfo("%s: abort mission", self.name)
+    def abort_mission_and_goto(self):
+        """ This method handles abort mission and goto"""
+        rospy.loginfo("Abort mission and goto")
         try:
-            self.abort_external_mission_srv(EmptyRequest())
+            self.abort_external_mission_srv(TriggerRequest())
         except rospy.exceptions.ROSException:
-            rospy.logerr('%s: error aborting the external mission', self.name)
-
-        try:
-            self.abort_mission_srv(EmptyRequest())
-        except rospy.exceptions.ROSException:
-            rospy.logerr('%s: error aborting the mission', self.name)
+            rospy.logerr("Error aborting the external mission")
 
         try:
-            self.abort_goto_srv(EmptyRequest())
+            self.abort_mission_srv(TriggerRequest())
         except rospy.exceptions.ROSException:
-            rospy.logerr('%s: error aborting the goto', self.name)
+            rospy.logerr("Error aborting the mission")
 
         try:
-            self.abort_keep_pose_srv(EmptyRequest())
+            self.abort_goto_srv(TriggerRequest())
         except rospy.exceptions.ROSException:
-            rospy.logerr('%s: error aborting the keep pose', self.name)
+            rospy.logerr("Error aborting the goto")
 
 
-
-    def surface(self):
-        """ This method handles surface recovery action """
-        rospy.loginfo("%s: surface", self.name)
-
-        # If we are controlling with the joystick in position (Z),
-        # submerge service could fail.
-        # Then, we first set all joystick axes to velocity
-        self.set_joy_to_vel_srv(EmptyRequest())
-
+    def abort_keep_position(self):
+        """ This method aborts keep position """
+        rospy.loginfo("Abort keep position")
         try:
-            goto = GotoRequest()
-            goto.priority = GoalDescriptor.PRIORITY_SAFETY_HIGH
-            goto.altitude = self.controlled_surface_depth
-            goto.altitude_mode = False
-            goto.blocking = False
-            goto.keep_position = False
-            goto.disable_axis.x = True
-            goto.disable_axis.y = True
-            goto.disable_axis.z = False
-            goto.disable_axis.roll = True
-            goto.disable_axis.pitch = True
-            goto.disable_axis.yaw = False
-            goto.position.z = self.controlled_surface_depth
-            goto.position_tolerance.z = 1.0
-            goto.yaw = self.last_yaw
-            goto.orientation_tolerance.yaw = 0.1
-            goto.reference = GotoRequest.REFERENCE_NED
-
-            self.goto_srv(goto)
+            self.abort_keep_position_srv(TriggerRequest())
         except rospy.exceptions.ROSException:
-            rospy.logerr('%s: error surfacing the vehicle', self.name)
+            rospy.logerr("Error aborting keep position")
+
+
+    def keep_position(self):
+        """ This method enables keep position """
+        rospy.loginfo("Enabling keep position")
+        try:
+            self.keep_position_srv(TriggerRequest())
+        except rospy.exceptions.ROSException:
+            rospy.logerr("Error keeping position")
+
+
+    def disable_thrusters(self):
+        """ This method disables the thrusters """
+        rospy.loginfo("Disabling thrusters")
+        try:
+            self.disable_thrusters_srv(EmptyRequest())
+        except rospy.exceptions.ROSException:
+            rospy.logerr("Error disabling thrusters")
 
 
     def emergency_surface(self):
         """ This method handles an emergency surface """
-        rospy.loginfo("%s: emergency surface", self.name)
-        try:
-            self.abort_thrusters_srv(EmptyRequest())
-        except rospy.exceptions.ROSException:
-            rospy.logerr('%s: error disabling thrusters', self.name)
-
+        rospy.loginfo("Emergency surface")
         r = rospy.Rate(10)
         thrusters = Setpoints()
-        while True:
+        thrusters.setpoints = self.emergency_surface_setpoints
+        while not rospy.is_shutdown():
             thrusters.header.stamp = rospy.Time.now()
-            thrusters.setpoints = self.emergency_surface_setpoints
             self.pub_thrusters.publish(thrusters)
             r.sleep()
 
 
     def get_config(self):
         """ Get config from param server """
+        # TODO: this is dangerous. The default emergency setpoint should be always loaded from param server instead of
+        # silently taking a default value
         param_dict = {'frame_id': ('frame_id', "girona500"),
-                      'emergency_surface_setpoints': ('emergency_surface_setpoints', [0.0, 0.0, 0.75, 0.75, 0.0]),
-                      'controlled_surface_depth': ('controlled_surface_depth', 0.0)}
-
+                      'emergency_surface_setpoints': ('emergency_surface_setpoints', [0.0, 0.0, 0.75, 0.75, 0.0])}
         param_loader.get_ros_params(self, param_dict)
 
 
     def no_disable_thrusters_message(self, event):
         """ Timer to show an error in disable thrusters service """
-        rospy.logfatal('%s: error creating client to disable thrusters', self.name)
+        rospy.logfatal("Error creating client to disable thrusters")
 
 
     def no_captain_clients_message(self, event):
         """ Timer to show an error if unavailable captain service """
-        rospy.logfatal('%s: error creating some captain clients', self.name)
+        rospy.logfatal("Error creating some captain clients")
 
 
 if __name__ == '__main__':
     try:
         rospy.init_node('recovery_actions')
-        recovery_actions = RecoveryActions(rospy.get_name())
+        recovery_actions = RecoveryActions()
         rospy.spin()
     except rospy.ROSInterruptException:
         pass

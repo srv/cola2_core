@@ -117,7 +117,7 @@ void LosCteController::compute(const control::State& current_state, const contro
   }
 
   // Compute yaw
-  desired_yaw = cola2::utils::wrapAngle(atan2(LOSY, LOSX));
+  desired_yaw = std::atan2(LOSY, LOSX);
 
   // define current z according to altitude_mode
   double current_z = current_state.pose.position.depth;

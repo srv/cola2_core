@@ -74,13 +74,6 @@ void AnchorController::compute(const control::State& current_state, const contro
     desired_surge = 0.0;
   }
 
-  // Safety
-  if (robot_distance_2D > config_.safety_distance)
-  {
-    desired_surge = 0.0;
-    desired_yaw = 0.0;
-  }
-
   // Set up controller's output and feedback:
   // Set z...
   controller_output.pose.altitude_mode = waypoint.altitude_mode;
@@ -113,10 +106,9 @@ void AnchorController::compute(const control::State& current_state, const contro
   marker.points_list.push_back(initial_point);
   final_point.x = waypoint.position.north;
   final_point.y = waypoint.position.east;
+  final_point.z = waypoint.position.depth;
   if (waypoint.altitude_mode)
     final_point.z = current_state.pose.position.depth + (current_state.pose.altitude - waypoint.altitude);
-  else
-    final_point.z = waypoint.position.depth;
   marker.points_list.push_back(final_point);
 
   // Set success to false so that the pilot does not stop keeping position

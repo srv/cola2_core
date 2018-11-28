@@ -19,8 +19,8 @@
 #include <cola2_msgs/CaptainStatus.h>
 #include <cola2_msgs/GoalDescriptor.h>
 #include <cola2_msgs/Goto.h>
+#include <cola2_msgs/Mission.h>
 #include <cola2_msgs/NavSts.h>
-#include <cola2_msgs/String.h>
 #include <cola2_msgs/WorldSectionAction.h>
 #include <cola2_msgs/WorldWaypointAction.h>
 #include <geometry_msgs/PoseStamped.h>
@@ -28,10 +28,10 @@
 #include <ros/ros.h>
 #include <ros/package.h>
 #include <ros/console.h>
-#include <std_srvs/Empty.h>
 #include <std_srvs/Trigger.h>
 #include <vector>
 #include <string>
+#include <sstream>
 #include <algorithm>
 #include <memory>
 #include <thread>
@@ -86,6 +86,9 @@ class Captain
   cola2_msgs::CaptainStatus captain_status_;
   ros::Timer captain_status_timer_;
 
+  // External mission caller id
+  std::string external_mission_caller_name_;
+
   // Threads
   std::thread* thread_wait_waypoint_;
   std::thread* thread_mission_;
@@ -116,10 +119,18 @@ class Captain
    * \param[out] Response
    * \return Success
    */
-  bool enableMissionInternal(cola2_msgs::String::Request&, cola2_msgs::String::Response&);
+  bool enableMissionInternal(cola2_msgs::Mission::Request&, cola2_msgs::Mission::Response&);
 
   /**
-   * \brief Computes distance from current position to given x, y, z, altitude, altitude_moe
+   * \brief Computes distance from current position to given x, y
+   * \param[in] Position x
+   * \param[in] Position y
+   * \return Distance
+   */
+  double distanceTo2D(double, double);
+
+  /**
+   * \brief Computes distance from current position to given x, y, z, altitude, altitude_mode
    * \param[in] Position x
    * \param[in] Position y
    * \param[in] Position z
@@ -127,7 +138,7 @@ class Captain
    * \param[in] Position altitude_mode
    * \return Distance
    */
-  double distanceTo(double, double, double, double, bool);
+  double distanceTo3D(double, double, double, double, bool);
 
   /**
    * \brief Blocks the execution thread until the waypoint finalizes
@@ -142,7 +153,7 @@ class Captain
   nav_msgs::Path createPathFromMission(Mission);
 
   /**
-   * \brief Calls a standard action or an empty service with name const std::string action_id and parameters
+   * \brief Calls a standard action or a trigger service with name const std::string action_id and parameters
    *        const std::vector<std::string> parameters
    * \param[in] Is the action empty?
    * \param[in] Action ID
@@ -185,7 +196,7 @@ class Captain
    * \param[out] Response
    * \return Success
    */
-  bool disableGotoSrv(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+  bool disableGotoSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response&);
 
   /**
    * \brief Enable mission with name 'last_mission.xml' and returns immediately
@@ -193,7 +204,7 @@ class Captain
    * \param[out] Response
    * \return Success
    */
-  bool enableDefaultMissionNonBlockSrv(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+  bool enableDefaultMissionNonBlockSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response&);
   void enableDefaultMissionNonBlockSrvHelper();  // Helper method required to start a thread with argument references
 
   /**
@@ -202,7 +213,7 @@ class Captain
    * \param[out] Response
    * \return Success
    */
-  bool disableMissionSrv(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+  bool disableMissionSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response&);
 
   /**
    * \brief Enable mission defined in cola2_msgs::String::Request
@@ -210,7 +221,7 @@ class Captain
    * \param[out] Response
    * \return Success
    */
-  bool enableMissionSrv(cola2_msgs::String::Request&, cola2_msgs::String::Response&);
+  bool enableMissionSrv(cola2_msgs::Mission::Request&, cola2_msgs::Mission::Response&);
 
   /**
    * \brief Enable keep position for surge, sway, heave and yaw DoFs
@@ -218,7 +229,7 @@ class Captain
    * \param[out] Response
    * \return Success
    */
-  bool enableKeepPositionHolonomicSrv(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+  bool enableKeepPositionHolonomicSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response&);
 
   /**
    * \brief Enable keep position for surge, heave, and yaw DoFs
@@ -226,7 +237,7 @@ class Captain
    * \param[out] Response
    * \return Success
    */
-  bool enableKeepPositionNonHolonomicSrv(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+  bool enableKeepPositionNonHolonomicSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response&);
 
   /**
    * \brief Disable keep position
@@ -234,7 +245,7 @@ class Captain
    * \param[out] Response
    * \return Success
    */
-  bool disableKeepPositionSrv(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+  bool disableKeepPositionSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response&);
 
   /**
    * \brief Allows an external controller to 'fake' that a mission is under execution
@@ -242,7 +253,7 @@ class Captain
    * \param[out] Response
    * \return Success
    */
-  bool enableExternalMissionSrv(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+  bool enableExternalMissionSrv(ros::ServiceEvent<std_srvs::Trigger::Request, std_srvs::Trigger::Response>&);
 
   /**
    * \brief Finalizes the exeternal mission
@@ -250,7 +261,7 @@ class Captain
    * \param[out] Response
    * \return Success
    */
-  bool disableExternalMissionSrv(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
+  bool disableExternalMissionSrv(ros::ServiceEvent<std_srvs::Trigger::Request, std_srvs::Trigger::Response>&);
 
  public:
   /**
@@ -409,25 +420,29 @@ bool Captain::enableGotoInternal(cola2_msgs::Goto::Request& req, cola2_msgs::Got
   }
   else
   {
-    ROS_ERROR_STREAM("Invalid GOTO reference. REFERENCE_VEHICLE not yet implemented");
-    state_ = CaptainStates::Idle;
+    std::string msg("Invalid GOTO reference. REFERENCE_VEHICLE not yet implemented");
+    ROS_ERROR_STREAM(msg);
+    res.message = msg;
     res.success = false;
+    state_ = CaptainStates::Idle;
     return false;
   }
 
   // Check max distance to waypoint
-  double distance_to_waypoint =
-      distanceTo(waypoint.position.north, waypoint.position.east, req.position.z, req.altitude, req.altitude_mode);
+  double distance_to_waypoint = distanceTo2D(waypoint.position.north, waypoint.position.east);
 
   // Load max distance to waypoint from param server and check request
   double max_distance_to_waypoint;
   cola2::rosutils::getParam("~max_distance_to_waypoint", max_distance_to_waypoint, 300.0);  // Default value
   if (!(req.disable_axis.x && req.disable_axis.y) && (distance_to_waypoint > max_distance_to_waypoint))
   {
-    ROS_ERROR_STREAM("Invalid request. Max distance to waypoint is " << max_distance_to_waypoint <<
-                     " while requested waypoint distance is at " << distance_to_waypoint);
-    state_ = CaptainStates::Idle;
+    std::stringstream msg_ss;
+    msg_ss << "Invalid request. Max distance to waypoint is " << max_distance_to_waypoint <<
+              " while requested waypoint distance is at " << distance_to_waypoint;
+    ROS_ERROR_STREAM(msg_ss.str());
+    res.message = msg_ss.str();
     res.success = false;
+    state_ = CaptainStates::Idle;
     return false;
   }
 
@@ -556,28 +571,35 @@ bool Captain::enableGotoInternal(cola2_msgs::Goto::Request& req, cola2_msgs::Got
     thread_wait_waypoint_ = new std::thread(&Captain::waitWaypoint, this);
   }
 
+  res.message = "Goto finalized";
   res.success = true;
   return true;
 }
 
-bool Captain::enableMissionInternal(cola2_msgs::String::Request& req, cola2_msgs::String::Response&)
+bool Captain::enableMissionInternal(cola2_msgs::Mission::Request& req, cola2_msgs::Mission::Response& res)
 {
   // Get path were missions are stored
   std::string package;
   if (!cola2::rosutils::getParam("~vehicle_config_launch_mission_package", package))
   {
-    ROS_ERROR_STREAM("Package vehicle_config_launch_mission not defined!");
+    std::string msg("Package vehicle_config_launch_mission not defined!");
+    ROS_ERROR_STREAM(msg);
+    res.message = msg;
+    res.success = false;
     state_ = CaptainStates::Idle;
     return false;
   }
   std::string package_path = ros::package::getPath(package);
   if (package_path.empty())
   {
-    ROS_ERROR_STREAM("Error defining mission path!");
+    std::string msg("Error defining mission path!");
+    ROS_ERROR_STREAM(msg);
+    res.message = msg;
+    res.success = false;
     state_ = CaptainStates::Idle;
     return false;
   }
-  std::string mission_path = package_path + "/missions/" + req.request;
+  std::string mission_path = package_path + "/missions/" + req.mission;
 
   // Load mission
   ROS_INFO_STREAM("Loading mission: " << mission_path);
@@ -593,7 +615,10 @@ bool Captain::enableMissionInternal(cola2_msgs::String::Request& req, cola2_msgs
   }
   if (!valid_mission)
   {
-    ROS_ERROR_STREAM("Problem loading mission");
+    std::string msg("Problem loading mission");
+    ROS_ERROR_STREAM(msg);
+    res.message = msg;
+    res.success = false;
     state_ = CaptainStates::Idle;
     return false;
   }
@@ -666,13 +691,16 @@ bool Captain::enableMissionInternal(cola2_msgs::String::Request& req, cola2_msgs
   }
 
   // Display info
+  std::string msg;
   if (state_ == CaptainStates::Mission)
   {
-    ROS_INFO_STREAM("Mission finalized");
+    msg = "Mission finalized";
+    ROS_INFO_STREAM(msg);
   }
   else
   {
-    ROS_WARN_STREAM("Mission has been disabled");
+    msg = "Mission has been disabled";
+    ROS_WARN_STREAM(msg);
   }
 
   // Set captain state
@@ -684,11 +712,18 @@ bool Captain::enableMissionInternal(cola2_msgs::String::Request& req, cola2_msgs
   captain_status_.current_step = 0;
   captain_status_.total_steps = 0;
 
+  res.message = msg;
+  res.success = true;
   return true;
 }
 
-double Captain::distanceTo(const double x, const double y, const double depth, const double altitude,
-                           const bool altitude_mode)
+double Captain::distanceTo2D(const double x, const double y)
+{
+  return std::sqrt(std::pow(x - nav_.x, 2) + std::pow(y - nav_.y, 2));
+}
+
+double Captain::distanceTo3D(const double x, const double y,
+                             const double depth, const double altitude, const bool altitude_mode)
 {
   double inc_z = altitude_mode ? (altitude - nav_.altitude) : (depth - nav_.z);
   return std::sqrt(std::pow(x - nav_.x, 2) + std::pow(y - nav_.y, 2) + std::pow(inc_z, 2));
@@ -824,8 +859,8 @@ bool Captain::worldSection(const MissionSection &sec)
   double min_vel = std::min(heave, surge_los);
   if (sec.getSpeed() != 0.0 && sec.getSpeed() < min_vel) min_vel = sec.getSpeed();
   double distance_to_end_section =
-      distanceTo(final_north, final_east, sec.getFinalPosition().getZ(), sec.getFinalPosition().getZ(),
-                 sec.getInitialPosition().getAltitudeMode());
+      distanceTo3D(final_north, final_east, sec.getFinalPosition().getZ(), sec.getFinalPosition().getZ(),
+                   sec.getInitialPosition().getAltitudeMode());
   double timeout = 2.0 * distance_to_end_section / min_vel;
   ROS_INFO_STREAM("Section timeout = " << timeout);
   section.timeout = timeout;
@@ -899,14 +934,20 @@ bool Captain::enableGotoSrv(cola2_msgs::Goto::Request& req, cola2_msgs::Goto::Re
   // Check navigation
   if (!nav_received_)
   {
-    ROS_ERROR_STREAM("Impossible to enable goto. Navigation not received yet");
+    std::string msg("Impossible to enable goto. Navigation not received yet");
+    ROS_ERROR_STREAM(msg);
+    res.message = msg;
+    res.success = false;
     return true;
   }
 
   // Check current state
   if (state_ != CaptainStates::Idle)
   {
-    ROS_ERROR_STREAM("Impossible to enable goto. Something is already running");
+    std::string msg("Impossible to enable goto. Something is already running");
+    ROS_ERROR_STREAM(msg);
+    res.message = msg;
+    res.success = false;
     return true;
   }
 
@@ -919,6 +960,7 @@ bool Captain::enableGotoSrv(cola2_msgs::Goto::Request& req, cola2_msgs::Goto::Re
   captain_status_.total_steps = 0;
 
   // Call enable goto
+  ROS_INFO_STREAM("Enabling goto");
   enableGotoInternal(req, res);
 
   // If it was blocking, put the state back to Idle now
@@ -934,12 +976,15 @@ bool Captain::enableGotoSrv(cola2_msgs::Goto::Request& req, cola2_msgs::Goto::Re
   return true;
 }
 
-bool Captain::disableGotoSrv(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+bool Captain::disableGotoSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& res)
 {
   // Check current state
   if (state_ != CaptainStates::Goto)
   {
-    ROS_WARN_STREAM("Impossible to disable goto. Captain not in goto state");
+    std::string msg("Impossible to disable goto. Captain not in goto state");
+    ROS_WARN_STREAM(msg);
+    res.message = msg;
+    res.success = false;
     return true;
   }
 
@@ -959,52 +1004,68 @@ bool Captain::disableGotoSrv(std_srvs::Empty::Request&, std_srvs::Empty::Respons
   captain_status_.current_step = 0;
   captain_status_.total_steps = 0;
 
+  res.message = "Goto disabled";
+  res.success = true;
+  ROS_INFO_STREAM(res.message);
   return true;
 }
 
-bool Captain::enableMissionSrv(cola2_msgs::String::Request& req, cola2_msgs::String::Response& res)
+bool Captain::enableMissionSrv(cola2_msgs::Mission::Request& req, cola2_msgs::Mission::Response& res)
 {
   // Check navigation
   if (!nav_received_)
   {
-    ROS_ERROR_STREAM("Impossible to enable mission. Navigation not received yet");
+    std::string msg("Impossible to enable mission. Navigation not received yet");
+    ROS_ERROR_STREAM(msg);
+    res.message = msg;
+    res.success = false;
     return true;
   }
 
   // Check current state
   if (state_ != CaptainStates::Idle)
   {
-    ROS_ERROR_STREAM("Impossible to enable mission. Something is already running");
+    std::string msg("Impossible to enable mission. Something is already running");
+    ROS_ERROR_STREAM(msg);
+    res.message = msg;
+    res.success = false;
     return true;
   }
 
   // Set captain state
   state_ = CaptainStates::Mission;
+  ROS_INFO_STREAM("Enabling mission");
 
   // Set captain status
   captain_status_.altitude_mode = false;
   captain_status_.current_step = 0;
   captain_status_.total_steps = 0;
 
-  // Call enable goto
+  // Call enable mission
   enableMissionInternal(req, res);
 
   return true;
 }
 
-bool Captain::enableDefaultMissionNonBlockSrv(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+bool Captain::enableDefaultMissionNonBlockSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& res)
 {
   // Check navigation
   if (!nav_received_)
   {
-    ROS_ERROR_STREAM("Impossible to enable default mission. Navigation not received yet");
+    std::string msg("Impossible to enable default mission. Navigation not received yet");
+    ROS_ERROR_STREAM(msg);
+    res.message = msg;
+    res.success = false;
     return true;
   }
 
   // Check current state
   if (state_ != CaptainStates::Idle)
   {
-    ROS_ERROR_STREAM("Impossible to enable default mission. Something is already running");
+    std::string msg("Impossible to enable default mission. Something is already running");
+    ROS_ERROR_STREAM(msg);
+    res.message = msg;
+    res.success = false;
     return true;
   }
 
@@ -1015,24 +1076,30 @@ bool Captain::enableDefaultMissionNonBlockSrv(std_srvs::Empty::Request&, std_srv
   if (thread_mission_ != NULL) thread_mission_->join();
   thread_mission_ = new std::thread(&Captain::enableDefaultMissionNonBlockSrvHelper, this);
 
+  res.message = "Default mission enabled";
+  res.success = true;
+  ROS_INFO_STREAM(res.message);
   return true;
 }
 
 void Captain::enableDefaultMissionNonBlockSrvHelper()
 {
   // Helper method. It is needed because enableMission() has reference arguments
-  cola2_msgs::String::Request req;
-  cola2_msgs::String::Response res;
-  req.request = "last_mission.xml";
+  cola2_msgs::Mission::Request req;
+  cola2_msgs::Mission::Response res;
+  req.mission = "last_mission.xml";
   enableMissionInternal(req, res);
 }
 
-bool Captain::disableMissionSrv(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+bool Captain::disableMissionSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& res)
 {
   // Check current state
   if (state_ != CaptainStates::Mission)
   {
-    ROS_WARN_STREAM("Impossible to disable mission. Captain not in mission state");
+    std::string msg("Impossible to disable mission. Captain not in mission state");
+    ROS_WARN_STREAM(msg);
+    res.message = msg;
+    res.success = false;
     return true;
   }
 
@@ -1057,24 +1124,37 @@ bool Captain::disableMissionSrv(std_srvs::Empty::Request&, std_srvs::Empty::Resp
   captain_status_.current_step = 0;
   captain_status_.total_steps = 0;
 
+  res.message = "Mission disabled";
+  res.success = true;
+  ROS_INFO_STREAM(res.message);
   return true;
 }
 
-bool Captain::enableKeepPositionHolonomicSrv(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+bool Captain::enableKeepPositionHolonomicSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& res)
 {
   // Check navigation
   if (!nav_received_)
   {
-    ROS_ERROR_STREAM("Impossible to enable keep position. Navigation not received yet");
+    std::string msg("Impossible to enable keep position. Navigation not received yet");
+    ROS_ERROR_STREAM(msg);
+    res.message = msg;
+    res.success = false;
     return true;
   }
 
   // Check current state
   if (state_ != CaptainStates::Idle)
   {
-    ROS_ERROR_STREAM("Impossible to enable keep position. Something is already running");
+    std::string msg("Impossible to enable keep position. Something is already running");
+    ROS_ERROR_STREAM(msg);
+    res.message = msg;
+    res.success = false;
     return true;
   }
+
+  // Get safety depth
+  double controlled_surface_depth;
+  cola2::rosutils::getParam("~controlled_surface_depth", controlled_surface_depth, 0.0);  // Default value
 
   // Set captain state
   state_ = CaptainStates::KeepPosition;
@@ -1084,10 +1164,11 @@ bool Captain::enableKeepPositionHolonomicSrv(std_srvs::Empty::Request&, std_srvs
   captain_status_.current_step = 0;
   captain_status_.total_steps = 0;
 
-  // Call goto with appropriate parameters
+  // Display info
   ROS_INFO_STREAM("Start holonomic keep position at [" <<
-                  nav_.x << ", " << nav_.y << ", " << nav_.z << "] with orientation " << nav_.yaw);
+                  nav_.x << ", " << nav_.y << ", " << controlled_surface_depth << "] with orientation " << nav_.yaw);
 
+  // Call internal goto
   cola2_msgs::Goto::Request goto_req;
   cola2_msgs::Goto::Response goto_res;
   goto_req.priority = cola2_msgs::GoalDescriptor::PRIORITY_NORMAL;
@@ -1102,36 +1183,45 @@ bool Captain::enableKeepPositionHolonomicSrv(std_srvs::Empty::Request&, std_srvs
   goto_req.disable_axis.yaw = false;
   goto_req.position.x = nav_.x;
   goto_req.position.y = nav_.y;
-  goto_req.position.z = nav_.z;
+  goto_req.position.z = controlled_surface_depth;
   goto_req.yaw = static_cast<float>(nav_.yaw);
-
-  // If toloerance is 0.0 position, the waypoint is impossible to reach
-  // and therefore, the controller will never finish
-  goto_req.position_tolerance.x = 0.0;
-  goto_req.position_tolerance.y = 0.0;
+  goto_req.position_tolerance.x = 0.0;  // If toloerance is 0.0 position, the waypoint is impossible to reach
+  goto_req.position_tolerance.y = 0.0;  // and therefore, the controller will never finish
   goto_req.position_tolerance.z = 0.0;
   goto_req.orientation_tolerance.yaw = 0.0;
   goto_req.reference = cola2_msgs::Goto::Request::REFERENCE_NED;
   enableGotoInternal(goto_req, goto_res);
 
+  res.message = "Holonomic keep position enabled";
+  res.success = true;
   return true;
 }
 
-bool Captain::enableKeepPositionNonHolonomicSrv(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+bool Captain::enableKeepPositionNonHolonomicSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& res)
 {
   // Check navigation
   if (!nav_received_)
   {
-    ROS_ERROR_STREAM("Impossible to enable keep position. Navigation not received yet");
+    std::string msg("Impossible to enable keep position. Navigation not received yet");
+    ROS_ERROR_STREAM(msg);
+    res.message = msg;
+    res.success = false;
     return true;
   }
 
   // Check current state
   if (state_ != CaptainStates::Idle)
   {
-    ROS_ERROR_STREAM("Impossible to enable keep position. Something is already running");
+    std::string msg("Impossible to enable keep position. Something is already running");
+    ROS_ERROR_STREAM(msg);
+    res.message = msg;
+    res.success = false;
     return true;
   }
+
+  // Get safety depth
+  double controlled_surface_depth;
+  cola2::rosutils::getParam("~controlled_surface_depth", controlled_surface_depth, 0.0);  // Default value
 
   // Set captain state
   state_ = CaptainStates::KeepPosition;
@@ -1141,10 +1231,11 @@ bool Captain::enableKeepPositionNonHolonomicSrv(std_srvs::Empty::Request&, std_s
   captain_status_.current_step = 0;
   captain_status_.total_steps = 0;
 
-  // Call goto with appropriate parameters
+  // Display info
   ROS_INFO_STREAM("Start non holonomic keep position at [" <<
-                  nav_.x << ", " << nav_.y << ", " << nav_.z << "] with orientation " << nav_.yaw);
+                  nav_.x << ", " << nav_.y << ", " << controlled_surface_depth << "] with orientation " << nav_.yaw);
 
+  // Call internal goto
   cola2_msgs::Goto::Request goto_req;
   cola2_msgs::Goto::Response goto_res;
   goto_req.priority = cola2_msgs::GoalDescriptor::PRIORITY_NORMAL;
@@ -1159,27 +1250,29 @@ bool Captain::enableKeepPositionNonHolonomicSrv(std_srvs::Empty::Request&, std_s
   goto_req.disable_axis.yaw = false;
   goto_req.position.x = nav_.x;
   goto_req.position.y = nav_.y;
-  goto_req.position.z = nav_.z;
+  goto_req.position.z = controlled_surface_depth;
   goto_req.yaw = static_cast<float>(nav_.yaw);
-
-  // If tolerance is 0.0 position, the waypoint is impossible to reach
-  // and therefore, the controller will never finish
-  goto_req.position_tolerance.x = 0.0;
-  goto_req.position_tolerance.y = 0.0;
+  goto_req.position_tolerance.x = 0.0;  // If tolerance is 0.0 position, the waypoint is impossible to reach
+  goto_req.position_tolerance.y = 0.0;  // and therefore, the controller will never finish
   goto_req.position_tolerance.z = 0.0;
   goto_req.orientation_tolerance.yaw = 0.0;
   goto_req.reference = cola2_msgs::Goto::Request::REFERENCE_NED;
   enableGotoInternal(goto_req, goto_res);
 
+  res.message = "Nonholonomic keep position enabled";
+  res.success = true;
   return true;
 }
 
-bool Captain::disableKeepPositionSrv(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+bool Captain::disableKeepPositionSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& res)
 {
   // Check current state
   if (state_ != CaptainStates::KeepPosition)
   {
-    ROS_WARN_STREAM("Impossible to disable keep position. Captain not in keep position state");
+    std::string msg("Impossible to disable keep position. Captain not in keep position state");
+    ROS_WARN_STREAM(msg);
+    res.message = msg;
+    res.success = false;
     return true;
   }
 
@@ -1199,18 +1292,31 @@ bool Captain::disableKeepPositionSrv(std_srvs::Empty::Request&, std_srvs::Empty:
   captain_status_.current_step = 0;
   captain_status_.total_steps = 0;
 
+  res.message = "Keep position disabled";
+  res.success = true;
+  ROS_INFO_STREAM(res.message);
   return true;
 }
 
 
-bool Captain::enableExternalMissionSrv(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+bool Captain::enableExternalMissionSrv(ros::ServiceEvent<std_srvs::Trigger::Request,
+                                                         std_srvs::Trigger::Response>& event)
 {
+  // Get service response
+  std_srvs::Trigger::Response& res = event.getResponse();
+
   // Check current state
   if (state_ != CaptainStates::Idle)
   {
-    ROS_ERROR_STREAM("Impossible to enable external mission. Something is already running");
+    std::string msg("Impossible to enable external mission. Something is already running");
+    ROS_ERROR_STREAM(msg);
+    res.message = msg;
+    res.success = false;
     return true;
   }
+
+  // Store caller name
+  external_mission_caller_name_ = event.getCallerName();
 
   // Set captain state
   state_ = CaptainStates::Backseat;
@@ -1221,16 +1327,47 @@ bool Captain::enableExternalMissionSrv(std_srvs::Empty::Request&, std_srvs::Empt
   captain_status_.current_step = 0;
   captain_status_.total_steps = 0;
 
+  res.message = "External mission enabled";
+  res.success = true;
+  ROS_INFO_STREAM(res.message);
   return true;
 }
 
-bool Captain::disableExternalMissionSrv(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+bool Captain::disableExternalMissionSrv(ros::ServiceEvent<std_srvs::Trigger::Request,
+                                                          std_srvs::Trigger::Response>& event)
 {
+  // Get service response
+  std_srvs::Trigger::Response& res = event.getResponse();
+
   // Check current state
   if (state_ != CaptainStates::Backseat)
   {
-    ROS_WARN_STREAM("Impossible to disable external mission. Captain not in external mission state");
+    std::string msg("Impossible to disable external mission. Captain not in external mission state");
+    ROS_WARN_STREAM(msg);
+    res.message = msg;
+    res.success = false;
     return true;
+  }
+
+  // Disable external mission if stopped from somewhere else
+  if (external_mission_caller_name_ != event.getCallerName())
+  {
+    std::string srv_name(external_mission_caller_name_ + "/disable");
+    ros::ServiceClient srv = nh_.serviceClient<std_srvs::Trigger>(srv_name);
+    if (srv.waitForExistence(ros::Duration(5.0)))
+    {
+      std_srvs::Trigger::Request srv_req;
+      std_srvs::Trigger::Response srv_res;
+      srv.call(srv_req, srv_res);
+      if (!srv_res.success)
+      {
+        ROS_WARN_STREAM("External disable service responded False with msg: " << srv_res.message);
+      }
+    }
+    else
+    {
+      ROS_ERROR_STREAM("External disable service "<< srv_name <<" does not exist");
+    }
   }
 
   // Set captain state
@@ -1242,6 +1379,9 @@ bool Captain::disableExternalMissionSrv(std_srvs::Empty::Request&, std_srvs::Emp
   captain_status_.current_step = 0;
   captain_status_.total_steps = 0;
 
+  res.message = "External mission disabled";
+  res.success = true;
+  ROS_INFO_STREAM(res.message);
   return true;
 }
 
