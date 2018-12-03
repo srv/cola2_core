@@ -180,8 +180,8 @@ class Dynamics:
             # O = PyKDL.Rotation.RPY(self.p[3], self.p[4], self.p[5])
             O = tf.transformations.euler_matrix(self.p[3], self.p[4], self.p[5])
             # currents = O.Inverse() * t
-            currents = O.T.dot(t)
-            return np.array([currents[0], currents[1], currents[2], 0, 0, 0])
+            currents = -O[0:3,0:3].T.dot(t)
+            return np.array([currents[0][0], currents[1][0], currents[2][0], 0, 0, 0])
         else:
             return np.array([0, 0, 0, 0, 0, 0])
 
