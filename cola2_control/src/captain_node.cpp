@@ -36,6 +36,7 @@
 #include <algorithm>
 #include <memory>
 #include <thread>
+#include <stdexcept>
 
 /**
  * \brief Captain class. It can execute maneuvers like goto and keep position as well as missions
@@ -115,12 +116,22 @@ class Captain
   bool enableGotoInternal(cola2_msgs::Goto::Request&, cola2_msgs::Goto::Response&);
 
   /**
-   * \brief Internal enable mission helper method
+   * \brief Internal load mission helper method
    * \param[in] Request
    * \param[out] Response
+   * \param[out] Mission
    * \return Success
    */
-  bool enableMissionInternal(cola2_msgs::Mission::Request&, cola2_msgs::Mission::Response&);
+  bool loadMission(cola2_msgs::Mission::Request&, cola2_msgs::Mission::Response&, Mission&);
+
+  /**
+   * \brief Internal execute mission helper method
+   * \param[in] Request
+   * \param[out] Response
+   * \param[in] Mission
+   * \return Success
+   */
+  bool executeMission(cola2_msgs::Mission::Request&, cola2_msgs::Mission::Response&, Mission&);
 
   /**
    * \brief Computes distance from current position to given x, y
@@ -206,7 +217,7 @@ class Captain
    * \return Success
    */
   bool enableDefaultMissionNonBlockSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response&);
-  void enableDefaultMissionNonBlockSrvHelper();  // Helper method required to start a thread with argument references
+  void enableDefaultMissionNonBlockSrvHelper(Mission);  // Helper method required to start a thread with argument references
 
   /**
    * \brief Disable mission
@@ -562,6 +573,9 @@ bool Captain::enableGotoInternal(cola2_msgs::Goto::Request& req, cola2_msgs::Got
       result = waypoint_actionlib_.waitForResult(ros::Duration(1.0));
     }
     is_waypoint_actionlib_running_ = false;
+
+    // Response message
+    res.message = "Goto finalized";
   }
   else
   {
@@ -570,14 +584,16 @@ bool Captain::enableGotoInternal(cola2_msgs::Goto::Request& req, cola2_msgs::Got
 
     // Start new thread
     thread_wait_waypoint_ = new std::thread(&Captain::waitWaypoint, this);
+
+    // Response message
+    res.message = "Goto enabled";
   }
 
-  res.message = "Goto finalized";
   res.success = true;
   return true;
 }
 
-bool Captain::enableMissionInternal(cola2_msgs::Mission::Request& req, cola2_msgs::Mission::Response& res)
+bool Captain::loadMission(cola2_msgs::Mission::Request& req, cola2_msgs::Mission::Response& res, Mission& mission)
 {
   // Get path were missions are stored
   std::string package;
@@ -603,27 +619,22 @@ bool Captain::enableMissionInternal(cola2_msgs::Mission::Request& req, cola2_msg
   std::string mission_path = package_path + "/missions/" + req.mission;
 
   // Load mission
-  ROS_INFO_STREAM("Loading mission: " << mission_path);
-  Mission mission;
-  bool valid_mission = true;
   try
   {
-      valid_mission = (mission.loadMission(mission_path) >= 0);
+    ROS_INFO_STREAM("Loading mission: " << mission_path);
+    mission.loadMission(mission_path);
+    ROS_INFO_STREAM("Mission loaded");
   }
-  catch (...)
+  catch (const std::exception& ex)
   {
-    valid_mission = false;
-  }
-  if (!valid_mission)
-  {
-    std::string msg("Problem loading mission");
+    std::string msg("Problem loading mission: ");
+    msg += ex.what();
     ROS_ERROR_STREAM(msg);
     res.message = msg;
     res.success = false;
     state_ = CaptainStates::Idle;
     return false;
   }
-  ROS_INFO_STREAM("Mission loaded");
 
   // Check services in the mission before starting
   std::set<std::string> missing_services;  // Use set to avoid reporting duplicates
@@ -657,6 +668,11 @@ bool Captain::enableMissionInternal(cola2_msgs::Mission::Request& req, cola2_msg
     return false;
   }
 
+  return true;
+}
+
+bool Captain::executeMission(cola2_msgs::Mission::Request&, cola2_msgs::Mission::Response& res, Mission& mission)
+{
   // Publish mission path
   nav_msgs::Path path = createPathFromMission(mission);
   pub_path_.publish(path);
@@ -667,7 +683,7 @@ bool Captain::enableMissionInternal(cola2_msgs::Mission::Request& req, cola2_msg
     if (ros::isShuttingDown()) return true;
 
     // Get step pointer
-    MissionStep* step = mission.getStep(i);
+    auto step = mission.getStep(i);
     ROS_INFO_STREAM("Mission step " << i);
 
     if (state_ != CaptainStates::Mission)
@@ -683,7 +699,7 @@ bool Captain::enableMissionInternal(cola2_msgs::Mission::Request& req, cola2_msg
       // Play mission step maneuver
       if (step->getManeuverPtr()->getManeuverType() == WAYPOINT_MANEUVER)  // This comes from mission_maneuver.h
       {
-        auto* maneuver_wp = static_cast<MissionWaypoint*>(step->getManeuverPtr());
+        auto maneuver_wp = std::dynamic_pointer_cast<MissionWaypoint>(step->getManeuverPtr());
         captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_WAYPOINT;
         captain_status_.altitude_mode = maneuver_wp->getPosition().getAltitudeMode();
         if (!worldWaypoint(*maneuver_wp))
@@ -693,7 +709,7 @@ bool Captain::enableMissionInternal(cola2_msgs::Mission::Request& req, cola2_msg
       }
       else if (step->getManeuverPtr()->getManeuverType() == SECTION_MANEUVER)
       {
-        auto* maneuver_sec = static_cast<MissionSection*>(step->getManeuverPtr());
+        auto maneuver_sec = std::dynamic_pointer_cast<MissionSection>(step->getManeuverPtr());
         captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_SECTION;
         captain_status_.altitude_mode = maneuver_sec->getInitialPosition().getAltitudeMode();
         if (!worldSection(*maneuver_sec))
@@ -703,7 +719,7 @@ bool Captain::enableMissionInternal(cola2_msgs::Mission::Request& req, cola2_msg
       }
       else if (step->getManeuverPtr()->getManeuverType() == PARK_MANEUVER)
       {
-        auto* maneuver_park = static_cast<MissionPark*>(step->getManeuverPtr());
+        auto maneuver_park = std::dynamic_pointer_cast<MissionPark>(step->getManeuverPtr());
         captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_PARK;
         captain_status_.altitude_mode = maneuver_park->getPosition().getAltitudeMode();
         if (!park(*maneuver_park))
@@ -1075,6 +1091,10 @@ bool Captain::enableMissionSrv(cola2_msgs::Mission::Request& req, cola2_msgs::Mi
     return true;
   }
 
+  // Load mission
+  Mission mission;
+  if (!loadMission(req, res, mission)) return true;
+
   // Set captain state
   state_ = CaptainStates::Mission;
   ROS_INFO_STREAM("Enabling mission");
@@ -1085,7 +1105,7 @@ bool Captain::enableMissionSrv(cola2_msgs::Mission::Request& req, cola2_msgs::Mi
   captain_status_.total_steps = 0;
 
   // Call enable mission
-  enableMissionInternal(req, res);
+  executeMission(req, res, mission);
 
   return true;
 }
@@ -1112,12 +1132,26 @@ bool Captain::enableDefaultMissionNonBlockSrv(std_srvs::Trigger::Request&, std_s
     return true;
   }
 
+  // Create default req
+  cola2_msgs::Mission::Request mission_req;
+  cola2_msgs::Mission::Response mission_res;
+  mission_req.mission = "last_mission.xml";
+
+  // Load mission
+  Mission mission;
+  if (!loadMission(mission_req, mission_res, mission))
+  {
+    res.message = mission_res.message;  // Copy result from Mission to Trigger type
+    res.success = mission_res.success;
+    return true;
+  }
+
   // Set captain state
   state_ = CaptainStates::Mission;
 
   // Start thread joining first the previous one, which should be done by now (if the state machine is correct)
   if (thread_mission_ != NULL) thread_mission_->join();
-  thread_mission_ = new std::thread(&Captain::enableDefaultMissionNonBlockSrvHelper, this);
+  thread_mission_ = new std::thread(&Captain::enableDefaultMissionNonBlockSrvHelper, this, mission);
 
   res.message = "Default mission enabled";
   res.success = true;
@@ -1125,13 +1159,12 @@ bool Captain::enableDefaultMissionNonBlockSrv(std_srvs::Trigger::Request&, std_s
   return true;
 }
 
-void Captain::enableDefaultMissionNonBlockSrvHelper()
+void Captain::enableDefaultMissionNonBlockSrvHelper(Mission mission)
 {
   // Helper method. It is needed because enableMission() has reference arguments
   cola2_msgs::Mission::Request req;
   cola2_msgs::Mission::Response res;
-  req.mission = "last_mission.xml";
-  enableMissionInternal(req, res);
+  executeMission(req, res, mission);
 }
 
 bool Captain::disableMissionSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& res)

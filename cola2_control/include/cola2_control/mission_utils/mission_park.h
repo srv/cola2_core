@@ -5,8 +5,6 @@
 #ifndef COLA2_CONTROL_MISSION_PARK_H
 #define COLA2_CONTROL_MISSION_PARK_H
 
-#include <vector>
-#include <string>
 #include <iostream>
 #include <cola2_control/mission_utils/mission_position.h>
 #include <cola2_control/mission_utils/mission_tolerance.h>
@@ -28,7 +26,7 @@ public:
 
   ~MissionPark();
 
-  MissionPark(MissionPosition position_, unsigned int time_, MissionTolerance tolerance_);
+  MissionPark(const MissionPosition& position, const unsigned int t, const MissionTolerance& tolerance);
 
 //  friend std::ostream& operator<<(std::ostream& stream, const MissionPark& p)
 //  {
@@ -41,11 +39,11 @@ public:
 
   MissionTolerance getTolerance() const;
 
-  void setPosition(const MissionPosition position);
+  void setPosition(const MissionPosition& position);
 
   void setTime(const unsigned int time);
 
-  void setTolerance(const MissionTolerance tolerance);
+  void setTolerance(const MissionTolerance& tolerance);
 
   double x();
 

@@ -12,20 +12,16 @@ MissionPosition::~MissionPosition()
 {
 }
 
-MissionPosition::MissionPosition(const MissionPosition& position)
+MissionPosition::MissionPosition(const MissionPosition& position):
+  latitude_(position.latitude_), longitude_(position.longitude_), z_(position.z_),
+  altitude_mode_(position.altitude_mode_)
 {
-  latitude_ = position.latitude_;
-  longitude_ = position.longitude_;
-  z_ = position.z_;
-  altitude_mode_ = position.altitude_mode_;
 }
 
-MissionPosition::MissionPosition(double latitude, double longitude, double z, bool altitude_mode)
+MissionPosition::MissionPosition(const double latitude, const double longitude,
+                                 const double z, const bool altitude_mode):
+  latitude_(latitude), longitude_(longitude), z_(z), altitude_mode_(altitude_mode)
 {
-  latitude_ = latitude;
-  longitude_ = longitude;
-  z_ = z;
-  altitude_mode_ = altitude_mode;
 }
 
 double MissionPosition::getLatitude() const

@@ -5,7 +5,6 @@
 #ifndef COLA2_CONTROL_MISSION_CONFIGURATION_H
 #define COLA2_CONTROL_MISSION_CONFIGURATION_H
 
-#include <vector>
 #include <string>
 #include <iostream>
 
@@ -24,7 +23,7 @@ public:
 
   ~MissionConfiguration();
 
-  MissionConfiguration(std::string key, std::string value);
+  MissionConfiguration(const std::string& key, const std::string& value);
 
   friend std::ostream& operator<<(std::ostream& stream, const MissionConfiguration& conf)
   {

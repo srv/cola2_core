@@ -5,10 +5,6 @@
 #ifndef COLA2_CONTROL_MISSION_MANEUVER_H
 #define COLA2_CONTROL_MISSION_MANEUVER_H
 
-#include <vector>
-#include <string>
-#include <iostream>
-
 const unsigned int WAYPOINT_MANEUVER = 0;
 const unsigned int SECTION_MANEUVER = 1;
 const unsigned int PARK_MANEUVER = 2;
@@ -35,6 +31,7 @@ public:
 
   unsigned int getManeuverType();
 
+  // This is used in the captain to create a path
   virtual double x() = 0;
 
   virtual double y() = 0;

@@ -6,8 +6,8 @@
 #define COLA2_CONTROL_MISSION_STEP_H
 
 #include <vector>
-#include <string>
 #include <iostream>
+#include <memory>
 #include <cola2_control/mission_utils/mission_maneuver.h>
 #include <cola2_control/mission_utils/mission_action.h>
 #include <memory>
@@ -18,8 +18,7 @@
 class MissionStep
 {
 private:
-  unsigned int step_id_;
-  MissionManeuver* maneuver_;
+  std::shared_ptr<MissionManeuver> maneuver_;
   std::vector<MissionAction> actions_;
 
 public:
@@ -27,17 +26,13 @@ public:
 
   ~MissionStep();
 
-  MissionManeuver* getManeuverPtr() const;
+  std::shared_ptr<MissionManeuver> getManeuverPtr() const;
 
   std::vector<MissionAction> getActions() const;
 
-  void setManeuverPtr(MissionManeuver* maneuver);
+  void setManeuverPtr(std::shared_ptr<MissionManeuver> maneuver);
 
-  void addAction(MissionAction action);
-
-  unsigned int getStepId();
-
-  void incStepId();
+  void addAction(const MissionAction& action);
 };
 
 #endif //COLA2_CONTROL_MISSION_STEP_H
