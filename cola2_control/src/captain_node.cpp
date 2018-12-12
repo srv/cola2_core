@@ -645,6 +645,7 @@ bool Captain::loadMission(cola2_msgs::Mission::Request& req, cola2_msgs::Mission
     {
       if (ros::isShuttingDown()) return true;
       std::string action_id = action.getActionId();
+      if (missing_services.find(action_id) != missing_services.end()) continue;  // Already in missing_services
       if (action.getIsEmpty())
       {
         ros::ServiceClient action_client = nh_.serviceClient<std_srvs::Trigger>(action_id);
