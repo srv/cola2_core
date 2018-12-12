@@ -30,6 +30,7 @@
 #include <ros/console.h>
 #include <std_srvs/Trigger.h>
 #include <vector>
+#include <set>
 #include <string>
 #include <sstream>
 #include <algorithm>
@@ -622,14 +623,46 @@ bool Captain::enableMissionInternal(cola2_msgs::Mission::Request& req, cola2_msg
     state_ = CaptainStates::Idle;
     return false;
   }
-
   ROS_INFO_STREAM("Mission loaded");
+
+  // Check services in the mission before starting
+  std::set<std::string> missing_services;  // Use set to avoid reporting duplicates
+  for (std::size_t i = 0; i < mission.size(); ++i)
+  {
+    std::vector<MissionAction> actions = mission.getStep(i)->getActions();
+    for (const auto& action : actions)
+    {
+      if (ros::isShuttingDown()) return true;
+      std::string action_id = action.getActionId();
+      if (action.getIsEmpty())
+      {
+        ros::ServiceClient action_client = nh_.serviceClient<std_srvs::Trigger>(action_id);
+        if (!action_client.waitForExistence(ros::Duration(1.0))) missing_services.insert(action_id);
+      }
+      else
+      {
+        ros::ServiceClient action_client = nh_.serviceClient<cola2_msgs::Action>(action_id);
+        if (!action_client.waitForExistence(ros::Duration(1.0))) missing_services.insert(action_id);
+      }
+    }
+  }
+  if (!missing_services.empty())
+  {
+    std::string msg("Problem loading mission. Missing services:");
+    for (const auto& service : missing_services) msg += " " + service;
+    ROS_ERROR_STREAM(msg);
+    res.message = msg;
+    res.success = false;
+    state_ = CaptainStates::Idle;
+    return false;
+  }
 
   // Publish mission path
   nav_msgs::Path path = createPathFromMission(mission);
   pub_path_.publish(path);
 
-  for (std::size_t i = 0; i < mission.size(); i++)
+  // Main loop over mission steps
+  for (std::size_t i = 0; i < mission.size(); ++i)
   {
     if (ros::isShuttingDown()) return true;
 
@@ -650,30 +683,30 @@ bool Captain::enableMissionInternal(cola2_msgs::Mission::Request& req, cola2_msg
       // Play mission step maneuver
       if (step->getManeuverPtr()->getManeuverType() == WAYPOINT_MANEUVER)  // This comes from mission_maneuver.h
       {
-        auto* wp = static_cast<MissionWaypoint*>(step->getManeuverPtr());
+        auto* maneuver_wp = static_cast<MissionWaypoint*>(step->getManeuverPtr());
         captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_WAYPOINT;
-        captain_status_.altitude_mode = wp->getPosition().getAltitudeMode();
-        if (!this->worldWaypoint(*wp))
+        captain_status_.altitude_mode = maneuver_wp->getPosition().getAltitudeMode();
+        if (!worldWaypoint(*maneuver_wp))
         {
           ROS_WARN_STREAM("Impossible to reach waypoint. Move to next mission step");
         }
       }
       else if (step->getManeuverPtr()->getManeuverType() == SECTION_MANEUVER)
       {
-        auto* sec = static_cast<MissionSection*>(step->getManeuverPtr());
+        auto* maneuver_sec = static_cast<MissionSection*>(step->getManeuverPtr());
         captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_SECTION;
-        captain_status_.altitude_mode = sec->getInitialPosition().getAltitudeMode();
-        if (!this->worldSection(*sec))
+        captain_status_.altitude_mode = maneuver_sec->getInitialPosition().getAltitudeMode();
+        if (!worldSection(*maneuver_sec))
         {
           ROS_WARN_STREAM("Impossible to reach section. Move to next mission step");
         }
       }
       else if (step->getManeuverPtr()->getManeuverType() == PARK_MANEUVER)
       {
-        auto* park = static_cast<MissionPark*>(step->getManeuverPtr());
+        auto* maneuver_park = static_cast<MissionPark*>(step->getManeuverPtr());
         captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_PARK;
-        captain_status_.altitude_mode = park->getPosition().getAltitudeMode();
-        if (!this->park(*park))
+        captain_status_.altitude_mode = maneuver_park->getPosition().getAltitudeMode();
+        if (!park(*maneuver_park))
         {
           ROS_WARN_STREAM("Impossible to reach park waypoint. Move to next mission step");
         }
@@ -685,7 +718,7 @@ bool Captain::enableMissionInternal(cola2_msgs::Mission::Request& req, cola2_msg
     for (const auto& action : actions)
     {
       if (ros::isShuttingDown()) return true;
-      this->callAction(action.getIsEmpty(), action.getActionId(), action.getParameters());
+      callAction(action.getIsEmpty(), action.getActionId(), action.getParameters());
       ros::Duration(2.0).sleep();
     }
   }
@@ -768,24 +801,34 @@ nav_msgs::Path Captain::createPathFromMission(Mission mission)
 
 void Captain::callAction(const bool is_empty, const std::string &action_id, const std::vector<std::string> parameters)
 {
-  ROS_INFO_STREAM("Calling id -> " << action_id);
   if (is_empty)
   {
-    ROS_INFO_STREAM("Calling a trigger service");
+    ROS_INFO_STREAM("Calling trigger service with id " << action_id);
     ros::ServiceClient action_client = nh_.serviceClient<std_srvs::Trigger>(action_id);
-    std_srvs::Trigger params;
-    action_client.call(params);
+    if (action_client.waitForExistence(ros::Duration(1.0)))
+    {
+      std_srvs::Trigger params;
+      action_client.call(params);
+    }
+    else
+    {
+      ROS_ERROR_STREAM("Trigger service with id " << action_id << " does not exist");
+    }
   }
   else
   {
-    ROS_INFO_STREAM("Calling an action service");
+    ROS_INFO_STREAM("Calling action service with id " << action_id);
     ros::ServiceClient action_client = nh_.serviceClient<cola2_msgs::Action>(action_id);
-    cola2_msgs::Action params;
-    for (const auto &param : parameters)
+    if (action_client.waitForExistence(ros::Duration(1.0)))
     {
-      params.request.param.push_back(param);
+      cola2_msgs::Action params;
+      for (const auto &param : parameters) params.request.param.push_back(param);
+      action_client.call(params);
     }
-    action_client.call(params);
+    else
+    {
+      ROS_ERROR_STREAM("Action service with id " << action_id << " does not exist");
+    }
   }
 }
 
@@ -1143,6 +1186,14 @@ bool Captain::enableKeepPositionHolonomicSrv(std_srvs::Trigger::Request&, std_sr
   }
 
   // Check current state
+  if (state_ == CaptainStates::KeepPosition)
+  {
+    std::string msg("Keep position already enabled");
+    ROS_WARN_STREAM(msg);
+    res.message = msg;
+    res.success = true;
+    return true;
+  }
   if (state_ != CaptainStates::Idle)
   {
     std::string msg("Impossible to enable keep position. Something is already running");
@@ -1210,6 +1261,14 @@ bool Captain::enableKeepPositionNonHolonomicSrv(std_srvs::Trigger::Request&, std
   }
 
   // Check current state
+  if (state_ == CaptainStates::KeepPosition)
+  {
+    std::string msg("Keep position already enabled");
+    ROS_WARN_STREAM(msg);
+    res.message = msg;
+    res.success = true;
+    return true;
+  }
   if (state_ != CaptainStates::Idle)
   {
     std::string msg("Impossible to enable keep position. Something is already running");
