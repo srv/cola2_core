@@ -242,6 +242,12 @@ class SafetySupervisor(object):
         else:
             self.diagnostic.add('water_detected', 'False')
 
+        # Rule: Outside Virtual Cage
+        if not vehicle_status.inside_virtual_cage:
+            if self.virtual_cage_calls_keep_position:
+                self.error_code[ErrorCode.NAV_STS_WARNING] = '1'
+                self.call_recovery_action("Outside virtual cage!", RecoveryAction.ABORT_AND_SURFACE)
+
         # Rule: High Temperature
         temperatures = vehicle_status.temperature
         if temperatures:
@@ -312,6 +318,7 @@ class SafetySupervisor(object):
                       'working_area_east_origin': (ns + '/virtual_cage/east_origin', -50.0),
                       'working_area_north_length': (ns + '/virtual_cage/north_longitude', 100.0),
                       'working_area_east_length': (ns + '/virtual_cage/east_longitude', 100.0),
+                      'virtual_cage_calls_keep_position': (ns + '/virtual_cage/calls_keep_position', False),
                       'timeout': (ns + '/safety/timeout', 3600),
                       'min_modem_update': (ns + '/safety/min_modem_update', 2.0),
                       'min_dvl_good_data': (ns + '/safety/min_dvl_good_data', 30),

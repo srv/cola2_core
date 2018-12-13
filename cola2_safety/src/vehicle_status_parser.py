@@ -60,6 +60,9 @@ class VehicleStatusParser:
         # Initialize water vector
         self.water = [False] * len(self.diag_water)
 
+        # Initialize virtual cage state
+        self.status.inside_virtual_cage = True
+
         # Subscriber
         rospy.Subscriber(namespace + "diagnostics_agg",
                          DiagnosticArray,
@@ -229,6 +232,13 @@ class VehicleStatusParser:
             if (rospy.Time.now() - self.last_water_inside) > dt:
                 self.status.water_detected = True
 
+            # Get virtual cage status
+            if __getDiagnostic__(status, self.diag_inside_virtual_cage[0]):
+                if __getDiagnostic__(status, self.diag_inside_virtual_cage[0], self.diag_inside_virtual_cage[1], 'False') == 'True':
+                    self.status.inside_virtual_cage = True
+                else:
+                    self.status.inside_virtual_cage = False
+
         # Publish status message
         self.status.header.stamp = rospy.Time.now()
         self.status.header.frame_id = rospy.get_namespace() + str('base_link')
@@ -256,7 +266,8 @@ class VehicleStatusParser:
                       'diag_modem_data_age': ('modem_data_age', ["",""]),
                       'diag_temperature': ('temperature', [["",""],["",""]]),
                       'diag_water': ('water', [["", ""], ["", ""]]),
-                      'temperature_name': ('temperature_name', ["",""])
+                      'temperature_name': ('temperature_name', ["",""]),
+                      'diag_inside_virtual_cage': ('inside_virtual_cage', ["",""])
                      }
 
         param_loader.get_ros_params(self, param_dict)
