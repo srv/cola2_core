@@ -303,13 +303,16 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
   // Check other
   // *****************************************
   // Check current freq
-  diag_help_.add("freq", std::to_string(diag_help_.getCurrentFreq()));
   double freq = diag_help_.getCurrentFreq();
-  if (freq < config_.min_diagnostics_frequency_)
+  diag_help_.add("freq", std::to_string(freq));
+  if (init_ekf_ && (ros::Time::now().toSec() - last_ekf_init_time_ > 10.0))
   {
-    is_nav_data_ok = false;
-    ROS_WARN_STREAM("Diagnostics frequency too low (" << freq << " lower than " <<
-                    config_.min_diagnostics_frequency_ << ")");
+    if (freq < config_.min_diagnostics_frequency_)
+    {
+      is_nav_data_ok = false;
+      ROS_WARN_STREAM("Diagnostics frequency too low (" << freq << " lower than " <<
+                      config_.min_diagnostics_frequency_ << ")");
+    }
   }
   // If filter or NED not initialized set to Warning
   if (!init_ekf_)

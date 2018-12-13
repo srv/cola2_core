@@ -55,6 +55,8 @@ NavigatorNode::NavigatorNode()
   sub_sound_velocity_ = nh_.subscribe("sound_velocity", 2, &EKFBaseLandmarksROS::updateSoundVelocityMsg,  reinterpret_cast<EKFBaseLandmarksROS*>(this));
   sub_altitude_ = nh_.subscribe("altitude", 2, &EKFBaseLandmarksROS::updateAltitudeMsg,  reinterpret_cast<EKFBaseLandmarksROS*>(this));
   // clang-format on
+
+  ROS_INFO("Initialized");
 }
 
 NavigatorNode::~NavigatorNode()
@@ -65,7 +67,6 @@ int main(int argc, char** argv)
 {
   // Init
   ros::init(argc, argv, "navigator");
-  ROS_INFO("Init NavigatorNode");
   NavigatorNode node;
   ros::spin();  // spin until architecture stops
   return 0;

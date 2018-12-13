@@ -148,6 +148,8 @@ class Teleoperation(object):
         data = ack_msg.data.split(' ')
         if data[1] == 'ack' and data[0] == str(self.seq + 1):
             self.map_ack_alive = True
+            if not self.map_ack_init:
+                rospy.loginfo("Initial map ack received")
             self.map_ack_init = True
             self.seq = self.seq + 1
             self.last_map_ack = rospy.Time.now().to_sec()

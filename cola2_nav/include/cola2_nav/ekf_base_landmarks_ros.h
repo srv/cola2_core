@@ -133,6 +133,7 @@ protected:
   double last_dvl_time_ = 0.0;                   //!< last time dvl received
   double last_imu_time_ = 0.0;                   //!< last time imu received
   double last_altitude_time_ = 0.0;              //!< last time altitude received
+  double last_ekf_init_time_ = 0.0;              //!< last time ekf initialized
   size_t dvl_bottom_status_ = 0;
   size_t gps_samples_ = 0;
   size_t gps_samples_wrong_before_init_ = 0;
