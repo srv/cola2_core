@@ -12,7 +12,7 @@
 import rospy
 from cola2_control.joystickbase import JoystickBase
 from cola2_lib.rosutils import param_loader
-from std_srvs.srv import Empty
+from std_srvs.srv import Empty, Trigger, TriggerRequest, TriggerResponse
 
 
 class LogitechFX10(JoystickBase):
@@ -71,7 +71,7 @@ class LogitechFX10(JoystickBase):
         if self.start_service != "":
             rospy.wait_for_service(self.start_service, 10)
             try:
-                self.enable_keep_pose = rospy.ServiceProxy(self.start_service, Empty)
+                self.enable_keep_pose = rospy.ServiceProxy(self.start_service, Trigger)
             except rospy.ServiceException, e:
                 rospy.logwarn("%s: Service call failed: %s", self.name, e)
 
@@ -79,7 +79,7 @@ class LogitechFX10(JoystickBase):
         if self.start_service != '':
             rospy.wait_for_service(self.stop_service, 10)
             try:
-                self.disable_keep_pose = rospy.ServiceProxy(self.stop_service, Empty)
+                self.disable_keep_pose = rospy.ServiceProxy(self.stop_service, Trigger)
             except rospy.ServiceException, e:
                 rospy.logwarn("%s: Service call failed: %s", self.name, e)
 
@@ -162,10 +162,15 @@ class LogitechFX10(JoystickBase):
         # Enable/disable keep position
         if joy.buttons[self.BUTTON_START] == 1.0:
             rospy.loginfo("%s: Start button service called", self.name)
-            self.enable_keep_pose()
+            res = self.enable_keep_pose(TriggerRequest())
+            if not res.success:
+                rospy.logwarn("%s: Impossible to enable keep position, captain response: %s", self.name, res.message) 
         if joy.buttons[self.BUTTON_BACK] == 1.0:
             rospy.loginfo("%s: Stop button service called", self.name)
-            self.disable_keep_pose()
+            res = self.disable_keep_pose(TriggerRequest())
+            if not res.success:
+                rospy.logwarn("%s: Impossible to disable keep position, captain response: %s", self.name, res.message)
+
 
         # Enable/disable thrusters
         if joy.axes[self.LEFT_TRIGGER] < -0.9 and joy.axes[self.RIGHT_TRIGGER] < -0.9:
