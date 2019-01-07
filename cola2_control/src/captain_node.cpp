@@ -59,6 +59,8 @@ class Captain
   ros::ServiceServer enable_keep_position_holonomic_srv_;
   ros::ServiceServer enable_keep_position_non_holonomic_srv_;
   ros::ServiceServer disable_keep_position_srv_;
+  ros::ServiceServer enable_safety_keep_position_srv_;
+  ros::ServiceServer disable_safety_keep_position_srv_;
   ros::ServiceServer enable_external_mission_srv_;
   ros::ServiceServer disable_external_mission_srv_;
   ros::ServiceServer enable_mission_srv_;
@@ -75,7 +77,7 @@ class Captain
   bool is_waypoint_actionlib_running_, is_section_actionlib_running_;
 
   // Possible captain states
-  enum class CaptainStates {Idle, Goto, Mission, KeepPosition, Backseat};
+  enum class CaptainStates {Idle, Goto, Mission, KeepPosition, SafetyKeepPosition, Backseat};
   CaptainStates state_;
 
   // Navigation data
@@ -260,6 +262,22 @@ class Captain
   bool disableKeepPositionSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response&);
 
   /**
+   * \brief Enable safety keep position for surge, heave, and yaw DoFs
+   * \param[in] Request
+   * \param[out] Response
+   * \return Success
+   */
+  bool enableSafetyKeepPositionSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response&);
+
+  /**
+   * \brief Disable safety keep position
+   * \param[in] Request
+   * \param[out] Response
+   * \return Success
+   */
+  bool disableSafetyKeepPositionSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response&);
+
+  /**
    * \brief Allows an external controller to 'fake' that a mission is under execution
    * \param[in] Request
    * \param[out] Response
@@ -321,6 +339,8 @@ Captain::Captain()
   enable_keep_position_holonomic_srv_ = nh_.advertiseService("enable_keep_position_holonomic", &Captain::enableKeepPositionHolonomicSrv, this);
   enable_keep_position_non_holonomic_srv_ = nh_.advertiseService("enable_keep_position_non_holonomic", &Captain::enableKeepPositionNonHolonomicSrv, this);
   disable_keep_position_srv_ = nh_.advertiseService("disable_keep_position", &Captain::disableKeepPositionSrv, this);
+  enable_safety_keep_position_srv_ = nh_.advertiseService("enable_safety_keep_position", &Captain::enableSafetyKeepPositionSrv, this);
+  disable_safety_keep_position_srv_ = nh_.advertiseService("disable_safety_keep_position", &Captain::disableSafetyKeepPositionSrv, this);
   enable_mission_srv_ = nh_.advertiseService("enable_mission", &Captain::enableMissionSrv, this);
   enable_default_mission_non_block_srv_ = nh_.advertiseService("enable_default_mission_non_block", &Captain::enableDefaultMissionNonBlockSrv, this);
   disable_mission_srv_ = nh_.advertiseService("disable_mission", &Captain::disableMissionSrv, this);
@@ -1237,10 +1257,6 @@ bool Captain::enableKeepPositionHolonomicSrv(std_srvs::Trigger::Request&, std_sr
     return true;
   }
 
-  // Get safety depth
-  double controlled_surface_depth;
-  cola2::rosutils::getParam("~controlled_surface_depth", controlled_surface_depth, 0.0);  // Default value
-
   // Set captain state
   state_ = CaptainStates::KeepPosition;
 
@@ -1251,7 +1267,7 @@ bool Captain::enableKeepPositionHolonomicSrv(std_srvs::Trigger::Request&, std_sr
 
   // Display info
   ROS_INFO_STREAM("Start holonomic keep position at [" <<
-                  nav_.x << ", " << nav_.y << ", " << controlled_surface_depth << "] with orientation " << nav_.yaw);
+                  nav_.x << ", " << nav_.y << ", " << nav_.z << "] with orientation " << nav_.yaw);
 
   // Call internal goto
   cola2_msgs::Goto::Request goto_req;
@@ -1268,10 +1284,10 @@ bool Captain::enableKeepPositionHolonomicSrv(std_srvs::Trigger::Request&, std_sr
   goto_req.disable_axis.yaw = false;
   goto_req.position.x = nav_.x;
   goto_req.position.y = nav_.y;
-  goto_req.position.z = controlled_surface_depth;
+  goto_req.position.z = nav_.z;
   goto_req.yaw = static_cast<float>(nav_.yaw);
-  goto_req.position_tolerance.x = 0.0;  // If toloerance is 0.0 position, the waypoint is impossible to reach
-  goto_req.position_tolerance.y = 0.0;  // and therefore, the controller will never finish
+  goto_req.position_tolerance.x = 0.0;  // If tolerance is 0.0 position, the waypoint is impossible to reach
+  goto_req.position_tolerance.y = 0.0;  // and therefore the controller will never finish
   goto_req.position_tolerance.z = 0.0;
   goto_req.orientation_tolerance.yaw = 0.0;
   goto_req.reference = cola2_msgs::Goto::Request::REFERENCE_NED;
@@ -1312,10 +1328,6 @@ bool Captain::enableKeepPositionNonHolonomicSrv(std_srvs::Trigger::Request&, std
     return true;
   }
 
-  // Get safety depth
-  double controlled_surface_depth;
-  cola2::rosutils::getParam("~controlled_surface_depth", controlled_surface_depth, 0.0);  // Default value
-
   // Set captain state
   state_ = CaptainStates::KeepPosition;
 
@@ -1325,8 +1337,8 @@ bool Captain::enableKeepPositionNonHolonomicSrv(std_srvs::Trigger::Request&, std
   captain_status_.total_steps = 0;
 
   // Display info
-  ROS_INFO_STREAM("Start non holonomic keep position at [" <<
-                  nav_.x << ", " << nav_.y << ", " << controlled_surface_depth << "] with orientation " << nav_.yaw);
+  ROS_INFO_STREAM("Start nonholonomic keep position at [" <<
+                  nav_.x << ", " << nav_.y << ", " << nav_.z << "] with orientation " << nav_.yaw);
 
   // Call internal goto
   cola2_msgs::Goto::Request goto_req;
@@ -1343,10 +1355,10 @@ bool Captain::enableKeepPositionNonHolonomicSrv(std_srvs::Trigger::Request&, std
   goto_req.disable_axis.yaw = false;
   goto_req.position.x = nav_.x;
   goto_req.position.y = nav_.y;
-  goto_req.position.z = controlled_surface_depth;
+  goto_req.position.z = nav_.z;
   goto_req.yaw = static_cast<float>(nav_.yaw);
   goto_req.position_tolerance.x = 0.0;  // If tolerance is 0.0 position, the waypoint is impossible to reach
-  goto_req.position_tolerance.y = 0.0;  // and therefore, the controller will never finish
+  goto_req.position_tolerance.y = 0.0;  // and therefore the controller will never finish
   goto_req.position_tolerance.z = 0.0;
   goto_req.orientation_tolerance.yaw = 0.0;
   goto_req.reference = cola2_msgs::Goto::Request::REFERENCE_NED;
@@ -1391,6 +1403,114 @@ bool Captain::disableKeepPositionSrv(std_srvs::Trigger::Request&, std_srvs::Trig
   return true;
 }
 
+bool Captain::enableSafetyKeepPositionSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& res)
+{
+  // Check navigation
+  if (!nav_received_)
+  {
+    std::string msg("Impossible to enable safety keep position. Navigation not received yet");
+    ROS_ERROR_STREAM(msg);
+    res.message = msg;
+    res.success = false;
+    return true;
+  }
+
+  // Check current state
+  if (state_ == CaptainStates::SafetyKeepPosition)
+  {
+    std::string msg("Safety keep position already enabled");
+    ROS_WARN_STREAM(msg);
+    res.message = msg;
+    res.success = true;
+    return true;
+  }
+  if (state_ != CaptainStates::Idle)
+  {
+    std::string msg("Impossible to enable safety keep position. Something is already running");
+    ROS_ERROR_STREAM(msg);
+    res.message = msg;
+    res.success = false;
+    return true;
+  }
+
+  // Get safety depth
+  double controlled_surface_depth;
+  cola2::rosutils::getParam("~controlled_surface_depth", controlled_surface_depth, 0.0);  // Default value
+
+  // Set captain state
+  state_ = CaptainStates::SafetyKeepPosition;
+
+  // Set captain status
+  captain_status_.altitude_mode = false;
+  captain_status_.current_step = 0;
+  captain_status_.total_steps = 0;
+
+  // Display info
+  ROS_INFO_STREAM("Start nonholonomic safety keep position at [" <<
+                  nav_.x << ", " << nav_.y << ", " << controlled_surface_depth << "] with orientation " << nav_.yaw);
+
+  // Call internal goto
+  cola2_msgs::Goto::Request goto_req;
+  cola2_msgs::Goto::Response goto_res;
+  goto_req.priority = cola2_msgs::GoalDescriptor::PRIORITY_NORMAL;
+  goto_req.altitude_mode = false;
+  goto_req.blocking = false;
+  goto_req.keep_position = true;
+  goto_req.disable_axis.x = false;
+  goto_req.disable_axis.y = true;
+  goto_req.disable_axis.z = false;
+  goto_req.disable_axis.roll = true;
+  goto_req.disable_axis.pitch = true;
+  goto_req.disable_axis.yaw = false;
+  goto_req.position.x = nav_.x;
+  goto_req.position.y = nav_.y;
+  goto_req.position.z = controlled_surface_depth;
+  goto_req.yaw = static_cast<float>(nav_.yaw);
+  goto_req.position_tolerance.x = 0.0;  // If tolerance is 0.0 position, the waypoint is impossible to reach
+  goto_req.position_tolerance.y = 0.0;  // and therefore the controller will never finish
+  goto_req.position_tolerance.z = 0.0;
+  goto_req.orientation_tolerance.yaw = 0.0;
+  goto_req.reference = cola2_msgs::Goto::Request::REFERENCE_NED;
+  enableGotoInternal(goto_req, goto_res);
+
+  res.message = "Safety nonholonomic keep position enabled";
+  res.success = true;
+  return true;
+}
+
+bool Captain::disableSafetyKeepPositionSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& res)
+{
+  // Check current state
+  if (state_ != CaptainStates::SafetyKeepPosition)
+  {
+    std::string msg("Impossible to disable safety keep position. Captain not in safety keep position state");
+    ROS_WARN_STREAM(msg);
+    res.message = msg;
+    res.success = false;
+    return true;
+  }
+
+  // Set captain state
+  state_ = CaptainStates::Idle;
+
+  // Cancel actionlib if necessary
+  if (is_waypoint_actionlib_running_)
+  {
+    waypoint_actionlib_.cancelGoal();
+    is_waypoint_actionlib_running_ = false;
+  }
+
+  // Set captain status
+  captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_NONE;
+  captain_status_.altitude_mode = false;
+  captain_status_.current_step = 0;
+  captain_status_.total_steps = 0;
+
+  res.message = "Safety keep position disabled";
+  res.success = true;
+  ROS_INFO_STREAM(res.message);
+  return true;
+}
 
 bool Captain::enableExternalMissionSrv(ros::ServiceEvent<std_srvs::Trigger::Request,
                                                          std_srvs::Trigger::Response>& event)

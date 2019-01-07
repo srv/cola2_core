@@ -65,6 +65,14 @@ class RecoveryActions(object):
             rospy.logfatal("Disable keep position service not available!")
 
         try:
+            rospy.wait_for_service(ns + 'captain/disable_safety_keep_position', 2)
+            self.abort_safety_keep_position_srv = rospy.ServiceProxy(ns +
+                                                                     'captain/disable_safety_keep_position', Trigger)
+        except rospy.exceptions.ROSException:
+            self.captain_clients = False
+            rospy.logfatal("Disable safety keep position service not available!")
+
+        try:
             rospy.wait_for_service(ns + 'captain/disable_goto', 2)
             self.abort_goto_srv = rospy.ServiceProxy(ns + 'captain/disable_goto', Trigger)
         except rospy.exceptions.ROSException:
@@ -79,11 +87,11 @@ class RecoveryActions(object):
             rospy.logfatal("Goto service not available!")
 
         try:
-            rospy.wait_for_service(ns + 'captain/enable_keep_position_non_holonomic', 2)  # Should work for both robots
-            self.keep_position_srv = rospy.ServiceProxy(ns + 'captain/enable_keep_position_non_holonomic', Trigger)
+            rospy.wait_for_service(ns + 'captain/enable_safety_keep_position', 2)
+            self.safety_keep_position_srv = rospy.ServiceProxy(ns + 'captain/enable_safety_keep_position', Trigger)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
-            rospy.logfatal("Keep position service not available!")
+            rospy.logfatal("Safety keep position service not available!")
 
         if not self.captain_clients:
             self.no_captain_clients_timer = rospy.Timer(rospy.Duration(0.4), self.no_captain_clients_message)
@@ -132,14 +140,17 @@ class RecoveryActions(object):
         elif error == RecoveryAction.ABORT_MISSION:
             rospy.loginfo("Recovery action %s: ABORT_MISSION", error)
             self.abort_mission_and_goto()
+            # self.abort_keep_position()
         elif error == RecoveryAction.ABORT_AND_SURFACE:
             rospy.loginfo("Recovery action %s: ABORT_AND_SURFACE", error)
             self.abort_mission_and_goto()
-            self.keep_position()
+            self.abort_keep_position()
+            self.safety_keep_position()
         elif error == RecoveryAction.EMERGENCY_SURFACE:
             rospy.loginfo("Recovery action %s: EMERGENCY_SURFACE", error)
             self.abort_mission_and_goto()
             self.abort_keep_position()
+            self.abort_safety_keep_position()
             self.disable_thrusters()
             self.emergency_surface()
         elif error == RecoveryAction.STOP_THRUSTERS:
@@ -177,13 +188,22 @@ class RecoveryActions(object):
             rospy.logerr("Error aborting keep position")
 
 
-    def keep_position(self):
-        """ This method enables keep position """
-        rospy.loginfo("Enabling keep position")
+    def abort_safety_keep_position(self):
+        """ This method aborts safety keep position """
+        rospy.loginfo("Abort safety keep position")
         try:
-            self.keep_position_srv(TriggerRequest())
+            self.abort_safety_keep_position_srv(TriggerRequest())
         except rospy.exceptions.ROSException:
-            rospy.logerr("Error keeping position")
+            rospy.logerr("Error aborting safety keep position")
+
+
+    def safety_keep_position(self):
+        """ This method enables safety keep position """
+        rospy.loginfo("Enabling safety keep position")
+        try:
+            self.safety_keep_position_srv(TriggerRequest())
+        except rospy.exceptions.ROSException:
+            rospy.logerr("Error enabling safety keep position")
 
 
     def disable_thrusters(self):
