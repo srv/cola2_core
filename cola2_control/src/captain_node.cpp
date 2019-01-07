@@ -565,14 +565,14 @@ bool Captain::enableGotoInternal(cola2_msgs::Goto::Request& req, cola2_msgs::Got
     mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_PARK;
 
     // Check timeout
-    if (req.timeout > 0)
+    if (req.timeout > 0.0)
     {
       ROS_INFO_STREAM("Keep position TRUE. Setting timeout to " << req.timeout << " seconds");
-      waypoint.timeout = static_cast<double>(req.timeout);
+      waypoint.timeout = req.timeout;
     }
     else
     {
-      ROS_INFO_STREAM("Keep position TRUE but the requested timeout is 0. Keeping position for 3600 seconds");
+      ROS_INFO_STREAM("Keep position TRUE but the requested timeout is 0.0. Keeping position for 3600.0 seconds");
       waypoint.timeout = 3600.0;
     }
   }
@@ -590,11 +590,11 @@ bool Captain::enableGotoInternal(cola2_msgs::Goto::Request& req, cola2_msgs::Got
         (min_vel > waypoint.linear_velocity.x)) min_vel = waypoint.linear_velocity.x;
     waypoint.timeout = 2.0 * distance_to_waypoint / min_vel;
     if (waypoint.timeout < 30.0) waypoint.timeout = 30.0;
-    if ((req.timeout > 0) && (static_cast<double>(req.timeout) < waypoint.timeout))
+    if ((req.timeout > 0.0) && (req.timeout < waypoint.timeout))
     {
-      ROS_WARN_STREAM("Goto request timeout is " << req.timeout << " while computed timeout is " <<
-                      waypoint.timeout << ". Taking requested timeout");
-      waypoint.timeout = static_cast<double>(req.timeout);
+      ROS_WARN_STREAM("Goto request timeout is " << req.timeout << " seconds while computed timeout is " <<
+                      waypoint.timeout << " seconds. Taking requested timeout");
+      waypoint.timeout = req.timeout;
     }
   }
 
@@ -603,14 +603,14 @@ bool Captain::enableGotoInternal(cola2_msgs::Goto::Request& req, cola2_msgs::Got
   {
     ROS_INFO_STREAM("Send waypoint request at [" << waypoint.position.north << ", " << waypoint.position.east
                                                      << "] with altitude " << waypoint.altitude
-                                                     << ". Timeout = " << waypoint.timeout);
+                                                     << ". Timeout is " << waypoint.timeout << " seconds");
     mission_status_.altitude_mode = true;
   }
   else
   {
     ROS_INFO_STREAM("Send waypoint request at [" << waypoint.position.north << ", " << waypoint.position.east
                                                      << "] with depth " << waypoint.position.depth
-                                                     << ". Timeout = " << waypoint.timeout);
+                                                     << ". Timeout is " << waypoint.timeout << " seconds");
     mission_status_.altitude_mode = false;
   }
 
@@ -979,7 +979,7 @@ bool Captain::worldSection(const MissionSection &sec)
       distanceTo3D(final_north, final_east, sec.getFinalPosition().getZ(), sec.getFinalPosition().getZ(),
                    sec.getInitialPosition().getAltitudeMode());
   double timeout = 2.0 * distance_to_end_section / min_vel;
-  ROS_INFO_STREAM("Section timeout = " << timeout);
+  ROS_INFO_STREAM("Section timeout is " << timeout << " seconds");
   section.timeout = timeout;
 
   // Send section using actionlib
@@ -1034,7 +1034,7 @@ bool Captain::park(const MissionPark &park)
       goto_req.position_tolerance.x = 0.0;
       goto_req.position_tolerance.y = 0.0;
       goto_req.position_tolerance.z = 0.0;
-      goto_req.timeout = static_cast<unsigned short>(park.getTime());
+      goto_req.timeout = static_cast<double>(park.getTime());
       return enableGotoInternal(goto_req, goto_res);
     }
     return true;
@@ -1328,6 +1328,7 @@ bool Captain::enableKeepPositionHolonomicSrv(std_srvs::Trigger::Request&, std_sr
   goto_req.position_tolerance.z = 0.0;
   goto_req.orientation_tolerance.yaw = 0.0;
   goto_req.reference = cola2_msgs::Goto::Request::REFERENCE_NED;
+  goto_req.timeout = 0.0;
   enableGotoInternal(goto_req, goto_res);
 
   res.message = "Holonomic keep position enabled";
@@ -1399,6 +1400,7 @@ bool Captain::enableKeepPositionNonHolonomicSrv(std_srvs::Trigger::Request&, std
   goto_req.position_tolerance.z = 0.0;
   goto_req.orientation_tolerance.yaw = 0.0;
   goto_req.reference = cola2_msgs::Goto::Request::REFERENCE_NED;
+  goto_req.timeout = 0.0;
   enableGotoInternal(goto_req, goto_res);
 
   res.message = "Nonholonomic keep position enabled";
@@ -1508,6 +1510,7 @@ bool Captain::enableSafetyKeepPositionSrv(std_srvs::Trigger::Request&, std_srvs:
   goto_req.position_tolerance.z = 0.0;
   goto_req.orientation_tolerance.yaw = 0.0;
   goto_req.reference = cola2_msgs::Goto::Request::REFERENCE_NED;
+  goto_req.timeout = 1e6;  // Effectively waiting forever
   enableGotoInternal(goto_req, goto_res);
 
   res.message = "Safety nonholonomic keep position enabled";
