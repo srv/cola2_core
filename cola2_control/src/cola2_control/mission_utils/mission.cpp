@@ -318,9 +318,10 @@ void Mission::loadPosition(TiXmlHandle hDoc, MissionPosition& position)
     }
     else if (wp_tag == "altitude_mode")
     {
-      std::string mode = pElem->GetText();
-      std::transform(mode.begin(), mode.end(), mode.begin(), ::tolower);
-      if (mode == "true") position.setAltitudeMode(true);
+      std::string mode_str = pElem->GetText();
+      std::transform(mode_str.begin(), mode_str.end(),
+                     mode_str.begin(), ::tolower);
+      if (mode_str == "true") position.setAltitudeMode(true);
       else position.setAltitudeMode(false);
       mode = true;
     }
