@@ -16,6 +16,7 @@
 #include <cola2_lib/rosutils/this_node.h>
 #include <cola2_lib/utils/ned.h>
 #include <cola2_msgs/Action.h>
+#include <cola2_msgs/MissionStatus.h>
 #include <cola2_msgs/CaptainStatus.h>
 #include <cola2_msgs/GoalDescriptor.h>
 #include <cola2_msgs/Goto.h>
@@ -49,6 +50,7 @@ class Captain
 
   // Publishers
   ros::Publisher pub_path_;
+  ros::Publisher pub_mission_status_;
   ros::Publisher pub_captain_status_;
 
   // Services
@@ -77,7 +79,7 @@ class Captain
   bool is_waypoint_actionlib_running_, is_section_actionlib_running_;
 
   // Possible captain states
-  enum class CaptainStates {Idle, Goto, Mission, KeepPosition, SafetyKeepPosition, Backseat};
+  enum class CaptainStates {Idle, Goto, Mission, KeepPosition, SafetyKeepPosition, ExternalMission};
   CaptainStates state_;
 
   // Navigation data
@@ -86,9 +88,10 @@ class Captain
   double last_ned_lat_origin_;
   double last_ned_lon_origin_;
 
-  // Captain status timer and data
-  cola2_msgs::CaptainStatus captain_status_;
-  ros::Timer captain_status_timer_;
+  // Mission and captain status timer and data
+  cola2_msgs::MissionStatus mission_status_;
+  std::string last_loaded_mission_name_;
+  ros::Timer status_timer_;
 
   // External mission caller id
   std::string external_mission_caller_name_;
@@ -101,7 +104,7 @@ class Captain
    * \brief Defunes a timer to publish the captain status
    * \param[in] Timer event
    */
-  void captainStatusTimer(const ros::TimerEvent&);
+  void statusTimer(const ros::TimerEvent&);
 
   /**
    * \brief Callback to 'namespace'/navigator/navigation topic
@@ -319,7 +322,8 @@ Captain::Captain()
 {
   // Publishers
   pub_path_ = nh_.advertise<nav_msgs::Path>("trajectory_path", 1, true);
-  pub_captain_status_ = nh_.advertise<cola2_msgs::CaptainStatus>("status", 1, true);
+  pub_mission_status_ = nh_.advertise<cola2_msgs::MissionStatus>("mission_status", 1, true);
+  pub_captain_status_ = nh_.advertise<cola2_msgs::CaptainStatus>("captain_status", 1, true);
 
   // Wait actionlib clients
   for (;;)
@@ -353,13 +357,13 @@ Captain::Captain()
   sub_nav_ = nh_.subscribe(cola2::rosutils::getNamespace() + "/navigator/navigation", 1, &Captain::updateNav, this);
 
   // Init captain status
-  captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_NONE;
-  captain_status_.altitude_mode = false;
-  captain_status_.current_step = 0;
-  captain_status_.total_steps = 0;
+  mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_NONE;
+  mission_status_.altitude_mode = false;
+  mission_status_.current_step = 0;
+  mission_status_.total_steps = 0;
 
-  // Captain status timer
-  captain_status_timer_ = nh_.createTimer(ros::Duration(2.0), &Captain::captainStatusTimer, this);
+  // Status timer
+  status_timer_ = nh_.createTimer(ros::Duration(2.0), &Captain::statusTimer, this);
 
   ROS_INFO_STREAM("Initialized");
 }
@@ -384,12 +388,42 @@ Captain::~Captain()
   }
 }
 
-void Captain::captainStatusTimer(const ros::TimerEvent&)
+void Captain::statusTimer(const ros::TimerEvent&)
 {
-  // The mission_active flag is computed here before publishing
-  captain_status_.mission_active = (state_ == CaptainStates::Mission) ||
-                                   (state_ == CaptainStates::Backseat);
-  pub_captain_status_.publish(captain_status_);
+  // Publish mission status. The mission_active flag is computed here before publishing
+  mission_status_.mission_active = (state_ == CaptainStates::Mission) ||
+                                   (state_ == CaptainStates::ExternalMission);
+  pub_mission_status_.publish(mission_status_);
+
+  // Publish captain status
+  cola2_msgs::CaptainStatus captain_status_msg;
+  if (state_ == CaptainStates::Idle)
+  {
+    captain_status_msg.state = cola2_msgs::CaptainStatus::IDLE;
+  }
+  else if (state_ == CaptainStates::Goto)
+  {
+    captain_status_msg.state = cola2_msgs::CaptainStatus::GOTO;
+  }
+  else if (state_ == CaptainStates::Mission)
+  {
+    captain_status_msg.state = cola2_msgs::CaptainStatus::MISSION;
+    captain_status_msg.message = "Last loaded mission name: " + last_loaded_mission_name_;
+  }
+  else if (state_ == CaptainStates::KeepPosition)
+  {
+    captain_status_msg.state = cola2_msgs::CaptainStatus::KEEPPOSITION;
+  }
+  else if (state_ == CaptainStates::SafetyKeepPosition)
+  {
+    captain_status_msg.state = cola2_msgs::CaptainStatus::SAFETYKEEPPOSITION;
+  }
+  else if (state_ == CaptainStates::ExternalMission)
+  {
+    captain_status_msg.state = cola2_msgs::CaptainStatus::EXTERNALMISSION;
+    captain_status_msg.message = "External mission caller name: " + external_mission_caller_name_;
+  }
+  pub_captain_status_.publish(captain_status_msg);
 }
 
 void Captain::updateNav(const cola2_msgs::NavSts& msg)
@@ -414,7 +448,7 @@ void Captain::updateNav(const cola2_msgs::NavSts& msg)
     diagnostic_.add("keep_position_enabled", "False");
   }
 
-  if ((state_ == CaptainStates::Mission) || (state_ == CaptainStates::Backseat))
+  if ((state_ == CaptainStates::Mission) || (state_ == CaptainStates::ExternalMission))
   {
     diagnostic_.add("trajectory_enabled", "True");
     diagnostic_.setLevel(diagnostic_msgs::DiagnosticStatus::OK);
@@ -528,7 +562,7 @@ bool Captain::enableGotoInternal(cola2_msgs::Goto::Request& req, cola2_msgs::Got
   if (req.keep_position)
   {
     // Set active controller to park
-    captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_PARK;
+    mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_PARK;
 
     // Check timeout
     if (req.timeout > 0)
@@ -545,7 +579,7 @@ bool Captain::enableGotoInternal(cola2_msgs::Goto::Request& req, cola2_msgs::Got
   else
   {
     // Set active controller to waypoint
-    captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_WAYPOINT;
+    mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_WAYPOINT;
 
     // Compute timeout
     double surge, heave;
@@ -570,14 +604,14 @@ bool Captain::enableGotoInternal(cola2_msgs::Goto::Request& req, cola2_msgs::Got
     ROS_INFO_STREAM("Send waypoint request at [" << waypoint.position.north << ", " << waypoint.position.east
                                                      << "] with altitude " << waypoint.altitude
                                                      << ". Timeout = " << waypoint.timeout);
-    captain_status_.altitude_mode = true;
+    mission_status_.altitude_mode = true;
   }
   else
   {
     ROS_INFO_STREAM("Send waypoint request at [" << waypoint.position.north << ", " << waypoint.position.east
                                                      << "] with depth " << waypoint.position.depth
                                                      << ". Timeout = " << waypoint.timeout);
-    captain_status_.altitude_mode = false;
+    mission_status_.altitude_mode = false;
   }
 
   // Call actionlib
@@ -689,6 +723,9 @@ bool Captain::loadMission(cola2_msgs::Mission::Request& req, cola2_msgs::Mission
     return false;
   }
 
+  // Store name for the captain status message
+  last_loaded_mission_name_ = mission_path;
+
   return true;
 }
 
@@ -714,15 +751,15 @@ bool Captain::executeMission(cola2_msgs::Mission::Request&, cola2_msgs::Mission:
     else
     {
       // Captain status
-      captain_status_.current_step = i + 1;
-      captain_status_.total_steps = mission.size();
+      mission_status_.current_step = i + 1;
+      mission_status_.total_steps = mission.size();
 
       // Play mission step maneuver
       if (step->getManeuverPtr()->getManeuverType() == WAYPOINT_MANEUVER)  // This comes from mission_maneuver.h
       {
         auto maneuver_wp = std::dynamic_pointer_cast<MissionWaypoint>(step->getManeuverPtr());
-        captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_WAYPOINT;
-        captain_status_.altitude_mode = maneuver_wp->getPosition().getAltitudeMode();
+        mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_WAYPOINT;
+        mission_status_.altitude_mode = maneuver_wp->getPosition().getAltitudeMode();
         if (!worldWaypoint(*maneuver_wp))
         {
           ROS_WARN_STREAM("Impossible to reach waypoint. Move to next mission step");
@@ -731,8 +768,8 @@ bool Captain::executeMission(cola2_msgs::Mission::Request&, cola2_msgs::Mission:
       else if (step->getManeuverPtr()->getManeuverType() == SECTION_MANEUVER)
       {
         auto maneuver_sec = std::dynamic_pointer_cast<MissionSection>(step->getManeuverPtr());
-        captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_SECTION;
-        captain_status_.altitude_mode = maneuver_sec->getInitialPosition().getAltitudeMode();
+        mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_SECTION;
+        mission_status_.altitude_mode = maneuver_sec->getInitialPosition().getAltitudeMode();
         if (!worldSection(*maneuver_sec))
         {
           ROS_WARN_STREAM("Impossible to reach section. Move to next mission step");
@@ -741,8 +778,8 @@ bool Captain::executeMission(cola2_msgs::Mission::Request&, cola2_msgs::Mission:
       else if (step->getManeuverPtr()->getManeuverType() == PARK_MANEUVER)
       {
         auto maneuver_park = std::dynamic_pointer_cast<MissionPark>(step->getManeuverPtr());
-        captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_PARK;
-        captain_status_.altitude_mode = maneuver_park->getPosition().getAltitudeMode();
+        mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_PARK;
+        mission_status_.altitude_mode = maneuver_park->getPosition().getAltitudeMode();
         if (!park(*maneuver_park))
         {
           ROS_WARN_STREAM("Impossible to reach park waypoint. Move to next mission step");
@@ -777,10 +814,10 @@ bool Captain::executeMission(cola2_msgs::Mission::Request&, cola2_msgs::Mission:
   state_ = CaptainStates::Idle;
 
   // Reset captain status
-  captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_NONE;
-  captain_status_.altitude_mode = false;
-  captain_status_.current_step = 0;
-  captain_status_.total_steps = 0;
+  mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_NONE;
+  mission_status_.altitude_mode = false;
+  mission_status_.current_step = 0;
+  mission_status_.total_steps = 0;
 
   res.message = msg;
   res.success = true;
@@ -808,10 +845,10 @@ void Captain::waitWaypoint()
   }
   is_waypoint_actionlib_running_ = false;
   state_ = CaptainStates::Idle;
-  captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_NONE;
-  captain_status_.altitude_mode = false;
-  captain_status_.current_step = 0;
-  captain_status_.total_steps = 0;
+  mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_NONE;
+  mission_status_.altitude_mode = false;
+  mission_status_.current_step = 0;
+  mission_status_.total_steps = 0;
 }
 
 nav_msgs::Path Captain::createPathFromMission(Mission mission)
@@ -1035,9 +1072,9 @@ bool Captain::enableGotoSrv(cola2_msgs::Goto::Request& req, cola2_msgs::Goto::Re
   state_ = CaptainStates::Goto;
 
   // Set captain status
-  captain_status_.altitude_mode = false;
-  captain_status_.current_step = 0;
-  captain_status_.total_steps = 0;
+  mission_status_.altitude_mode = false;
+  mission_status_.current_step = 0;
+  mission_status_.total_steps = 0;
 
   // Call enable goto
   ROS_INFO_STREAM("Enabling goto");
@@ -1047,10 +1084,10 @@ bool Captain::enableGotoSrv(cola2_msgs::Goto::Request& req, cola2_msgs::Goto::Re
   if (req.blocking)
   {
     state_ = CaptainStates::Idle;
-    captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_NONE;
-    captain_status_.altitude_mode = false;
-    captain_status_.current_step = 0;
-    captain_status_.total_steps = 0;
+    mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_NONE;
+    mission_status_.altitude_mode = false;
+    mission_status_.current_step = 0;
+    mission_status_.total_steps = 0;
   }
 
   return true;
@@ -1079,10 +1116,10 @@ bool Captain::disableGotoSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Res
   }
 
   // Set captain status
-  captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_NONE;
-  captain_status_.altitude_mode = false;
-  captain_status_.current_step = 0;
-  captain_status_.total_steps = 0;
+  mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_NONE;
+  mission_status_.altitude_mode = false;
+  mission_status_.current_step = 0;
+  mission_status_.total_steps = 0;
 
   res.message = "Goto disabled";
   res.success = true;
@@ -1121,9 +1158,9 @@ bool Captain::enableMissionSrv(cola2_msgs::Mission::Request& req, cola2_msgs::Mi
   ROS_INFO_STREAM("Enabling mission");
 
   // Set captain status
-  captain_status_.altitude_mode = false;
-  captain_status_.current_step = 0;
-  captain_status_.total_steps = 0;
+  mission_status_.altitude_mode = false;
+  mission_status_.current_step = 0;
+  mission_status_.total_steps = 0;
 
   // Call enable mission
   executeMission(req, res, mission);
@@ -1216,10 +1253,10 @@ bool Captain::disableMissionSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::
   }
 
   // Set captain status
-  captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_NONE;
-  captain_status_.altitude_mode = false;
-  captain_status_.current_step = 0;
-  captain_status_.total_steps = 0;
+  mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_NONE;
+  mission_status_.altitude_mode = false;
+  mission_status_.current_step = 0;
+  mission_status_.total_steps = 0;
 
   res.message = "Mission disabled";
   res.success = true;
@@ -1261,9 +1298,9 @@ bool Captain::enableKeepPositionHolonomicSrv(std_srvs::Trigger::Request&, std_sr
   state_ = CaptainStates::KeepPosition;
 
   // Set captain status
-  captain_status_.altitude_mode = false;
-  captain_status_.current_step = 0;
-  captain_status_.total_steps = 0;
+  mission_status_.altitude_mode = false;
+  mission_status_.current_step = 0;
+  mission_status_.total_steps = 0;
 
   // Display info
   ROS_INFO_STREAM("Start holonomic keep position at [" <<
@@ -1332,9 +1369,9 @@ bool Captain::enableKeepPositionNonHolonomicSrv(std_srvs::Trigger::Request&, std
   state_ = CaptainStates::KeepPosition;
 
   // Set captain status
-  captain_status_.altitude_mode = false;
-  captain_status_.current_step = 0;
-  captain_status_.total_steps = 0;
+  mission_status_.altitude_mode = false;
+  mission_status_.current_step = 0;
+  mission_status_.total_steps = 0;
 
   // Display info
   ROS_INFO_STREAM("Start nonholonomic keep position at [" <<
@@ -1392,10 +1429,10 @@ bool Captain::disableKeepPositionSrv(std_srvs::Trigger::Request&, std_srvs::Trig
   }
 
   // Set captain status
-  captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_NONE;
-  captain_status_.altitude_mode = false;
-  captain_status_.current_step = 0;
-  captain_status_.total_steps = 0;
+  mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_NONE;
+  mission_status_.altitude_mode = false;
+  mission_status_.current_step = 0;
+  mission_status_.total_steps = 0;
 
   res.message = "Keep position disabled";
   res.success = true;
@@ -1441,9 +1478,9 @@ bool Captain::enableSafetyKeepPositionSrv(std_srvs::Trigger::Request&, std_srvs:
   state_ = CaptainStates::SafetyKeepPosition;
 
   // Set captain status
-  captain_status_.altitude_mode = false;
-  captain_status_.current_step = 0;
-  captain_status_.total_steps = 0;
+  mission_status_.altitude_mode = false;
+  mission_status_.current_step = 0;
+  mission_status_.total_steps = 0;
 
   // Display info
   ROS_INFO_STREAM("Start nonholonomic safety keep position at [" <<
@@ -1501,10 +1538,10 @@ bool Captain::disableSafetyKeepPositionSrv(std_srvs::Trigger::Request&, std_srvs
   }
 
   // Set captain status
-  captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_NONE;
-  captain_status_.altitude_mode = false;
-  captain_status_.current_step = 0;
-  captain_status_.total_steps = 0;
+  mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_NONE;
+  mission_status_.altitude_mode = false;
+  mission_status_.current_step = 0;
+  mission_status_.total_steps = 0;
 
   res.message = "Safety keep position disabled";
   res.success = true;
@@ -1532,13 +1569,13 @@ bool Captain::enableExternalMissionSrv(ros::ServiceEvent<std_srvs::Trigger::Requ
   external_mission_caller_name_ = event.getCallerName();
 
   // Set captain state
-  state_ = CaptainStates::Backseat;
+  state_ = CaptainStates::ExternalMission;
 
   // Set captain status
-  captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_NONE;
-  captain_status_.altitude_mode = false;
-  captain_status_.current_step = 0;
-  captain_status_.total_steps = 0;
+  mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_NONE;
+  mission_status_.altitude_mode = false;
+  mission_status_.current_step = 0;
+  mission_status_.total_steps = 0;
 
   res.message = "External mission enabled";
   res.success = true;
@@ -1553,7 +1590,7 @@ bool Captain::disableExternalMissionSrv(ros::ServiceEvent<std_srvs::Trigger::Req
   std_srvs::Trigger::Response& res = event.getResponse();
 
   // Check current state
-  if (state_ != CaptainStates::Backseat)
+  if (state_ != CaptainStates::ExternalMission)
   {
     std::string msg("Impossible to disable external mission. Captain not in external mission state");
     ROS_WARN_STREAM(msg);
@@ -1587,10 +1624,10 @@ bool Captain::disableExternalMissionSrv(ros::ServiceEvent<std_srvs::Trigger::Req
   state_ = CaptainStates::Idle;
 
   // Set captain status
-  captain_status_.active_controller = cola2_msgs::CaptainStatus::CONTROLLER_NONE;
-  captain_status_.altitude_mode = false;
-  captain_status_.current_step = 0;
-  captain_status_.total_steps = 0;
+  mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_NONE;
+  mission_status_.altitude_mode = false;
+  mission_status_.current_step = 0;
+  mission_status_.total_steps = 0;
 
   res.message = "External mission disabled";
   res.success = true;
