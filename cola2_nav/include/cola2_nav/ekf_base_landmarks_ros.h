@@ -115,6 +115,7 @@ private:
 
 protected:
   ros::NodeHandle nh_ = ros::NodeHandle("~");  // ROS node handler
+  bool online_;  // navigator running online
 
   // Init flags
   bool init_depth_offset_ = false;  //!< init depth offset
@@ -185,7 +186,7 @@ public:
   /**
    *  \brief Destructor.
    */
-  virtual ~EKFBaseLandmarksROS() = default;
+  // virtual ~EKFBaseLandmarksROS() = default;
   /**
    *  \brief Get namespace.
    */

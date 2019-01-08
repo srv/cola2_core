@@ -15,6 +15,9 @@ EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size, c
   , ned_(0.0, 0.0, 0.0)
   , diag_help_(nh_, cola2::rosutils::getUnresolvedNodeName(), "software")
 {
+  // Save param
+  online_ = online;
+
   // Get correct namespace and vehicle frame
   ns_ = cola2::rosutils::getNamespace();  // nh_.getNamespace();
   frame_vehicle_ = ns_ + std::string("/base_link");
@@ -40,7 +43,7 @@ EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size, c
   }
 
   // Normal online navigator
-  if (online) {
+  if (online_) {
     // Publishers
     pub_odom_ = nh_.advertise<nav_msgs::Odometry>("odometry", 1);
     pub_map_ = nh_.advertise<cola2_msgs::Map>("landmarks", 1);
@@ -876,6 +879,12 @@ void EKFBaseLandmarksROS::updateAltitudeMsg(const sensor_msgs::Range& msg)
 
 void EKFBaseLandmarksROS::publishNavigationAndLandmarks(const ros::Time& stamp)
 {
+  // Don't do anything if offline
+  if (!online_)
+  {
+    return;
+  }
+
   // State
   const Eigen::Vector3d pos = getPosition();
   const Eigen::Vector3d vel = getVelocity();
@@ -1068,6 +1077,12 @@ void EKFBaseLandmarksROS::publishNavigationAndLandmarks(const ros::Time& stamp)
 
 void EKFBaseLandmarksROS::publishGPSNED(const ros::Time& stamp, const Eigen::Vector3d& ned) const
 {
+  // Don't do anything if offline
+  if (!online_)
+  {
+    return;
+  }
+
   geometry_msgs::PoseStamped msg;
   msg.header.stamp = stamp;
   msg.header.frame_id = frame_world_;
@@ -1083,6 +1098,12 @@ void EKFBaseLandmarksROS::publishGPSNED(const ros::Time& stamp, const Eigen::Vec
 
 void EKFBaseLandmarksROS::publishUSBLNED(const ros::Time& stamp, const Eigen::Vector3d& ned) const
 {
+  // Don't do anything if offline
+  if (!online_)
+  {
+    return;
+  }
+
   geometry_msgs::PoseStamped msg;
   msg.header.stamp = stamp;
   msg.header.frame_id = frame_world_;
@@ -1099,6 +1120,12 @@ void EKFBaseLandmarksROS::publishUSBLNED(const ros::Time& stamp, const Eigen::Ve
 void EKFBaseLandmarksROS::publishRangeMarker(const ros::Time &stamp, const std::string& landmark_id,
                                              const double range, const double sigma) const
 {
+  // Don't do anything if offline
+  if (!online_)
+  {
+    return;
+  }
+
   int l = getLandmarkPosition(landmark_id);
   if (l >= 0)
   {
