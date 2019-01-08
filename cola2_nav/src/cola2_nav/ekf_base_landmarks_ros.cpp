@@ -305,7 +305,7 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
   // Check current freq
   double freq = diag_help_.getCurrentFreq();
   diag_help_.add("freq", std::to_string(freq));
-  if (init_ekf_ && (ros::Time::now().toSec() - last_ekf_init_time_ > 10.0))
+  if (init_ekf_ && (e.current_real.toSec() - last_ekf_init_time_ > 10.0))
   {
     if (freq < config_.min_diagnostics_frequency_)
     {
@@ -779,7 +779,7 @@ void EKFBaseLandmarksROS::updateRangeMsg(const cola2_msgs::RangeDetection& msg)
       // Update and publish
       applyUpdate(inno, cov, H, Eigen::MatrixXd::Identity(1, 1), 25.0);
       setLandmarkLastUpdate(msg.id, msg.header.stamp.toSec());
-      publishRangeMarker(msg.id, msg.range, msg.sigma);
+      publishRangeMarker(msg.header.stamp, msg.id, msg.range, msg.sigma);
     }
   }
 }
@@ -1070,15 +1070,15 @@ void EKFBaseLandmarksROS::publishUSBLNED(const ros::Time& stamp, const Eigen::Ve
   pub_usbl_ned_.publish(msg);
 }
 
-void EKFBaseLandmarksROS::publishRangeMarker(const std::string& landmark_id, const double range,
-                                             const double sigma) const
+void EKFBaseLandmarksROS::publishRangeMarker(const ros::Time &stamp, const std::string& landmark_id,
+                                             const double range, const double sigma) const
 {
   int l = getLandmarkPosition(landmark_id);
   if (l >= 0)
   {
     visualization_msgs::Marker marker;
     marker.header.frame_id = frame_world_;
-    marker.header.stamp = ros::Time::now();
+    marker.header.stamp = stamp;
     marker.ns = std::string("range_") + landmark_id;
     marker.id = 0;
     marker.type = visualization_msgs::Marker::LINE_LIST;

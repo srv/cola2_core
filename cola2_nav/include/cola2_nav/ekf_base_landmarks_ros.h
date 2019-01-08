@@ -214,7 +214,7 @@ public:
   void publishNavigationAndLandmarks(const ros::Time& stamp);
   void publishGPSNED(const ros::Time& stamp, const Eigen::Vector3d& ned) const;
   void publishUSBLNED(const ros::Time& stamp, const Eigen::Vector3d& ned) const;
-  void publishRangeMarker(const std::string& landmark_id, const double range, const double sigma) const;
+  void publishRangeMarker(const ros::Time& stamp, const std::string& landmark_id, const double range, const double sigma) const;
 
   // *****************************************
   // Services
