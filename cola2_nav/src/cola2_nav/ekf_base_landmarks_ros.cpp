@@ -10,7 +10,7 @@
 // *****************************************
 // Constructor and destructor
 // *****************************************
-EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size)
+EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size, const bool online)
   : EKFBaseLandmarks(state_vector_size)
   , ned_(0.0, 0.0, 0.0)
   , diag_help_(nh_, cola2::rosutils::getUnresolvedNodeName(), "software")
@@ -39,35 +39,43 @@ EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size)
     ofh_.precision(4);
   }
 
-  // Publishers
-  pub_odom_ = nh_.advertise<nav_msgs::Odometry>("odometry", 1);
-  pub_map_ = nh_.advertise<cola2_msgs::Map>("landmarks", 1);
-  pub_nav_ = nh_.advertise<cola2_msgs::NavSts>("navigation", 1);  // TODO change type
-  pub_gps_ned_ = nh_.advertise<geometry_msgs::PoseStamped>("gps_ned", 1);
-  pub_usbl_ned_ = nh_.advertise<geometry_msgs::PoseStamped>("usbl_ned", 1);
-  pub_range_update_ = nh_.advertise<visualization_msgs::Marker>("markers/range_update", 1);
-  pub_landmarks_ = nh_.advertise<visualization_msgs::MarkerArray>("markers/landmarks", 1);
-  pub_altitude_ = nh_.advertise<sensor_msgs::Range>("altitude_filtered", 1);
+  // Normal online navigator
+  if (online) {
+    // Publishers
+    pub_odom_ = nh_.advertise<nav_msgs::Odometry>("odometry", 1);
+    pub_map_ = nh_.advertise<cola2_msgs::Map>("landmarks", 1);
+    pub_nav_ = nh_.advertise<cola2_msgs::NavSts>("navigation", 1);  // TODO change type
+    pub_gps_ned_ = nh_.advertise<geometry_msgs::PoseStamped>("gps_ned", 1);
+    pub_usbl_ned_ = nh_.advertise<geometry_msgs::PoseStamped>("usbl_ned", 1);
+    pub_range_update_ = nh_.advertise<visualization_msgs::Marker>("markers/range_update", 1);
+    pub_landmarks_ = nh_.advertise<visualization_msgs::MarkerArray>("markers/landmarks", 1);
+    pub_altitude_ = nh_.advertise<sensor_msgs::Range>("altitude_filtered", 1);
 
-  // Service client to publish parameters
-  std::string publish_params_srv_name = cola2::rosutils::getNamespace() + "/param_logger/publish_params";
-  srv_publish_params_ = nh_.serviceClient<std_srvs::Trigger>(publish_params_srv_name);
-  while (ros::ok())
-  {
-    if (srv_publish_params_.waitForExistence(ros::Duration(5.0))) break;
-    ROS_INFO_STREAM("Waiting for client to service " << publish_params_srv_name);
+    // Service client to publish parameters
+    std::string publish_params_srv_name = cola2::rosutils::getNamespace() + "/param_logger/publish_params";
+    srv_publish_params_ = nh_.serviceClient<std_srvs::Trigger>(publish_params_srv_name);
+    while (ros::ok())
+    {
+      if (srv_publish_params_.waitForExistence(ros::Duration(5.0))) break;
+      ROS_INFO_STREAM("Waiting for client to service " << publish_params_srv_name);
+    }
+
+    // Init services
+    // clang-format off
+    srv_reload_params_ = nh_.advertiseService("reload_params", &EKFBaseLandmarksROS::srvResetNavigation, this);
+    srv_reset_navigation_ = nh_.advertiseService("reset_navigation", &EKFBaseLandmarksROS::srvResetNavigation, this);
+    srv_reset_landmarks_ = nh_.advertiseService("reset_landmarks", &EKFBaseLandmarksROS::srvResetLandmarks, this);
+    srv_set_depth_sensor_offset_ = nh_.advertiseService("set_depth_sensor_offset", &EKFBaseLandmarksROS::srvSetDepthSensorOffset, this);
+    // clang-format on
+
+    // Init timer
+    timer_ = nh_.createTimer(ros::Duration(1.0), &EKFBaseLandmarksROS::checkDiagnostics, this);
   }
-
-  // Init services
-  // clang-format off
-  srv_reload_params_ = nh_.advertiseService("reload_params", &EKFBaseLandmarksROS::srvResetNavigation, this);
-  srv_reset_navigation_ = nh_.advertiseService("reset_navigation", &EKFBaseLandmarksROS::srvResetNavigation, this);
-  srv_reset_landmarks_ = nh_.advertiseService("reset_landmarks", &EKFBaseLandmarksROS::srvResetLandmarks, this);
-  srv_set_depth_sensor_offset_ = nh_.advertiseService("set_depth_sensor_offset", &EKFBaseLandmarksROS::srvSetDepthSensorOffset, this);
-  // clang-format on
-
-  // Init timer
-  timer_ = nh_.createTimer(ros::Duration(1.0), &EKFBaseLandmarksROS::checkDiagnostics, this);
+  else
+  {
+    // Offline navigator
+    ROS_WARN("Using navigator offline...");
+  }
 
   // Check NED and GPS configuration
   if (config_.initialize_ned_from_gps_ && !config_.initialize_filter_from_gps_ && config_.use_gps_data_)
@@ -83,6 +91,24 @@ EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size)
     ROS_ERROR("Invalid configuration: Do not initialize NED and filter from GPS but use data from it");
     ROS_WARN("Use GPS data will be set to false");
     config_.use_gps_data_ = false;
+  }
+}
+
+void EKFBaseLandmarksROS::loadTranformsFromFile(const std::string &fname)
+{
+  // Load transforms from file
+  std::ifstream infile(fname);
+  if (!infile.is_open())
+  {
+    ROS_FATAL("missing transforms file: %s", fname.c_str());
+    ros::shutdown();
+  }
+  // Process lines
+  std::string parent, child;
+  double tx, ty, tz, qx, qy, qz, qw;
+  while (infile >> parent >> child >> tx >> ty >> tz >> qx >> qy >> qz >> qw)
+  {
+    tf_handler_.setTransformManually(child, tx, ty, tz, qx, qy, qz, qw);
   }
 }
 

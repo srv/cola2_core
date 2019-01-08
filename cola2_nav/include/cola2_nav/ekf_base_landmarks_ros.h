@@ -181,7 +181,7 @@ public:
   /**
    *  \brief Constructor.
    */
-  explicit EKFBaseLandmarksROS(const unsigned int state_vector_size);
+  explicit EKFBaseLandmarksROS(const unsigned int state_vector_size, const bool online = true);
   /**
    *  \brief Destructor.
    */
@@ -222,6 +222,11 @@ public:
   bool srvResetLandmarks(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
   bool srvResetNavigation(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
   bool srvSetDepthSensorOffset(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
+
+  // *****************************************
+  // Offline
+  // *****************************************
+  void loadTranformsFromFile(const std::string &fname);
 
   // *****************************************
   // To be implemented

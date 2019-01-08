@@ -7,7 +7,7 @@
 
 #include "cola2_nav/ekf_position_velocity_landmarks.h"
 
-EKFPositionVelocityLandmarks::EKFPositionVelocityLandmarks() : EKFBaseLandmarksROS(6)
+EKFPositionVelocityLandmarks::EKFPositionVelocityLandmarks(const bool online) : EKFBaseLandmarksROS(6, online)
 {
   // state vector contains [x y z vx vy vz] = size -> 6
 }
