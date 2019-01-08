@@ -499,8 +499,6 @@ void EKFBaseLandmarksROS::updatePositionUSBLMsg(const geometry_msgs::PoseWithCov
       const Eigen::Vector3d latlonh(msg.pose.pose.position.x, msg.pose.pose.position.y, 0.0);
       Eigen::Vector3d ned = ned_.geodetic2Ned(latlonh);
       ned.head(2) += position_increment.tail(2);  // increment the same we increased
-      ned(2) = getPosition()(2);                  // show in current depth
-      publishUSBLNED(current_time, ned);          // show
       Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
       for (unsigned int i = 0; i < 3; ++i)
       {
@@ -509,6 +507,9 @@ void EKFBaseLandmarksROS::updatePositionUSBLMsg(const geometry_msgs::PoseWithCov
           cov(i, j) = msg.pose.covariance[6 * i + j];  // from 6x6 matrix
         }
       }
+      // Publish USBL in NED frame
+      ned(2) = getPosition()(2);                  // show in current depth
+      publishUSBLNED(current_time, ned);          // show
       // Transform to vehicle frame
       Eigen::Affine3d trans;
       if (!tf_handler_.getTransform(msg.header.frame_id, trans))
