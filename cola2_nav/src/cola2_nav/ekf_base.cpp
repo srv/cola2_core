@@ -106,6 +106,11 @@ Eigen::Quaterniond EKFBase::getOrientation() const
   return cola2::utils::euler2quaternion(getEuler());
 }
 
+bool EKFBase::isInitialized() const
+{
+  return init_ekf_;
+}
+
 double EKFBase::mahalanobisDistance(const Eigen::VectorXd& inno, const Eigen::MatrixXd& R, const Eigen::MatrixXd& H)
 {
   const Eigen::MatrixXd S = H * P_ * H.transpose() + R;
