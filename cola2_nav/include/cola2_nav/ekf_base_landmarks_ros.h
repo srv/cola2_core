@@ -54,7 +54,7 @@ namespace
 constexpr double TIME_BETWEEN_PUBLISHING = 1.0 / 20.0;  //!< minimum time between publishNavigationAndLandmarks()
 constexpr double USBL_KEEP_TIME = 10.0;                 //!< seconds to keep position history for delayed USBLs
 constexpr size_t ALTITUDE_WINDOW_SIZE = 4;              //!< altitude window to check for valid measurements
-}
+}  // namespace
 
 /**
  * \brief EKF including all the ROS functionalities.
@@ -115,7 +115,7 @@ private:
 
 protected:
   ros::NodeHandle nh_ = ros::NodeHandle("~");  // ROS node handler
-  bool online_;  // navigator running online
+  bool online_;                                // navigator running online
 
   // Init flags
   bool init_depth_offset_ = false;  //!< init depth offset
@@ -215,7 +215,8 @@ public:
   void publishNavigationAndLandmarks(const ros::Time& stamp);
   void publishGPSNED(const ros::Time& stamp, const Eigen::Vector3d& ned) const;
   void publishUSBLNED(const ros::Time& stamp, const Eigen::Vector3d& ned) const;
-  void publishRangeMarker(const ros::Time& stamp, const std::string& landmark_id, const double range, const double sigma) const;
+  void publishRangeMarker(const ros::Time& stamp, const std::string& landmark_id, const double range,
+                          const double sigma) const;
 
   // *****************************************
   // Services
@@ -227,7 +228,7 @@ public:
   // *****************************************
   // Offline
   // *****************************************
-  void loadTranformsFromFile(const std::string &fname);
+  void loadTranformsFromFile(const std::string& fname);
 
   // *****************************************
   // To be implemented

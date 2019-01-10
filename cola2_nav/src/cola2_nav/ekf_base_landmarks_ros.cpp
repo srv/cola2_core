@@ -43,7 +43,8 @@ EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size, c
   }
 
   // Normal online navigator
-  if (online_) {
+  if (online_)
+  {
     // Publishers
     pub_odom_ = nh_.advertise<nav_msgs::Odometry>("odometry", 1);
     pub_map_ = nh_.advertise<cola2_msgs::Map>("landmarks", 1);
@@ -59,7 +60,8 @@ EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size, c
     srv_publish_params_ = nh_.serviceClient<std_srvs::Trigger>(publish_params_srv_name);
     while (ros::ok())
     {
-      if (srv_publish_params_.waitForExistence(ros::Duration(5.0))) break;
+      if (srv_publish_params_.waitForExistence(ros::Duration(5.0)))
+        break;
       ROS_INFO_STREAM("Waiting for client to service " << publish_params_srv_name);
     }
 
@@ -97,7 +99,7 @@ EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size, c
   }
 }
 
-void EKFBaseLandmarksROS::loadTranformsFromFile(const std::string &fname)
+void EKFBaseLandmarksROS::loadTranformsFromFile(const std::string& fname)
 {
   // Load transforms from file
   std::ifstream infile(fname);
@@ -325,15 +327,15 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
     if (freq < config_.min_diagnostics_frequency_)
     {
       is_nav_data_ok = false;
-      ROS_WARN_STREAM("Diagnostics frequency too low (" << freq << " lower than " <<
-                      config_.min_diagnostics_frequency_ << ")");
+      ROS_WARN_STREAM("Diagnostics frequency too low (" << freq << " lower than " << config_.min_diagnostics_frequency_
+                                                        << ")");
     }
   }
   // If filter or NED not initialized set to Warning
   if (!init_ekf_)
   {
     is_nav_data_ok = false;
-    //ROS_FATAL("EKF not yet init");
+    // ROS_FATAL("EKF not yet init");
   }
   else
   {
@@ -342,7 +344,7 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
   if (!init_ned_)
   {
     is_nav_data_ok = false;
-    //ROS_FATAL("NED not yet init");
+    // ROS_FATAL("NED not yet init");
   }
   else
   {
@@ -523,8 +525,8 @@ void EKFBaseLandmarksROS::updatePositionUSBLMsg(const geometry_msgs::PoseWithCov
         }
       }
       // Publish USBL in NED frame
-      ned(2) = getPosition()(2);                  // show in current depth
-      publishUSBLNED(current_time, ned);          // show
+      ned(2) = getPosition()(2);          // show in current depth
+      publishUSBLNED(current_time, ned);  // show
       // Transform to vehicle frame
       Eigen::Affine3d trans;
       if (!tf_handler_.getTransform(msg.header.frame_id, trans))
@@ -633,14 +635,14 @@ void EKFBaseLandmarksROS::updateVelocityDVLMsgImpl(const cola2_msgs::DVL& msg, c
         if (!is_dvl_fallback)
         {
           ofh_ << "#dvl " << tim << ' ' << vel(0) << ' ' << vel(1) << ' ' << vel(2) << ' ' << cov(0, 0) << ' '
-              << cov(0, 1) << ' ' << cov(0, 2) << ' ' << cov(1, 0) << ' ' << cov(1, 1) << ' ' << cov(1, 2) << ' '
-              << cov(2, 0) << ' ' << cov(2, 1) << ' ' << cov(2, 2) << '\n';
+               << cov(0, 1) << ' ' << cov(0, 2) << ' ' << cov(1, 0) << ' ' << cov(1, 1) << ' ' << cov(1, 2) << ' '
+               << cov(2, 0) << ' ' << cov(2, 1) << ' ' << cov(2, 2) << '\n';
         }
         else
         {
           ofh_ << "#dvl_fallback " << tim << ' ' << vel(0) << ' ' << vel(1) << ' ' << vel(2) << ' ' << cov(0, 0) << ' '
-              << cov(0, 1) << ' ' << cov(0, 2) << ' ' << cov(1, 0) << ' ' << cov(1, 1) << ' ' << cov(1, 2) << ' '
-              << cov(2, 0) << ' ' << cov(2, 1) << ' ' << cov(2, 2) << '\n';
+               << cov(0, 1) << ' ' << cov(0, 2) << ' ' << cov(1, 0) << ' ' << cov(1, 1) << ' ' << cov(1, 2) << ' '
+               << cov(2, 0) << ' ' << cov(2, 1) << ' ' << cov(2, 2) << '\n';
         }
       }
       // Update and publish
@@ -1087,8 +1089,8 @@ void EKFBaseLandmarksROS::publishUSBLNED(const ros::Time& stamp, const Eigen::Ve
   pub_usbl_ned_.publish(msg);
 }
 
-void EKFBaseLandmarksROS::publishRangeMarker(const ros::Time &stamp, const std::string& landmark_id,
-                                             const double range, const double sigma) const
+void EKFBaseLandmarksROS::publishRangeMarker(const ros::Time& stamp, const std::string& landmark_id, const double range,
+                                             const double sigma) const
 {
   // Don't do anything if offline
   if (!online_)
