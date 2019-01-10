@@ -195,7 +195,6 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
   cola2::rosutils::getParam("navigator/gps_samples_to_init", config_.gps_samples_to_init_, 10);
   cola2::rosutils::getParam("navigator/use_gps_data", config_.use_gps_data_, false);
   cola2::rosutils::getParam("navigator/use_usbl_data", config_.use_usbl_data_, false);
-  cola2::rosutils::getParam("navigator/use_force_model", config_.use_force_model_, false);
   cola2::rosutils::getParam("navigator/use_depth_data", config_.use_depth_data_, true);
   cola2::rosutils::getParam("navigator/use_dvl_data", config_.use_dvl_data_, true);
   cola2::rosutils::getParam("navigator/enable_debug", config_.enable_debug_, false);
@@ -211,11 +210,11 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
   cola2::rosutils::getParam("navigator/dvl_max_v", config_.dvl_max_v_, 1.5);
   config_.declination_ = cola2::utils::degreesToRadians(declination_deg);
   cola2::rosutils::getParam("navigator/water_density", config_.water_density_, 1030.0);
+  // DVL fallback
+  cola2::rosutils::getParam("navigator/dvl_fallback_delay", config_.dvl_fallback_delay_, 0.0);
   // Covariances
   cola2::rosutils::getParamVector("navigator/initial_state_covariance", config_.initial_state_covariance_);
   cola2::rosutils::getParamVector("navigator/prediction_model_covariance", config_.prediction_model_covariance_);
-  cola2::rosutils::getParamVector("navigator/force_model_covariance", config_.force_model_covariance_);
-  cola2::rosutils::getParamVector("navigator/force_model_scale", config_.force_model_scale_);
   // Diagnostics
   cola2::rosutils::getParam("navigator/min_diagnostics_frequency", config_.min_diagnostics_frequency_, 25.0);
 
@@ -229,7 +228,6 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
     ROS_INFO(" gps samples to init: %d", config_.gps_samples_to_init_);
     ROS_INFO("        use gps data: %d", config_.use_gps_data_);
     ROS_INFO("       use usbl data: %d", config_.use_usbl_data_);
-    ROS_INFO("     use force model: %d", config_.use_force_model_);
     ROS_INFO("      use depth data: %d", config_.use_depth_data_);
     ROS_INFO("        use dvl data: %d", config_.use_dvl_data_);
     ROS_INFO("        enable debug: %d\n", config_.enable_debug_);
@@ -238,10 +236,11 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
     ROS_INFO("init depth sensor offset: %d", config_.initialize_depth_sensor_offset_);
     ROS_INFO("    surface2depth sensor: %.3f", config_.surface2depth_sensor_distance_);
     ROS_INFO("     depth sensor offset: %.3f\n", config_.depth_sensor_offset_);
-    ROS_INFO(" declination deg: %.3f", declination_deg);
-    ROS_INFO("dvl max velocity: %.3f", config_.dvl_max_v_);
-    ROS_INFO("   water density: %.3f\n", config_.water_density_);
-    ROS_INFO("min diagnostics frequancy: %.3f\n", config_.min_diagnostics_frequency_);
+    ROS_INFO("   declination deg: %.3f", declination_deg);
+    ROS_INFO("  dvl max velocity: %.3f", config_.dvl_max_v_);
+    ROS_INFO("dvl fallback delay: %.3f", config_.dvl_fallback_delay_);
+    ROS_INFO("     water density: %.3f\n", config_.water_density_);
+    ROS_INFO("min diagnostics frequency: %.3f\n", config_.min_diagnostics_frequency_);
     // vectors
     std::stringstream ss;
     ss << "   initial state covariance: ";
@@ -258,19 +257,6 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
     }
     ROS_INFO_STREAM(ss.str());
     ss.str(std::string());
-    ss << "     force model covariance: ";
-    for (const double v : config_.force_model_covariance_)
-    {
-      ss << v << ' ';
-    }
-    ROS_INFO_STREAM(ss.str());
-    ss.str(std::string());
-    ss << "          force model scale: ";
-    for (const double v : config_.force_model_scale_)
-    {
-      ss << v << ' ';
-    }
-    ROS_INFO_STREAM(ss.str());
   }
 }
 
@@ -607,14 +593,17 @@ void EKFBaseLandmarksROS::updatePositionDepthMsg(const sensor_msgs::FluidPressur
   }
 }
 
-void EKFBaseLandmarksROS::updateVelocityDVLMsg(const cola2_msgs::DVL& msg)
+void EKFBaseLandmarksROS::updateVelocityDVLMsgImpl(const cola2_msgs::DVL& msg, const bool is_dvl_fallback)
 {
   // Valid measurement
   if ((msg.velocity_covariance[0] > 0.0) && (std::abs(msg.velocity.x) < config_.dvl_max_v_) &&
       (std::abs(msg.velocity.y) < config_.dvl_max_v_) && (std::abs(msg.velocity.z) < config_.dvl_max_v_))
   {
     // Diagnostics
-    diag_help_.increaseFrequencyCounter();
+    if (!is_dvl_fallback)
+    {
+      diag_help_.increaseFrequencyCounter();
+    }
     // Construct measurement
     Eigen::Vector3d vel(msg.velocity.x, msg.velocity.y, msg.velocity.z);
     Eigen::Matrix3d cov;
@@ -641,14 +630,43 @@ void EKFBaseLandmarksROS::updateVelocityDVLMsg(const cola2_msgs::DVL& msg)
       // Debug
       if (config_.enable_debug_)
       {
-        ofh_ << "#dvl " << tim << ' ' << vel(0) << ' ' << vel(1) << ' ' << vel(2) << ' ' << cov(0, 0) << ' '
-             << cov(0, 1) << ' ' << cov(0, 2) << ' ' << cov(1, 0) << ' ' << cov(1, 1) << ' ' << cov(1, 2) << ' '
-             << cov(2, 0) << ' ' << cov(2, 1) << ' ' << cov(2, 2) << '\n';
+        if (!is_dvl_fallback)
+        {
+          ofh_ << "#dvl " << tim << ' ' << vel(0) << ' ' << vel(1) << ' ' << vel(2) << ' ' << cov(0, 0) << ' '
+              << cov(0, 1) << ' ' << cov(0, 2) << ' ' << cov(1, 0) << ' ' << cov(1, 1) << ' ' << cov(1, 2) << ' '
+              << cov(2, 0) << ' ' << cov(2, 1) << ' ' << cov(2, 2) << '\n';
+        }
+        else
+        {
+          ofh_ << "#dvl_fallback " << tim << ' ' << vel(0) << ' ' << vel(1) << ' ' << vel(2) << ' ' << cov(0, 0) << ' '
+              << cov(0, 1) << ' ' << cov(0, 2) << ' ' << cov(1, 0) << ' ' << cov(1, 1) << ' ' << cov(1, 2) << ' '
+              << cov(2, 0) << ' ' << cov(2, 1) << ' ' << cov(2, 2) << '\n';
+        }
       }
       // Update and publish
       updateVelocity(msg.header.stamp.toSec(), vel, cov);
       publishNavigationAndLandmarks(msg.header.stamp);
     }
+  }
+}
+
+void EKFBaseLandmarksROS::updateVelocityDVLMsg(const cola2_msgs::DVL& msg)
+{
+  // Make update as main sensor
+  const bool is_dvl_fallback = false;
+  updateVelocityDVLMsgImpl(msg, is_dvl_fallback);
+}
+
+void EKFBaseLandmarksROS::updateVelocityDVLFallbackMsg(const cola2_msgs::DVL& msg)
+{
+  // Check that no DVL messages have been received for the specified delay
+  if ((msg.header.stamp.toSec() - last_dvl_time_) > config_.dvl_fallback_delay_)
+  {
+    // Make update without updating last_dvl_time_ because this is not the main sensor
+    const double old_time = last_dvl_time_;
+    const bool is_dvl_fallback = true;
+    updateVelocityDVLMsgImpl(msg, is_dvl_fallback);
+    last_dvl_time_ = old_time;
   }
 }
 
@@ -809,54 +827,6 @@ void EKFBaseLandmarksROS::updateRangeMsg(const cola2_msgs::RangeDetection& msg)
       applyUpdate(inno, cov, H, Eigen::MatrixXd::Identity(1, 1), 25.0);
       setLandmarkLastUpdate(msg.id, msg.header.stamp.toSec());
       publishRangeMarker(msg.header.stamp, msg.id, msg.range, msg.sigma);
-    }
-  }
-}
-
-void EKFBaseLandmarksROS::updateBodyForceReqMsg(const cola2_msgs::BodyForceReq& msg)
-{
-  // Valid measurement (we are not receiveng velocity messages from anywhere)
-  if (init_ekf_ && (msg.header.stamp.toSec() - last_dvl_time_ > 1.0))
-  {
-    // Diagnostics
-    diag_help_.increaseFrequencyCounter();
-    // Construct measurement
-    const Eigen::Vector3d force(msg.wrench.force.x, msg.wrench.force.y, msg.wrench.force.z);
-    Eigen::Vector3d velocity = Eigen::Vector3d::Zero();
-    if (not msg.disable_axis.x)
-    {
-      velocity(0) =
-          (force(0) > 0.0) ? force(0) / config_.force_model_scale_[0] : force(0) / config_.force_model_scale_[1];
-    }
-    if (not msg.disable_axis.y)
-    {
-      velocity(1) =
-          (force(1) > 0.0) ? force(1) / config_.force_model_scale_[2] : force(1) / config_.force_model_scale_[3];
-    }
-    if (not msg.disable_axis.x)
-    {
-      velocity(2) =
-          (force(2) > 0.0) ? force(2) / config_.force_model_scale_[4] : force(2) / config_.force_model_scale_[5];
-    }
-    Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
-    cov(0, 0) = config_.force_model_covariance_[0];
-    cov(1, 1) = config_.force_model_covariance_[1];
-    cov(2, 2) = config_.force_model_covariance_[2];
-    // Transform to vehicle frame => Velocities already in vehicle frame
-    // Predict and update
-    const double tim = msg.header.stamp.toSec();
-    if (makePrediction(tim))
-    {
-      // Debug
-      if (config_.enable_debug_)
-      {
-        ofh_ << "#force " << tim << ' ' << velocity(0) << ' ' << velocity(1) << ' ' << velocity(2) << ' ' << cov(0, 0)
-             << ' ' << cov(0, 1) << ' ' << cov(0, 2) << ' ' << cov(1, 0) << ' ' << cov(1, 1) << ' ' << cov(1, 2) << ' '
-             << cov(2, 0) << ' ' << cov(2, 1) << ' ' << cov(2, 2) << '\n';
-      }
-      // Update and publish
-      updateVelocity(msg.header.stamp.toSec(), velocity, cov, false);  // not coming from dvl
-      publishNavigationAndLandmarks(msg.header.stamp);
     }
   }
 }

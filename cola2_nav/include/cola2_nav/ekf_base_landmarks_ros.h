@@ -149,7 +149,6 @@ protected:
     int gps_samples_to_init_;
     bool use_gps_data_;
     bool use_usbl_data_;
-    bool use_force_model_;
     bool use_depth_data_;
     bool use_dvl_data_;
     bool enable_debug_;
@@ -164,11 +163,11 @@ protected:
     double declination_;
     double dvl_max_v_;
     double water_density_;
+    // DVL fallback
+    double dvl_fallback_delay_;
     // Covariances
     std::vector<double> initial_state_covariance_;
     std::vector<double> prediction_model_covariance_;
-    std::vector<double> force_model_covariance_;
-    std::vector<double> force_model_scale_;
     // Diagnostics
     double min_diagnostics_frequency_;
     // TODO: enable/disable dvl_bottom dvl_water force_model
@@ -200,12 +199,13 @@ public:
   void updatePositionUSBLMsg(const geometry_msgs::PoseWithCovarianceStamped& msg);
   void updatePositionDepthMsg(const sensor_msgs::FluidPressure& msg);
   void updateVelocityDVLMsg(const cola2_msgs::DVL& msg);
+  void updateVelocityDVLFallbackMsg(const cola2_msgs::DVL& msg);
+  void updateVelocityDVLMsgImpl(const cola2_msgs::DVL& msg, const bool is_dvl_fallback = false);
   void updateIMUMsg(const sensor_msgs::Imu& msg);
   // Landmarks
   void updateLandmarkMsg(const cola2_msgs::Detection& msg);
   void updateRangeMsg(const cola2_msgs::RangeDetection& msg);
   // Others
-  void updateBodyForceReqMsg(const cola2_msgs::BodyForceReq& msg);
   void updateSoundVelocityMsg(const cola2_msgs::Float32Stamped& msg);
   void updateAltitudeMsg(const sensor_msgs::Range& msg);
 
