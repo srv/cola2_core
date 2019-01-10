@@ -186,7 +186,7 @@ public:
   /**
    *  \brief Destructor.
    */
-  // virtual ~EKFBaseLandmarksROS() = default;
+  virtual ~EKFBaseLandmarksROS() noexcept {};
   /**
    *  \brief Get namespace.
    */
