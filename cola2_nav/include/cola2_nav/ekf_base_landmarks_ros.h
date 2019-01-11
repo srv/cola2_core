@@ -54,7 +54,7 @@ namespace
 constexpr double TIME_BETWEEN_PUBLISHING = 1.0 / 20.0;  //!< minimum time between publishNavigationAndLandmarks()
 constexpr double USBL_KEEP_TIME = 10.0;                 //!< seconds to keep position history for delayed USBLs
 constexpr size_t ALTITUDE_WINDOW_SIZE = 4;              //!< altitude window to check for valid measurements
-}
+}  // namespace
 
 /**
  * \brief EKF including all the ROS functionalities.
@@ -115,6 +115,7 @@ private:
 
 protected:
   ros::NodeHandle nh_ = ros::NodeHandle("~");  // ROS node handler
+  bool online_;                                // navigator running online
 
   // Init flags
   bool init_depth_offset_ = false;  //!< init depth offset
@@ -148,7 +149,6 @@ protected:
     int gps_samples_to_init_;
     bool use_gps_data_;
     bool use_usbl_data_;
-    bool use_force_model_;
     bool use_depth_data_;
     bool use_dvl_data_;
     bool enable_debug_;
@@ -163,11 +163,11 @@ protected:
     double declination_;
     double dvl_max_v_;
     double water_density_;
+    // DVL fallback
+    double dvl_fallback_delay_;
     // Covariances
     std::vector<double> initial_state_covariance_;
     std::vector<double> prediction_model_covariance_;
-    std::vector<double> force_model_covariance_;
-    std::vector<double> force_model_scale_;
     // Diagnostics
     double min_diagnostics_frequency_;
     // TODO: enable/disable dvl_bottom dvl_water force_model
@@ -181,11 +181,11 @@ public:
   /**
    *  \brief Constructor.
    */
-  explicit EKFBaseLandmarksROS(const unsigned int state_vector_size);
+  explicit EKFBaseLandmarksROS(const unsigned int state_vector_size, const bool online = true);
   /**
    *  \brief Destructor.
    */
-  virtual ~EKFBaseLandmarksROS() = default;
+  virtual ~EKFBaseLandmarksROS() noexcept {};
   /**
    *  \brief Get namespace.
    */
@@ -199,12 +199,13 @@ public:
   void updatePositionUSBLMsg(const geometry_msgs::PoseWithCovarianceStamped& msg);
   void updatePositionDepthMsg(const sensor_msgs::FluidPressure& msg);
   void updateVelocityDVLMsg(const cola2_msgs::DVL& msg);
+  void updateVelocityDVLFallbackMsg(const cola2_msgs::DVL& msg);
+  void updateVelocityDVLMsgImpl(const cola2_msgs::DVL& msg, const bool is_dvl_fallback = false);
   void updateIMUMsg(const sensor_msgs::Imu& msg);
   // Landmarks
   void updateLandmarkMsg(const cola2_msgs::Detection& msg);
   void updateRangeMsg(const cola2_msgs::RangeDetection& msg);
   // Others
-  void updateBodyForceReqMsg(const cola2_msgs::BodyForceReq& msg);
   void updateSoundVelocityMsg(const cola2_msgs::Float32Stamped& msg);
   void updateAltitudeMsg(const sensor_msgs::Range& msg);
 
@@ -214,7 +215,8 @@ public:
   void publishNavigationAndLandmarks(const ros::Time& stamp);
   void publishGPSNED(const ros::Time& stamp, const Eigen::Vector3d& ned) const;
   void publishUSBLNED(const ros::Time& stamp, const Eigen::Vector3d& ned) const;
-  void publishRangeMarker(const std::string& landmark_id, const double range, const double sigma) const;
+  void publishRangeMarker(const ros::Time& stamp, const std::string& landmark_id, const double range,
+                          const double sigma) const;
 
   // *****************************************
   // Services
@@ -222,6 +224,11 @@ public:
   bool srvResetLandmarks(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
   bool srvResetNavigation(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
   bool srvSetDepthSensorOffset(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
+
+  // *****************************************
+  // Offline
+  // *****************************************
+  void loadTranformsFromFile(const std::string& fname);
 
   // *****************************************
   // To be implemented

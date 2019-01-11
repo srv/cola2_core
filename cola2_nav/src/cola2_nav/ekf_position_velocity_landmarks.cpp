@@ -7,7 +7,7 @@
 
 #include "cola2_nav/ekf_position_velocity_landmarks.h"
 
-EKFPositionVelocityLandmarks::EKFPositionVelocityLandmarks() : EKFBaseLandmarksROS(6)
+EKFPositionVelocityLandmarks::EKFPositionVelocityLandmarks(const bool online) : EKFBaseLandmarksROS(6, online)
 {
   // state vector contains [x y z vx vy vz] = size -> 6
 }
@@ -146,7 +146,7 @@ bool EKFPositionVelocityLandmarks::updateOrientation(const double t, const Eigen
   {
     if ((!config_.use_gps_data_ || init_gps_) && (init_depth_) && (init_dvl_))
     {
-      last_ekf_init_time_ = ros::Time::now().toSec();
+      last_ekf_init_time_ = t;
       init_ekf_ = true;
       ROS_INFO_ONCE("ekf init");
     }

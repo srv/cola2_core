@@ -25,12 +25,11 @@ navigator/depth_sensor_offset: -1.0
 navigator/declination_in_degrees: 0.5
 # Ignore DVL velocities bigger than
 navigator/dvl_max_v: 1.2
+# Use a fallback DVL sensor (i.e. dynamics model) when no DVL messages for more than delay time (0.0 disables it)
+navigator/dvl_fallback_delay: 0.5
 # Water density (used in depth sensor)
 navigator/water_density: 1030.0
 
 # Covariances for the EKF
 navigator/initial_state_covariance: [2.0, 2.0, 0.5, 0.02, 0.02, 0.02]
 navigator/prediction_model_covariance: [0.02, 0.02, 0.02]
-navigator/force_model_covariance: [0.4, 0.4, 0.4]
-# force / scale = velocity
-navigator/force_model_scale: [200.0, 200.0, 275.0, 275.0, 440.0, 100.0] # pos/neg for each axis XYZ

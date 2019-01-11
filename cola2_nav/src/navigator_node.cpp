@@ -14,12 +14,12 @@ class NavigatorNode : public EKFPositionVelocityLandmarks
 {
 private:
   // Subscribers
-  ros::Subscriber sub_gps_;       // [x y]
-  ros::Subscriber sub_usbl_;      // [x y]
-  ros::Subscriber sub_pressure_;  // [z]
-  ros::Subscriber sub_dvl_;       // [vx vy vz]
-  ros::Subscriber sub_model_;     // [vx vy vz]
-  ros::Subscriber sub_imu_;       // [roll pitch yaw vroll vpitch vyaw]
+  ros::Subscriber sub_gps_;           // [x y]
+  ros::Subscriber sub_usbl_;          // [x y]
+  ros::Subscriber sub_pressure_;      // [z]
+  ros::Subscriber sub_dvl_;           // [vx vy vz]
+  ros::Subscriber sub_dvl_fallback_;  // [vx vy vz]
+  ros::Subscriber sub_imu_;           // [roll pitch yaw vroll vpitch vyaw]
   // ros::Subscriber sub_landmark_;        // landmark_id [lx ly lz lroll lpitch lyaw]
   // ros::Subscriber sub_range_;           // landmark_id [range]
   ros::Subscriber sub_sound_velocity_;  // sound velocity from SVS
@@ -47,9 +47,10 @@ NavigatorNode::NavigatorNode()
   sub_imu_ = nh_.subscribe("imu", 2, &EKFBaseLandmarksROS::updateIMUMsg,  reinterpret_cast<EKFBaseLandmarksROS*>(this));
   //sub_landmark_ = nh_.subscribe("detection_update", 2, &EKFBaseLandmarksROS::updateLandmarkMsg,  reinterpret_cast<EKFBaseLandmarksROS*>(this));
   //sub_range_ = nh_.subscribe("range_update", 2, &EKFBaseLandmarksROS::updateRangeMsg,  reinterpret_cast<EKFBaseLandmarksROS*>(this));
-  if (config_.use_force_model_)
+  if (config_.dvl_fallback_delay_ > 0.0)
   {
-    sub_model_ = nh_.subscribe("merged/body_force_req", 2, &EKFBaseLandmarksROS::updateBodyForceReqMsg,  reinterpret_cast<EKFBaseLandmarksROS*>(this));
+    ROS_INFO("Subscribing to 'dvl_fallback'");
+    sub_dvl_fallback_ = nh_.subscribe("dvl_fallback", 2, &EKFBaseLandmarksROS::updateVelocityDVLFallbackMsg,  reinterpret_cast<EKFBaseLandmarksROS*>(this));
   }
   // Other data
   sub_sound_velocity_ = nh_.subscribe("sound_velocity", 2, &EKFBaseLandmarksROS::updateSoundVelocityMsg,  reinterpret_cast<EKFBaseLandmarksROS*>(this));
