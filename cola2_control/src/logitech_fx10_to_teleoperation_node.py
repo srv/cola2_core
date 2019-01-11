@@ -76,7 +76,7 @@ class LogitechFX10(JoystickBase):
                 rospy.logwarn("%s: Service call failed: %s", self.name, e)
 
         # ... stop button service
-        if self.start_service != '':
+        if self.stop_service != '':
             rospy.wait_for_service(self.stop_service, 10)
             try:
                 self.disable_keep_pose = rospy.ServiceProxy(self.stop_service, Trigger)
@@ -164,7 +164,7 @@ class LogitechFX10(JoystickBase):
             rospy.loginfo("%s: Start button service called", self.name)
             res = self.enable_keep_pose(TriggerRequest())
             if not res.success:
-                rospy.logwarn("%s: Impossible to enable keep position, captain response: %s", self.name, res.message) 
+                rospy.logwarn("%s: Impossible to enable keep position, captain response: %s", self.name, res.message)
         if joy.buttons[self.BUTTON_BACK] == 1.0:
             rospy.loginfo("%s: Stop button service called", self.name)
             res = self.disable_keep_pose(TriggerRequest())
