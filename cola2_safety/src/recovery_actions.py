@@ -13,7 +13,7 @@ from std_srvs.srv import Empty, EmptyRequest
 from std_srvs.srv import Trigger, TriggerRequest
 from cola2_msgs.srv import Goto
 from cola2_msgs.srv import Recovery, RecoveryResponse
-from cola2_msgs.msg import Setpoints, RecoveryAction
+from cola2_msgs.msg import Setpoints, RecoveryAction, VehicleStatus
 from cola2_lib.rosutils import param_loader
 
 
@@ -27,10 +27,15 @@ class RecoveryActions(object):
 
         ns = rospy.get_namespace()
 
-        # Create publisher
+        # Create publishers
         self.pub_thrusters = rospy.Publisher(ns + "controller/thruster_setpoints", Setpoints, queue_size = 2)
         self.pub_external_ra = rospy.Publisher(rospy.get_name() + "/external_recovery_action",
                                                RecoveryAction, queue_size = 2)
+
+        # Create subscriber
+        self.vehicle_status = None
+        self.last_vehicle_status = None
+        rospy.Subscriber(ns + "vehicle_status", VehicleStatus, self.vehicle_status_callback, queue_size=1)
 
         # Init service clients
         rospy.loginfo("Waiting for services")
@@ -88,6 +93,11 @@ class RecoveryActions(object):
         # Show message
         rospy.loginfo("Initialized")
 
+    def vehicle_status_callback(self, msg):
+        """ Vehicle status callback """
+        self.vehicle_status = msg
+        self.last_vehicle_status = rospy.Time.now().to_sec()
+
     def recovery_action_srv(self, req):
         """ Callback of recovery action service """
         rospy.loginfo("Received recovery action")
@@ -119,8 +129,11 @@ class RecoveryActions(object):
             self.disable_mission_external_mission_and_goto()
         elif error == RecoveryAction.ABORT_AND_SURFACE:
             rospy.loginfo("Recovery action %s: ABORT_AND_SURFACE", error)
-            self.disable_all_and_set_idle()
-            self.enable_safety_keep_position()
+            if ((self.last_vehicle_status is None) or
+                (rospy.Time.now().to_sec() - self.last_vehicle_status > 10.0) or
+                (self.vehicle_status.captain_state is not VehicleStatus.SAFETYKEEPPOSITION)):
+                self.disable_all_and_set_idle()
+                self.enable_safety_keep_position()
         elif error == RecoveryAction.EMERGENCY_SURFACE:
             rospy.loginfo("Recovery action %s: EMERGENCY_SURFACE", error)
             self.disable_all_and_set_idle()
