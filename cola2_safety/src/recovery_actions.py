@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2018 Iqua Robotics SL - All Rights Reserved
+# Copyright (c) 2019 Iqua Robotics SL - All Rights Reserved
 #
 # This file is subject to the terms and conditions defined in file
 # 'LICENSE.txt', which is part of this source code package.
@@ -35,63 +35,42 @@ class RecoveryActions(object):
         # Init service clients
         rospy.loginfo("Waiting for services")
 
-        try:
-            rospy.wait_for_service(ns + 'teleoperation/set_joystick_axes_to_velocity', 20)
-            self.set_joy_to_vel_srv = rospy.ServiceProxy(ns + 'teleoperation/set_joystick_axes_to_velocity', Empty)
-        except rospy.exceptions.ROSException:
-            self.captain_clients = False
-            rospy.logfatal("Set joystick axes to velocity service is not available!")
-
         self.captain_clients = True
         try:
-            rospy.wait_for_service(ns + 'captain/disable_external_mission', 20)
-            self.abort_external_mission_srv = rospy.ServiceProxy(ns + 'captain/disable_external_mission', Trigger)
-        except rospy.exceptions.ROSException:
-            self.captain_clients = False
-            rospy.logfatal("Disable external mission service not available!")
-
-        try:
             rospy.wait_for_service(ns + 'captain/disable_mission', 20)
-            self.abort_mission_srv = rospy.ServiceProxy(ns + 'captain/disable_mission', Trigger)
+            self.disable_mission_srv = rospy.ServiceProxy(ns + 'captain/disable_mission', Trigger)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
             rospy.logfatal("Disable mission service not available!")
 
         try:
-            rospy.wait_for_service(ns + 'captain/disable_keep_position', 2)
-            self.abort_keep_position_srv = rospy.ServiceProxy(ns + 'captain/disable_keep_position', Trigger)
+            rospy.wait_for_service(ns + 'captain/disable_external_mission', 20)
+            self.disable_external_mission_srv = rospy.ServiceProxy(ns + 'captain/disable_external_mission', Trigger)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
-            rospy.logfatal("Disable keep position service not available!")
-
-        try:
-            rospy.wait_for_service(ns + 'captain/disable_safety_keep_position', 2)
-            self.abort_safety_keep_position_srv = rospy.ServiceProxy(ns +
-                                                                     'captain/disable_safety_keep_position', Trigger)
-        except rospy.exceptions.ROSException:
-            self.captain_clients = False
-            rospy.logfatal("Disable safety keep position service not available!")
+            rospy.logfatal("Disable external mission service not available!")
 
         try:
             rospy.wait_for_service(ns + 'captain/disable_goto', 2)
-            self.abort_goto_srv = rospy.ServiceProxy(ns + 'captain/disable_goto', Trigger)
+            self.disable_goto_srv = rospy.ServiceProxy(ns + 'captain/disable_goto', Trigger)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
             rospy.logfatal("Disable goto service not available!")
 
         try:
-            rospy.wait_for_service(ns + 'captain/enable_goto', 2)
-            self.goto_srv = rospy.ServiceProxy(ns + 'captain/enable_goto', Goto)
-        except rospy.exceptions.ROSException:
-            self.captain_clients = False
-            rospy.logfatal("Goto service not available!")
-
-        try:
             rospy.wait_for_service(ns + 'captain/enable_safety_keep_position', 2)
-            self.safety_keep_position_srv = rospy.ServiceProxy(ns + 'captain/enable_safety_keep_position', Trigger)
+            self.enable_safety_keep_position_srv = rospy.ServiceProxy(ns +
+                                                                      'captain/enable_safety_keep_position', Trigger)
         except rospy.exceptions.ROSException:
             self.captain_clients = False
             rospy.logfatal("Safety keep position service not available!")
+
+        try:
+            rospy.wait_for_service(ns + 'captain/disable_all_and_set_idle', 2)
+            self.disable_all_and_set_idle_srv = rospy.ServiceProxy(ns + 'captain/disable_all_and_set_idle', Trigger)
+        except rospy.exceptions.ROSException:
+            self.captain_clients = False
+            rospy.logfatal("Disable all and set Idle service not available!")
 
         if not self.captain_clients:
             self.no_captain_clients_timer = rospy.Timer(rospy.Duration(0.4), self.no_captain_clients_message)
@@ -108,7 +87,6 @@ class RecoveryActions(object):
 
         # Show message
         rospy.loginfo("Initialized")
-
 
     def recovery_action_srv(self, req):
         """ Callback of recovery action service """
@@ -131,7 +109,6 @@ class RecoveryActions(object):
         ret.attempted = True
         return ret
 
-
     def recovery_action(self, error):
         """ This method calls the appropiate method to handle the input code """
         # TODO: send message through modem?
@@ -139,18 +116,14 @@ class RecoveryActions(object):
             rospy.loginfo("Recovery action %s: INFORMATIVE", error)
         elif error == RecoveryAction.ABORT_MISSION:
             rospy.loginfo("Recovery action %s: ABORT_MISSION", error)
-            self.abort_mission_and_goto()
-            # self.abort_keep_position()
+            self.disable_mission_external_mission_and_goto()
         elif error == RecoveryAction.ABORT_AND_SURFACE:
             rospy.loginfo("Recovery action %s: ABORT_AND_SURFACE", error)
-            self.abort_mission_and_goto()
-            self.abort_keep_position()
-            self.safety_keep_position()
+            self.disable_all_and_set_idle()
+            self.enable_safety_keep_position()
         elif error == RecoveryAction.EMERGENCY_SURFACE:
             rospy.loginfo("Recovery action %s: EMERGENCY_SURFACE", error)
-            self.abort_mission_and_goto()
-            self.abort_keep_position()
-            self.abort_safety_keep_position()
+            self.disable_all_and_set_idle()
             self.disable_thrusters()
             self.emergency_surface()
         elif error == RecoveryAction.STOP_THRUSTERS:
@@ -159,52 +132,39 @@ class RecoveryActions(object):
         else:
             rospy.loginfo("Recovery action %s: INVALID ERROR CODE", error)
 
-
-    def abort_mission_and_goto(self):
-        """ This method handles abort mission and goto"""
-        rospy.loginfo("Abort mission and goto")
+    def disable_mission_external_mission_and_goto(self):
+        """ This method disables mission, external mission and goto"""
+        rospy.loginfo("Disabling mission, external mission and goto")
         try:
-            self.abort_external_mission_srv(TriggerRequest())
+            self.disable_mission_srv(TriggerRequest())
         except rospy.exceptions.ROSException:
-            rospy.logerr("Error aborting the external mission")
-
-        try:
-            self.abort_mission_srv(TriggerRequest())
-        except rospy.exceptions.ROSException:
-            rospy.logerr("Error aborting the mission")
+            rospy.logerr("Error disabling mission")
 
         try:
-            self.abort_goto_srv(TriggerRequest())
+            self.disable_external_mission_srv(TriggerRequest())
         except rospy.exceptions.ROSException:
-            rospy.logerr("Error aborting the goto")
+            rospy.logerr("Error disabling external mission")
 
-
-    def abort_keep_position(self):
-        """ This method aborts keep position """
-        rospy.loginfo("Abort keep position")
         try:
-            self.abort_keep_position_srv(TriggerRequest())
+            self.disable_goto_srv(TriggerRequest())
         except rospy.exceptions.ROSException:
-            rospy.logerr("Error aborting keep position")
+            rospy.logerr("Error disabling goto")
 
-
-    def abort_safety_keep_position(self):
-        """ This method aborts safety keep position """
-        rospy.loginfo("Abort safety keep position")
+    def disable_all_and_set_idle(self):
+        """ This method sets the captain back to idle """
+        rospy.loginfo("Setting captain to idle state")
         try:
-            self.abort_safety_keep_position_srv(TriggerRequest())
+            self.disable_all_and_set_idle_srv(TriggerRequest())
         except rospy.exceptions.ROSException:
-            rospy.logerr("Error aborting safety keep position")
+            rospy.logerr("Error setting captain to idle state")
 
-
-    def safety_keep_position(self):
+    def enable_safety_keep_position(self):
         """ This method enables safety keep position """
         rospy.loginfo("Enabling safety keep position")
         try:
-            self.safety_keep_position_srv(TriggerRequest())
+            self.enable_safety_keep_position_srv(TriggerRequest())
         except rospy.exceptions.ROSException:
             rospy.logerr("Error enabling safety keep position")
-
 
     def disable_thrusters(self):
         """ This method disables the thrusters """
@@ -213,7 +173,6 @@ class RecoveryActions(object):
             self.disable_thrusters_srv(EmptyRequest())
         except rospy.exceptions.ROSException:
             rospy.logerr("Error disabling thrusters")
-
 
     def emergency_surface(self):
         """ This method handles an emergency surface """
@@ -226,7 +185,6 @@ class RecoveryActions(object):
             self.pub_thrusters.publish(thrusters)
             r.sleep()
 
-
     def get_config(self):
         """ Get config from param server """
         # TODO: this is dangerous. The default emergency setpoint should be always loaded from param server instead of
@@ -235,11 +193,9 @@ class RecoveryActions(object):
                       'emergency_surface_setpoints': ('emergency_surface_setpoints', [0.0, 0.0, 0.75, 0.75, 0.0])}
         param_loader.get_ros_params(self, param_dict)
 
-
     def no_disable_thrusters_message(self, event):
         """ Timer to show an error in disable thrusters service """
         rospy.logfatal("Error creating client to disable thrusters")
-
 
     def no_captain_clients_message(self, event):
         """ Timer to show an error if unavailable captain service """

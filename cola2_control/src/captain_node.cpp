@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+ * Copyright (c) 2019 Iqua Robotics SL - All Rights Reserved
  *
  * This file is subject to the terms and conditions defined in file
  * 'LICENSE.txt', which is part of this source code package.
@@ -63,9 +63,11 @@ class Captain
   ros::ServiceServer disable_keep_position_srv_;
   ros::ServiceServer enable_safety_keep_position_srv_;
   ros::ServiceServer disable_safety_keep_position_srv_;
+  ros::ServiceServer disable_all_keep_positions_srv_;
   ros::ServiceServer enable_external_mission_srv_;
   ros::ServiceServer disable_external_mission_srv_;
   ros::ServiceServer enable_mission_srv_;
+  ros::ServiceServer disable_all_and_set_idle_;
 
   // Subscriber
   ros::Subscriber sub_nav_;
@@ -222,7 +224,9 @@ class Captain
    * \return Success
    */
   bool enableDefaultMissionNonBlockSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response&);
-  void enableDefaultMissionNonBlockSrvHelper(Mission);  // Helper method required to start a thread with argument references
+
+  // Helper method required to start a thread with argument references
+  void enableDefaultMissionNonBlockSrvHelper(Mission);
 
   /**
    * \brief Disable mission
@@ -281,6 +285,14 @@ class Captain
   bool disableSafetyKeepPositionSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response&);
 
   /**
+   * \brief Disable all keep positions
+   * \param[in] Request
+   * \param[out] Response
+   * \return Success
+   */
+  bool disableAllKeepPositionsSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Response&);
+
+  /**
    * \brief Allows an external controller to 'fake' that a mission is under execution
    * \param[in] Request
    * \param[out] Response
@@ -295,6 +307,14 @@ class Captain
    * \return Success
    */
   bool disableExternalMissionSrv(ros::ServiceEvent<std_srvs::Trigger::Request, std_srvs::Trigger::Response>&);
+
+  /**
+   * \brief Disables everything so that the state becomes idle
+   * \param[in] Request
+   * \param[out] Response
+   * \return Success
+   */
+  bool disableAllAndSetIdleSrv(ros::ServiceEvent<std_srvs::Trigger::Request, std_srvs::Trigger::Response>&);
 
  public:
   /**
@@ -340,18 +360,27 @@ Captain::Captain()
   // Services
   enable_goto_srv_ = nh_.advertiseService("enable_goto", &Captain::enableGotoSrv, this);
   disable_goto_srv_ = nh_.advertiseService("disable_goto", &Captain::disableGotoSrv, this);
-  enable_keep_position_holonomic_srv_ = nh_.advertiseService("enable_keep_position_holonomic", &Captain::enableKeepPositionHolonomicSrv, this);
-  enable_keep_position_non_holonomic_srv_ = nh_.advertiseService("enable_keep_position_non_holonomic", &Captain::enableKeepPositionNonHolonomicSrv, this);
+  enable_keep_position_holonomic_srv_ = nh_.advertiseService("enable_keep_position_holonomic",
+                                                             &Captain::enableKeepPositionHolonomicSrv, this);
+  enable_keep_position_non_holonomic_srv_ = nh_.advertiseService("enable_keep_position_non_holonomic",
+                                                                 &Captain::enableKeepPositionNonHolonomicSrv, this);
   disable_keep_position_srv_ = nh_.advertiseService("disable_keep_position", &Captain::disableKeepPositionSrv, this);
-  enable_safety_keep_position_srv_ = nh_.advertiseService("enable_safety_keep_position", &Captain::enableSafetyKeepPositionSrv, this);
-  disable_safety_keep_position_srv_ = nh_.advertiseService("disable_safety_keep_position", &Captain::disableSafetyKeepPositionSrv, this);
+  enable_safety_keep_position_srv_ = nh_.advertiseService("enable_safety_keep_position",
+                                                          &Captain::enableSafetyKeepPositionSrv, this);
+  disable_safety_keep_position_srv_ = nh_.advertiseService("disable_safety_keep_position",
+                                                           &Captain::disableSafetyKeepPositionSrv, this);
+  disable_all_keep_positions_srv_ = nh_.advertiseService("disable_all_keep_positions",
+                                                         &Captain::disableAllKeepPositionsSrv, this);
   enable_mission_srv_ = nh_.advertiseService("enable_mission", &Captain::enableMissionSrv, this);
-  enable_default_mission_non_block_srv_ = nh_.advertiseService("enable_default_mission_non_block", &Captain::enableDefaultMissionNonBlockSrv, this);
+  enable_default_mission_non_block_srv_ = nh_.advertiseService("enable_default_mission_non_block",
+                                                               &Captain::enableDefaultMissionNonBlockSrv, this);
   disable_mission_srv_ = nh_.advertiseService("disable_mission", &Captain::disableMissionSrv, this);
   enable_external_mission_srv_ = nh_.advertiseService("enable_external_mission",
                                                       &Captain::enableExternalMissionSrv, this);
   disable_external_mission_srv_ = nh_.advertiseService("disable_external_mission",
                                                        &Captain::disableExternalMissionSrv, this);
+  disable_all_and_set_idle_ = nh_.advertiseService("disable_all_and_set_idle",
+                                                   &Captain::disableAllAndSetIdleSrv, this);
 
   // Subscribers
   sub_nav_ = nh_.subscribe(cola2::rosutils::getNamespace() + "/navigator/navigation", 1, &Captain::updateNav, this);
@@ -1280,7 +1309,7 @@ bool Captain::enableKeepPositionHolonomicSrv(std_srvs::Trigger::Request&, std_sr
   if (state_ == CaptainStates::KeepPosition)
   {
     std::string msg("Keep position already enabled");
-    ROS_WARN_STREAM(msg);
+    ROS_INFO_STREAM(msg);
     res.message = msg;
     res.success = true;
     return true;
@@ -1352,7 +1381,7 @@ bool Captain::enableKeepPositionNonHolonomicSrv(std_srvs::Trigger::Request&, std
   if (state_ == CaptainStates::KeepPosition)
   {
     std::string msg("Keep position already enabled");
-    ROS_WARN_STREAM(msg);
+    ROS_INFO_STREAM(msg);
     res.message = msg;
     res.success = true;
     return true;
@@ -1458,7 +1487,7 @@ bool Captain::enableSafetyKeepPositionSrv(std_srvs::Trigger::Request&, std_srvs:
   if (state_ == CaptainStates::SafetyKeepPosition)
   {
     std::string msg("Safety keep position already enabled");
-    ROS_WARN_STREAM(msg);
+    ROS_INFO_STREAM(msg);
     res.message = msg;
     res.success = true;
     return true;
@@ -1552,6 +1581,33 @@ bool Captain::disableSafetyKeepPositionSrv(std_srvs::Trigger::Request&, std_srvs
   return true;
 }
 
+bool Captain::disableAllKeepPositionsSrv(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res)
+{
+  if (state_ == CaptainStates::KeepPosition)
+  {
+    disableKeepPositionSrv(req, res);
+  }
+  else if (state_ == CaptainStates::SafetyKeepPosition)
+  {
+    disableSafetyKeepPositionSrv(req, res);
+  }
+  else if (state_ == CaptainStates::Idle)
+  {
+    std::string msg("Already in Idle state");
+    ROS_INFO_STREAM(msg);
+    res.message = msg;
+    res.success = true;
+  }
+  else
+  {
+    std::string msg("Impossible to disable keep positions. Captain is not Idle nor keeping position");
+    ROS_WARN_STREAM(msg);
+    res.message = msg;
+    res.success = false;
+  }
+  return true;
+}
+
 bool Captain::enableExternalMissionSrv(ros::ServiceEvent<std_srvs::Trigger::Request,
                                                          std_srvs::Trigger::Response>& event)
 {
@@ -1635,6 +1691,40 @@ bool Captain::disableExternalMissionSrv(ros::ServiceEvent<std_srvs::Trigger::Req
   res.message = "External mission disabled";
   res.success = true;
   ROS_INFO_STREAM(res.message);
+  return true;
+}
+
+bool Captain::disableAllAndSetIdleSrv(ros::ServiceEvent<std_srvs::Trigger::Request,
+                                                        std_srvs::Trigger::Response>& event)
+{
+  std_srvs::Trigger::Request req = event.getRequest();
+  if (state_ == CaptainStates::Goto)
+  {
+    disableGotoSrv(req, event.getResponse());
+  }
+  else if (state_ == CaptainStates::Mission)
+  {
+    disableMissionSrv(req, event.getResponse());
+  }
+  else if (state_ == CaptainStates::KeepPosition)
+  {
+    disableKeepPositionSrv(req, event.getResponse());
+  }
+  else if (state_ == CaptainStates::SafetyKeepPosition)
+  {
+    disableSafetyKeepPositionSrv(req, event.getResponse());
+  }
+  else if (state_ == CaptainStates::ExternalMission)
+  {
+    disableExternalMissionSrv(event);
+  }
+  else
+  {
+    std::string msg("Already in Idle state");
+    ROS_INFO_STREAM(msg);
+    event.getResponse().message = msg;
+    event.getResponse().success = true;
+  }
   return true;
 }
 
