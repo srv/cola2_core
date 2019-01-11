@@ -99,8 +99,8 @@ class Captain
   std::string external_mission_caller_name_;
 
   // Threads
-  std::thread* thread_wait_waypoint_;
-  std::thread* thread_mission_;
+  std::shared_ptr<std::thread> thread_wait_waypoint_;
+  std::shared_ptr<std::thread> thread_mission_;
 
   /**
    * \brief Defunes a timer to publish the captain status
@@ -337,8 +337,6 @@ Captain::Captain()
   , is_section_actionlib_running_(false)
   , state_(CaptainStates::Idle)
   , nav_received_(false)
-  , thread_wait_waypoint_(NULL)
-  , thread_mission_(NULL)
 {
   // Publishers
   pub_path_ = nh_.advertise<nav_msgs::Path>("trajectory_path", 1, true);
@@ -401,20 +399,18 @@ Captain::~Captain()
 {
   // Change state, cancel goals and join threads
   state_ = CaptainStates::Idle;
-  if (is_waypoint_actionlib_running_) {
+  if (is_waypoint_actionlib_running_)
+  {
     waypoint_actionlib_.cancelGoal();
     is_waypoint_actionlib_running_ = false;
   }
-  if (is_section_actionlib_running_) {
+  if (is_section_actionlib_running_)
+  {
     section_actionlib_.cancelGoal();
     is_section_actionlib_running_ = false;
   }
-  if (thread_wait_waypoint_ != NULL) {
-    thread_wait_waypoint_->join();
-  }
-  if (thread_mission_ != NULL) {
-    thread_mission_->join();
-  }
+  if (thread_wait_waypoint_) thread_wait_waypoint_->join();
+  if (thread_mission_)       thread_mission_->join();
 }
 
 void Captain::statusTimer(const ros::TimerEvent&)
@@ -662,11 +658,8 @@ bool Captain::enableGotoInternal(cola2_msgs::Goto::Request& req, cola2_msgs::Got
   }
   else
   {
-    // Join previous thread if present, which should be finished by now (if the state machine is correct)
-    if (thread_wait_waypoint_ != NULL) thread_wait_waypoint_->join();
-
-    // Start new thread
-    thread_wait_waypoint_ = new std::thread(&Captain::waitWaypoint, this);
+    // Start thread
+    thread_wait_waypoint_ = std::make_shared<std::thread>(&Captain::waitWaypoint, this);
 
     // Response message
     res.message = "Goto enabled";
@@ -1143,6 +1136,8 @@ bool Captain::disableGotoSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::Res
     waypoint_actionlib_.cancelGoal();
     is_waypoint_actionlib_running_ = false;
   }
+  if (thread_wait_waypoint_) thread_wait_waypoint_->join();
+  thread_wait_waypoint_.reset();
 
   // Set captain status
   mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_NONE;
@@ -1236,9 +1231,8 @@ bool Captain::enableDefaultMissionNonBlockSrv(std_srvs::Trigger::Request&, std_s
   // Set captain state
   state_ = CaptainStates::Mission;
 
-  // Start thread joining first the previous one, which should be done by now (if the state machine is correct)
-  if (thread_mission_ != NULL) thread_mission_->join();
-  thread_mission_ = new std::thread(&Captain::enableDefaultMissionNonBlockSrvHelper, this, mission);
+  // Start thread
+  thread_mission_ = std::make_shared<std::thread>(&Captain::enableDefaultMissionNonBlockSrvHelper, this, mission);
 
   res.message = "Default mission enabled";
   res.success = true;
@@ -1280,6 +1274,8 @@ bool Captain::disableMissionSrv(std_srvs::Trigger::Request&, std_srvs::Trigger::
     section_actionlib_.cancelGoal();
     is_section_actionlib_running_ = false;
   }
+  if (thread_mission_) thread_mission_->join();
+  thread_mission_.reset();
 
   // Set captain status
   mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_NONE;
@@ -1458,6 +1454,8 @@ bool Captain::disableKeepPositionSrv(std_srvs::Trigger::Request&, std_srvs::Trig
     waypoint_actionlib_.cancelGoal();
     is_waypoint_actionlib_running_ = false;
   }
+  if (thread_wait_waypoint_) thread_wait_waypoint_->join();
+  thread_wait_waypoint_.reset();
 
   // Set captain status
   mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_NONE;
@@ -1568,6 +1566,8 @@ bool Captain::disableSafetyKeepPositionSrv(std_srvs::Trigger::Request&, std_srvs
     waypoint_actionlib_.cancelGoal();
     is_waypoint_actionlib_running_ = false;
   }
+  if (thread_wait_waypoint_) thread_wait_waypoint_->join();
+  thread_wait_waypoint_.reset();
 
   // Set captain status
   mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_NONE;
