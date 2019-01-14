@@ -659,6 +659,7 @@ bool Captain::enableGotoInternal(cola2_msgs::Goto::Request& req, cola2_msgs::Got
   else
   {
     // Start thread
+    if (thread_wait_waypoint_) thread_wait_waypoint_->join();
     thread_wait_waypoint_ = std::make_shared<std::thread>(&Captain::waitWaypoint, this);
 
     // Response message
@@ -1232,6 +1233,7 @@ bool Captain::enableDefaultMissionNonBlockSrv(std_srvs::Trigger::Request&, std_s
   state_ = CaptainStates::Mission;
 
   // Start thread
+  if (thread_mission_) thread_mission_->join();
   thread_mission_ = std::make_shared<std::thread>(&Captain::enableDefaultMissionNonBlockSrvHelper, this, mission);
 
   res.message = "Default mission enabled";
