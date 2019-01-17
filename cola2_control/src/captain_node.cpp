@@ -103,6 +103,14 @@ class Captain
   std::shared_ptr<std::thread> thread_mission_;
 
   /**
+   * \brief Waits for the actionlib to become ready
+   * \param[in] Actionlib client
+   * \param[in] Actionlib name (only used to display rosout msgs)
+   */
+  template <typename T>
+  void waitActionlib(actionlib::SimpleActionClient<T>&, const std::string&);
+
+  /**
    * \brief Defunes a timer to publish the captain status
    * \param[in] Timer event
    */
@@ -338,22 +346,23 @@ Captain::Captain()
   , state_(CaptainStates::Idle)
   , nav_received_(false)
 {
+  // Init mission status
+  mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_NONE;
+  mission_status_.altitude_mode = false;
+  mission_status_.current_step = 0;
+  mission_status_.total_steps = 0;
+
   // Publishers
   pub_path_ = nh_.advertise<nav_msgs::Path>("trajectory_path", 1, true);
   pub_mission_status_ = nh_.advertise<cola2_msgs::MissionStatus>("mission_status", 1, true);
   pub_captain_status_ = nh_.advertise<cola2_msgs::CaptainStatus>("captain_status", 1, true);
 
+  // Subscribers
+  sub_nav_ = nh_.subscribe(cola2::rosutils::getNamespace() + "/navigator/navigation", 1, &Captain::updateNav, this);
+
   // Wait actionlib clients
-  for (;;)
-  {
-    if (waypoint_actionlib_.waitForServer(ros::Duration(5.0))) break;
-    ROS_INFO_STREAM("Waiting waypoint actionlib");
-  }
-  for (;;)
-  {
-    if (section_actionlib_.waitForServer(ros::Duration(5.0))) break;
-    ROS_INFO_STREAM("Waiting section actionlib");
-  }
+  waitActionlib(waypoint_actionlib_, "waypoint");
+  waitActionlib(section_actionlib_, "section");
 
   // Services
   enable_goto_srv_ = nh_.advertiseService("enable_goto", &Captain::enableGotoSrv, this);
@@ -380,15 +389,6 @@ Captain::Captain()
   disable_all_and_set_idle_ = nh_.advertiseService("disable_all_and_set_idle",
                                                    &Captain::disableAllAndSetIdleSrv, this);
 
-  // Subscribers
-  sub_nav_ = nh_.subscribe(cola2::rosutils::getNamespace() + "/navigator/navigation", 1, &Captain::updateNav, this);
-
-  // Init captain status
-  mission_status_.active_controller = cola2_msgs::MissionStatus::CONTROLLER_NONE;
-  mission_status_.altitude_mode = false;
-  mission_status_.current_step = 0;
-  mission_status_.total_steps = 0;
-
   // Status timer
   status_timer_ = nh_.createTimer(ros::Duration(2.0), &Captain::statusTimer, this);
 
@@ -411,6 +411,25 @@ Captain::~Captain()
   }
   if (thread_wait_waypoint_) thread_wait_waypoint_->join();
   if (thread_mission_)       thread_mission_->join();
+}
+
+template <typename T>
+void Captain::waitActionlib(actionlib::SimpleActionClient<T>& actionlib, const std::string& name)
+{
+  for (;;)
+  {
+    try
+    {
+      if (actionlib.waitForServer(ros::Duration(5.0))) break;
+    }
+    catch (const std::exception& e)
+    {
+      ROS_WARN_STREAM("Actionlib's waitForServer() has thrown an exception " <<
+                      "(try updating your system): " << e.what());
+      ros::Duration(0.5).sleep();
+    }
+    ROS_INFO_STREAM("Waiting " << name << " actionlib");
+  }
 }
 
 void Captain::statusTimer(const ros::TimerEvent&)
