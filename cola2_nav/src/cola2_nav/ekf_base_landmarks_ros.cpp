@@ -624,7 +624,7 @@ void EKFBaseLandmarksROS::updateVelocityDVLMsgImpl(const cola2_msgs::DVL& msg, c
     }
     Eigen::Quaterniond quat(trans.rotation());
     vel = transforms::linearVelocity(vel, getAngularVelocity(), quat, trans.translation());
-    cov = transforms::positionCovariance(cov, getAngularVelocityUncertainty(), quat, trans.translation());
+    cov = transforms::linearVelocityCov(cov, getAngularVelocityUncertainty(), quat, trans.translation());
     // Predict and update
     const double tim = msg.header.stamp.toSec();
     if (makePrediction(tim) || !init_ekf_)
