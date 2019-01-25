@@ -10,11 +10,14 @@
 // *****************************************
 // Constructor and destructor
 // *****************************************
-EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size)
+EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size, const bool online)
   : EKFBaseLandmarks(state_vector_size)
   , ned_(0.0, 0.0, 0.0)
   , diag_help_(nh_, cola2::rosutils::getUnresolvedNodeName(), "software")
 {
+  // Save param
+  online_ = online;
+
   // Get correct namespace and vehicle frame
   ns_ = cola2::rosutils::getNamespace();  // nh_.getNamespace();
   frame_vehicle_ = ns_ + std::string("/base_link");
@@ -39,35 +42,45 @@ EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size)
     ofh_.precision(4);
   }
 
-  // Publishers
-  pub_odom_ = nh_.advertise<nav_msgs::Odometry>("odometry", 1);
-  pub_map_ = nh_.advertise<cola2_msgs::Map>("landmarks", 1);
-  pub_nav_ = nh_.advertise<cola2_msgs::NavSts>("navigation", 1);  // TODO change type
-  pub_gps_ned_ = nh_.advertise<geometry_msgs::PoseStamped>("gps_ned", 1);
-  pub_usbl_ned_ = nh_.advertise<geometry_msgs::PoseStamped>("usbl_ned", 1);
-  pub_range_update_ = nh_.advertise<visualization_msgs::Marker>("markers/range_update", 1);
-  pub_landmarks_ = nh_.advertise<visualization_msgs::MarkerArray>("markers/landmarks", 1);
-  pub_altitude_ = nh_.advertise<sensor_msgs::Range>("altitude_filtered", 1);
-
-  // Service client to publish parameters
-  std::string publish_params_srv_name = cola2::rosutils::getNamespace() + "/param_logger/publish_params";
-  srv_publish_params_ = nh_.serviceClient<std_srvs::Trigger>(publish_params_srv_name);
-  while (ros::ok())
+  // Normal online navigator
+  if (online_)
   {
-    if (srv_publish_params_.waitForExistence(ros::Duration(5.0))) break;
-    ROS_INFO_STREAM("Waiting for client to service " << publish_params_srv_name);
+    // Publishers
+    pub_odom_ = nh_.advertise<nav_msgs::Odometry>("odometry", 1);
+    pub_map_ = nh_.advertise<cola2_msgs::Map>("landmarks", 1);
+    pub_nav_ = nh_.advertise<cola2_msgs::NavSts>("navigation", 1);  // TODO change type
+    pub_gps_ned_ = nh_.advertise<geometry_msgs::PoseStamped>("gps_ned", 1);
+    pub_usbl_ned_ = nh_.advertise<geometry_msgs::PoseStamped>("usbl_ned", 1);
+    pub_range_update_ = nh_.advertise<visualization_msgs::Marker>("markers/range_update", 1);
+    pub_landmarks_ = nh_.advertise<visualization_msgs::MarkerArray>("markers/landmarks", 1);
+    pub_altitude_ = nh_.advertise<sensor_msgs::Range>("altitude_filtered", 1);
+
+    // Service client to publish parameters
+    std::string publish_params_srv_name = cola2::rosutils::getNamespace() + "/param_logger/publish_params";
+    srv_publish_params_ = nh_.serviceClient<std_srvs::Trigger>(publish_params_srv_name);
+    while (ros::ok())
+    {
+      if (srv_publish_params_.waitForExistence(ros::Duration(5.0)))
+        break;
+      ROS_INFO_STREAM("Waiting for client to service " << publish_params_srv_name);
+    }
+
+    // Init services
+    // clang-format off
+    srv_reload_params_ = nh_.advertiseService("reload_params", &EKFBaseLandmarksROS::srvResetNavigation, this);
+    srv_reset_navigation_ = nh_.advertiseService("reset_navigation", &EKFBaseLandmarksROS::srvResetNavigation, this);
+    srv_reset_landmarks_ = nh_.advertiseService("reset_landmarks", &EKFBaseLandmarksROS::srvResetLandmarks, this);
+    srv_set_depth_sensor_offset_ = nh_.advertiseService("set_depth_sensor_offset", &EKFBaseLandmarksROS::srvSetDepthSensorOffset, this);
+    // clang-format on
+
+    // Init timer
+    timer_ = nh_.createTimer(ros::Duration(1.0), &EKFBaseLandmarksROS::checkDiagnostics, this);
   }
-
-  // Init services
-  // clang-format off
-  srv_reload_params_ = nh_.advertiseService("reload_params", &EKFBaseLandmarksROS::srvResetNavigation, this);
-  srv_reset_navigation_ = nh_.advertiseService("reset_navigation", &EKFBaseLandmarksROS::srvResetNavigation, this);
-  srv_reset_landmarks_ = nh_.advertiseService("reset_landmarks", &EKFBaseLandmarksROS::srvResetLandmarks, this);
-  srv_set_depth_sensor_offset_ = nh_.advertiseService("set_depth_sensor_offset", &EKFBaseLandmarksROS::srvSetDepthSensorOffset, this);
-  // clang-format on
-
-  // Init timer
-  timer_ = nh_.createTimer(ros::Duration(1.0), &EKFBaseLandmarksROS::checkDiagnostics, this);
+  else
+  {
+    // Offline navigator
+    ROS_WARN("Using navigator offline...");
+  }
 
   // Check NED and GPS configuration
   if (config_.initialize_ned_from_gps_ && !config_.initialize_filter_from_gps_ && config_.use_gps_data_)
@@ -83,6 +96,24 @@ EKFBaseLandmarksROS::EKFBaseLandmarksROS(const unsigned int state_vector_size)
     ROS_ERROR("Invalid configuration: Do not initialize NED and filter from GPS but use data from it");
     ROS_WARN("Use GPS data will be set to false");
     config_.use_gps_data_ = false;
+  }
+}
+
+void EKFBaseLandmarksROS::loadTranformsFromFile(const std::string& fname)
+{
+  // Load transforms from file
+  std::ifstream infile(fname);
+  if (!infile.is_open())
+  {
+    ROS_FATAL("missing transforms file: %s", fname.c_str());
+    ros::shutdown();
+  }
+  // Process lines
+  std::string parent, child;
+  double tx, ty, tz, qx, qy, qz, qw;
+  while (infile >> parent >> child >> tx >> ty >> tz >> qx >> qy >> qz >> qw)
+  {
+    tf_handler_.setTransformManually(child, tx, ty, tz, qx, qy, qz, qw);
   }
 }
 
@@ -166,7 +197,6 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
   cola2::rosutils::getParam("navigator/gps_samples_to_init", config_.gps_samples_to_init_, 10);
   cola2::rosutils::getParam("navigator/use_gps_data", config_.use_gps_data_, false);
   cola2::rosutils::getParam("navigator/use_usbl_data", config_.use_usbl_data_, false);
-  cola2::rosutils::getParam("navigator/use_force_model", config_.use_force_model_, false);
   cola2::rosutils::getParam("navigator/use_depth_data", config_.use_depth_data_, true);
   cola2::rosutils::getParam("navigator/use_dvl_data", config_.use_dvl_data_, true);
   cola2::rosutils::getParam("navigator/enable_debug", config_.enable_debug_, false);
@@ -182,11 +212,11 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
   cola2::rosutils::getParam("navigator/dvl_max_v", config_.dvl_max_v_, 1.5);
   config_.declination_ = cola2::utils::degreesToRadians(declination_deg);
   cola2::rosutils::getParam("navigator/water_density", config_.water_density_, 1030.0);
+  // DVL fallback
+  cola2::rosutils::getParam("navigator/dvl_fallback_delay", config_.dvl_fallback_delay_, 0.0);
   // Covariances
   cola2::rosutils::getParamVector("navigator/initial_state_covariance", config_.initial_state_covariance_);
   cola2::rosutils::getParamVector("navigator/prediction_model_covariance", config_.prediction_model_covariance_);
-  cola2::rosutils::getParamVector("navigator/force_model_covariance", config_.force_model_covariance_);
-  cola2::rosutils::getParamVector("navigator/force_model_scale", config_.force_model_scale_);
   // Diagnostics
   cola2::rosutils::getParam("navigator/min_diagnostics_frequency", config_.min_diagnostics_frequency_, 25.0);
 
@@ -200,7 +230,6 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
     ROS_INFO(" gps samples to init: %d", config_.gps_samples_to_init_);
     ROS_INFO("        use gps data: %d", config_.use_gps_data_);
     ROS_INFO("       use usbl data: %d", config_.use_usbl_data_);
-    ROS_INFO("     use force model: %d", config_.use_force_model_);
     ROS_INFO("      use depth data: %d", config_.use_depth_data_);
     ROS_INFO("        use dvl data: %d", config_.use_dvl_data_);
     ROS_INFO("        enable debug: %d\n", config_.enable_debug_);
@@ -209,10 +238,11 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
     ROS_INFO("init depth sensor offset: %d", config_.initialize_depth_sensor_offset_);
     ROS_INFO("    surface2depth sensor: %.3f", config_.surface2depth_sensor_distance_);
     ROS_INFO("     depth sensor offset: %.3f\n", config_.depth_sensor_offset_);
-    ROS_INFO(" declination deg: %.3f", declination_deg);
-    ROS_INFO("dvl max velocity: %.3f", config_.dvl_max_v_);
-    ROS_INFO("   water density: %.3f\n", config_.water_density_);
-    ROS_INFO("min diagnostics frequancy: %.3f\n", config_.min_diagnostics_frequency_);
+    ROS_INFO("   declination deg: %.3f", declination_deg);
+    ROS_INFO("  dvl max velocity: %.3f", config_.dvl_max_v_);
+    ROS_INFO("dvl fallback delay: %.3f", config_.dvl_fallback_delay_);
+    ROS_INFO("     water density: %.3f\n", config_.water_density_);
+    ROS_INFO("min diagnostics frequency: %.3f\n", config_.min_diagnostics_frequency_);
     // vectors
     std::stringstream ss;
     ss << "   initial state covariance: ";
@@ -229,19 +259,6 @@ void EKFBaseLandmarksROS::getConfig(const bool show)
     }
     ROS_INFO_STREAM(ss.str());
     ss.str(std::string());
-    ss << "     force model covariance: ";
-    for (const double v : config_.force_model_covariance_)
-    {
-      ss << v << ' ';
-    }
-    ROS_INFO_STREAM(ss.str());
-    ss.str(std::string());
-    ss << "          force model scale: ";
-    for (const double v : config_.force_model_scale_)
-    {
-      ss << v << ' ';
-    }
-    ROS_INFO_STREAM(ss.str());
   }
 }
 
@@ -303,19 +320,22 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
   // Check other
   // *****************************************
   // Check current freq
-  diag_help_.add("freq", std::to_string(diag_help_.getCurrentFreq()));
   double freq = diag_help_.getCurrentFreq();
-  if (freq < config_.min_diagnostics_frequency_)
+  diag_help_.add("freq", std::to_string(freq));
+  if (init_ekf_ && (e.current_real.toSec() - last_ekf_init_time_ > 10.0))
   {
-    is_nav_data_ok = false;
-    ROS_WARN_STREAM("Diagnostics frequency too low (" << freq << " lower than " <<
-                    config_.min_diagnostics_frequency_ << ")");
+    if (freq < config_.min_diagnostics_frequency_)
+    {
+      is_nav_data_ok = false;
+      ROS_WARN_STREAM("Diagnostics frequency too low (" << freq << " lower than " << config_.min_diagnostics_frequency_
+                                                        << ")");
+    }
   }
   // If filter or NED not initialized set to Warning
   if (!init_ekf_)
   {
     is_nav_data_ok = false;
-    //ROS_FATAL("EKF not yet init");
+    // ROS_FATAL("EKF not yet init");
   }
   else
   {
@@ -324,7 +344,7 @@ void EKFBaseLandmarksROS::checkDiagnostics(const ros::TimerEvent& e)
   if (!init_ned_)
   {
     is_nav_data_ok = false;
-    //ROS_FATAL("NED not yet init");
+    // ROS_FATAL("NED not yet init");
   }
   else
   {
@@ -496,8 +516,6 @@ void EKFBaseLandmarksROS::updatePositionUSBLMsg(const geometry_msgs::PoseWithCov
       const Eigen::Vector3d latlonh(msg.pose.pose.position.x, msg.pose.pose.position.y, 0.0);
       Eigen::Vector3d ned = ned_.geodetic2Ned(latlonh);
       ned.head(2) += position_increment.tail(2);  // increment the same we increased
-      ned(2) = getPosition()(2);                  // show in current depth
-      publishUSBLNED(current_time, ned);          // show
       Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
       for (unsigned int i = 0; i < 3; ++i)
       {
@@ -506,6 +524,9 @@ void EKFBaseLandmarksROS::updatePositionUSBLMsg(const geometry_msgs::PoseWithCov
           cov(i, j) = msg.pose.covariance[6 * i + j];  // from 6x6 matrix
         }
       }
+      // Publish USBL in NED frame
+      ned(2) = getPosition()(2);          // show in current depth
+      publishUSBLNED(current_time, ned);  // show
       // Transform to vehicle frame
       Eigen::Affine3d trans;
       if (!tf_handler_.getTransform(msg.header.frame_id, trans))
@@ -574,14 +595,17 @@ void EKFBaseLandmarksROS::updatePositionDepthMsg(const sensor_msgs::FluidPressur
   }
 }
 
-void EKFBaseLandmarksROS::updateVelocityDVLMsg(const cola2_msgs::DVL& msg)
+void EKFBaseLandmarksROS::updateVelocityDVLMsgImpl(const cola2_msgs::DVL& msg, const bool is_dvl_fallback)
 {
   // Valid measurement
   if ((msg.velocity_covariance[0] > 0.0) && (std::abs(msg.velocity.x) < config_.dvl_max_v_) &&
       (std::abs(msg.velocity.y) < config_.dvl_max_v_) && (std::abs(msg.velocity.z) < config_.dvl_max_v_))
   {
     // Diagnostics
-    diag_help_.increaseFrequencyCounter();
+    if (!is_dvl_fallback)
+    {
+      diag_help_.increaseFrequencyCounter();
+    }
     // Construct measurement
     Eigen::Vector3d vel(msg.velocity.x, msg.velocity.y, msg.velocity.z);
     Eigen::Matrix3d cov;
@@ -600,7 +624,7 @@ void EKFBaseLandmarksROS::updateVelocityDVLMsg(const cola2_msgs::DVL& msg)
     }
     Eigen::Quaterniond quat(trans.rotation());
     vel = transforms::linearVelocity(vel, getAngularVelocity(), quat, trans.translation());
-    cov = transforms::positionCovariance(cov, getAngularVelocityUncertainty(), quat, trans.translation());
+    cov = transforms::linearVelocityCov(cov, getAngularVelocityUncertainty(), quat, trans.translation());
     // Predict and update
     const double tim = msg.header.stamp.toSec();
     if (makePrediction(tim) || !init_ekf_)
@@ -608,14 +632,43 @@ void EKFBaseLandmarksROS::updateVelocityDVLMsg(const cola2_msgs::DVL& msg)
       // Debug
       if (config_.enable_debug_)
       {
-        ofh_ << "#dvl " << tim << ' ' << vel(0) << ' ' << vel(1) << ' ' << vel(2) << ' ' << cov(0, 0) << ' '
-             << cov(0, 1) << ' ' << cov(0, 2) << ' ' << cov(1, 0) << ' ' << cov(1, 1) << ' ' << cov(1, 2) << ' '
-             << cov(2, 0) << ' ' << cov(2, 1) << ' ' << cov(2, 2) << '\n';
+        if (!is_dvl_fallback)
+        {
+          ofh_ << "#dvl " << tim << ' ' << vel(0) << ' ' << vel(1) << ' ' << vel(2) << ' ' << cov(0, 0) << ' '
+               << cov(0, 1) << ' ' << cov(0, 2) << ' ' << cov(1, 0) << ' ' << cov(1, 1) << ' ' << cov(1, 2) << ' '
+               << cov(2, 0) << ' ' << cov(2, 1) << ' ' << cov(2, 2) << '\n';
+        }
+        else
+        {
+          ofh_ << "#dvl_fallback " << tim << ' ' << vel(0) << ' ' << vel(1) << ' ' << vel(2) << ' ' << cov(0, 0) << ' '
+               << cov(0, 1) << ' ' << cov(0, 2) << ' ' << cov(1, 0) << ' ' << cov(1, 1) << ' ' << cov(1, 2) << ' '
+               << cov(2, 0) << ' ' << cov(2, 1) << ' ' << cov(2, 2) << '\n';
+        }
       }
       // Update and publish
       updateVelocity(msg.header.stamp.toSec(), vel, cov);
       publishNavigationAndLandmarks(msg.header.stamp);
     }
+  }
+}
+
+void EKFBaseLandmarksROS::updateVelocityDVLMsg(const cola2_msgs::DVL& msg)
+{
+  // Make update as main sensor
+  const bool is_dvl_fallback = false;
+  updateVelocityDVLMsgImpl(msg, is_dvl_fallback);
+}
+
+void EKFBaseLandmarksROS::updateVelocityDVLFallbackMsg(const cola2_msgs::DVL& msg)
+{
+  // Check that no DVL messages have been received for the specified delay
+  if ((msg.header.stamp.toSec() - last_dvl_time_) > config_.dvl_fallback_delay_)
+  {
+    // Make update without updating last_dvl_time_ because this is not the main sensor
+    const double old_time = last_dvl_time_;
+    const bool is_dvl_fallback = true;
+    updateVelocityDVLMsgImpl(msg, is_dvl_fallback);
+    last_dvl_time_ = old_time;
   }
 }
 
@@ -775,55 +828,7 @@ void EKFBaseLandmarksROS::updateRangeMsg(const cola2_msgs::RangeDetection& msg)
       // Update and publish
       applyUpdate(inno, cov, H, Eigen::MatrixXd::Identity(1, 1), 25.0);
       setLandmarkLastUpdate(msg.id, msg.header.stamp.toSec());
-      publishRangeMarker(msg.id, msg.range, msg.sigma);
-    }
-  }
-}
-
-void EKFBaseLandmarksROS::updateBodyForceReqMsg(const cola2_msgs::BodyForceReq& msg)
-{
-  // Valid measurement (we are not receiveng velocity messages from anywhere)
-  if (init_ekf_ && (msg.header.stamp.toSec() - last_dvl_time_ > 1.0))
-  {
-    // Diagnostics
-    diag_help_.increaseFrequencyCounter();
-    // Construct measurement
-    const Eigen::Vector3d force(msg.wrench.force.x, msg.wrench.force.y, msg.wrench.force.z);
-    Eigen::Vector3d velocity = Eigen::Vector3d::Zero();
-    if (not msg.disable_axis.x)
-    {
-      velocity(0) =
-          (force(0) > 0.0) ? force(0) / config_.force_model_scale_[0] : force(0) / config_.force_model_scale_[1];
-    }
-    if (not msg.disable_axis.y)
-    {
-      velocity(1) =
-          (force(1) > 0.0) ? force(1) / config_.force_model_scale_[2] : force(1) / config_.force_model_scale_[3];
-    }
-    if (not msg.disable_axis.x)
-    {
-      velocity(2) =
-          (force(2) > 0.0) ? force(2) / config_.force_model_scale_[4] : force(2) / config_.force_model_scale_[5];
-    }
-    Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
-    cov(0, 0) = config_.force_model_covariance_[0];
-    cov(1, 1) = config_.force_model_covariance_[1];
-    cov(2, 2) = config_.force_model_covariance_[2];
-    // Transform to vehicle frame => Velocities already in vehicle frame
-    // Predict and update
-    const double tim = msg.header.stamp.toSec();
-    if (makePrediction(tim))
-    {
-      // Debug
-      if (config_.enable_debug_)
-      {
-        ofh_ << "#force " << tim << ' ' << velocity(0) << ' ' << velocity(1) << ' ' << velocity(2) << ' ' << cov(0, 0)
-             << ' ' << cov(0, 1) << ' ' << cov(0, 2) << ' ' << cov(1, 0) << ' ' << cov(1, 1) << ' ' << cov(1, 2) << ' '
-             << cov(2, 0) << ' ' << cov(2, 1) << ' ' << cov(2, 2) << '\n';
-      }
-      // Update and publish
-      updateVelocity(msg.header.stamp.toSec(), velocity, cov, false);  // not coming from dvl
-      publishNavigationAndLandmarks(msg.header.stamp);
+      publishRangeMarker(msg.header.stamp, msg.id, msg.range, msg.sigma);
     }
   }
 }
@@ -846,6 +851,12 @@ void EKFBaseLandmarksROS::updateAltitudeMsg(const sensor_msgs::Range& msg)
 
 void EKFBaseLandmarksROS::publishNavigationAndLandmarks(const ros::Time& stamp)
 {
+  // Don't do anything if offline
+  if (!online_)
+  {
+    return;
+  }
+
   // State
   const Eigen::Vector3d pos = getPosition();
   const Eigen::Vector3d vel = getVelocity();
@@ -1038,6 +1049,12 @@ void EKFBaseLandmarksROS::publishNavigationAndLandmarks(const ros::Time& stamp)
 
 void EKFBaseLandmarksROS::publishGPSNED(const ros::Time& stamp, const Eigen::Vector3d& ned) const
 {
+  // Don't do anything if offline
+  if (!online_)
+  {
+    return;
+  }
+
   geometry_msgs::PoseStamped msg;
   msg.header.stamp = stamp;
   msg.header.frame_id = frame_world_;
@@ -1053,6 +1070,12 @@ void EKFBaseLandmarksROS::publishGPSNED(const ros::Time& stamp, const Eigen::Vec
 
 void EKFBaseLandmarksROS::publishUSBLNED(const ros::Time& stamp, const Eigen::Vector3d& ned) const
 {
+  // Don't do anything if offline
+  if (!online_)
+  {
+    return;
+  }
+
   geometry_msgs::PoseStamped msg;
   msg.header.stamp = stamp;
   msg.header.frame_id = frame_world_;
@@ -1066,15 +1089,21 @@ void EKFBaseLandmarksROS::publishUSBLNED(const ros::Time& stamp, const Eigen::Ve
   pub_usbl_ned_.publish(msg);
 }
 
-void EKFBaseLandmarksROS::publishRangeMarker(const std::string& landmark_id, const double range,
+void EKFBaseLandmarksROS::publishRangeMarker(const ros::Time& stamp, const std::string& landmark_id, const double range,
                                              const double sigma) const
 {
+  // Don't do anything if offline
+  if (!online_)
+  {
+    return;
+  }
+
   int l = getLandmarkPosition(landmark_id);
   if (l >= 0)
   {
     visualization_msgs::Marker marker;
     marker.header.frame_id = frame_world_;
-    marker.header.stamp = ros::Time::now();
+    marker.header.stamp = stamp;
     marker.ns = std::string("range_") + landmark_id;
     marker.id = 0;
     marker.type = visualization_msgs::Marker::LINE_LIST;

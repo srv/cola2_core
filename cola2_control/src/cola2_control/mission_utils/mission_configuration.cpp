@@ -8,7 +8,7 @@ MissionConfiguration::MissionConfiguration()
 {
 }
 
-MissionConfiguration::MissionConfiguration(std::string key, std::string value) : key_(key), value_(value)
+MissionConfiguration::MissionConfiguration(const std::string& key, const std::string& value) : key_(key), value_(value)
 {
 }
 

@@ -52,7 +52,7 @@ public:
   /**
    *  \brief Constructor.
    */
-  EKFPositionVelocityLandmarks();
+  EKFPositionVelocityLandmarks(const bool online = true);
   /**
    *  \brief Destructor.
    */

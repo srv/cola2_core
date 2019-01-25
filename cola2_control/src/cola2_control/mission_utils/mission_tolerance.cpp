@@ -12,18 +12,13 @@ MissionTolerance::~MissionTolerance()
 {
 }
 
-MissionTolerance::MissionTolerance(const MissionTolerance& tolerance)
+MissionTolerance::MissionTolerance(const MissionTolerance& tolerance):
+  x_(tolerance.x_), y_(tolerance.y_), z_(tolerance.z_)
 {
-  x_ = tolerance.x_;
-  y_ = tolerance.y_;
-  z_ = tolerance.z_;
 }
 
-MissionTolerance::MissionTolerance(double x, double y, double z)
+MissionTolerance::MissionTolerance(const double x, const double y, const double z): x_(x), y_(y), z_(z)
 {
-  x_ = x;
-  y_ = y;
-  z_ = z;
 }
 
 double MissionTolerance::getX() const

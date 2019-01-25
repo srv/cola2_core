@@ -29,6 +29,7 @@ from cola2_safety.cfg import VirtualCageInfoConfig
 from cola2_lib.rosutils import param_loader
 from cola2_lib.rosutils.diagnostic_helper import DiagnosticHelper
 
+
 class VirtualCage(object):
     """
     This node checks if the vehicle moves beyond some given virtual limits defined in NED coordinates
@@ -38,15 +39,23 @@ class VirtualCage(object):
         """ Init the class. """
         self.name = name
 
-        # Get config parameters
+        self.navigation_enabled = False
+        self.vehicle_position = [0.0, 0.0, 0.0]
+
+        # Default parameters
         self.north_origin = -50.0
         self.east_origin = -50.0
         self.north_longitude = 100
         self.east_longitude = 100
+        self.enabled = True
+
+        # Create dynamic reconfigure service
+        self.dynamic_reconfigure_srv = Server(VirtualCageInfoConfig, self.dynamic_reconfigure_callback)
+        rospy.sleep(2)  # TODO: solve this. The dynamic_reconfigure calls its callback some time after creation
+                        # and overides config
+
+        # Get config
         self.get_config()
-        self.virtual_cage_enabled = True
-        self.navigation_enabled = True
-        self.vehicle_position = [0.0, 0.0, 0.0]
 
         # Set up diagnostics
         self.diagnostic = DiagnosticHelper(self.name, "soft")
@@ -61,10 +70,6 @@ class VirtualCage(object):
         # Timer
         rospy.Timer(rospy.Duration(1.0), self.check_cage)
 
-        # Create dynamic reconfigure service
-        self.dynamic_reconfigure_srv = Server(VirtualCageInfoConfig, self.dynamic_reconfigure_callback)
-
-
     def dynamic_reconfigure_callback(self, config, level):
         rospy.loginfo("""Reconfigure Request: {north_origin}, {east_origin}, {north_longitude}, {east_longitude},
                       {enable}""".format(**config))
@@ -72,9 +77,8 @@ class VirtualCage(object):
         self.east_origin = config.east_origin
         self.north_longitude = config.north_longitude
         self.east_longitude = config.east_longitude
-        self.virtual_cage_enabled = config.enable
+        self.enabled = config.enable
         return config
-
 
     def check_cage(self, event):
         """ Check if the vehicle is inside or out of the virtual cage. """
@@ -107,7 +111,7 @@ class VirtualCage(object):
         cage_marker.points.append( Point(self.north_origin, self.east_origin, 0.0) )
         cage_marker.frame_locked = True
 
-        if self.virtual_cage_enabled and self.navigation_enabled:
+        if self.enabled and self.navigation_enabled:
             if self.vehicle_position[0] < self.north_origin or self.vehicle_position[0] > self.north_origin + \
                self.north_longitude or self.vehicle_position[1] < self.east_origin or self.vehicle_position[1] > \
                self.east_origin + self.east_longitude:
@@ -116,16 +120,16 @@ class VirtualCage(object):
                 cage_marker.color.g = 0.0
                 cage_marker.color.b = 0.0
                 cage_marker.color.a = 1.0
+                self.diagnostic.add("inside_virtual_cage", "False")
                 self.diagnostic.set_level(DiagnosticStatus.WARN, 'Vehicle out of virtual cage')
             else:
+                self.diagnostic.add("inside_virtual_cage", "True")
                 self.diagnostic.set_level(DiagnosticStatus.OK)
 
             self.cage_marker_pub.publish(cage_marker)
 
-
     def update_nav_sts(self, nav):
         """ Save current navigation data. """
-
         self.navigation_enabled = True
         self.vehicle_position = [nav.position.north,
                                  nav.position.east,

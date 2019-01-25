@@ -5,8 +5,6 @@
 #ifndef COLA2_CONTROL_MISSION_WAYPOINT_H
 #define COLA2_CONTROL_MISSION_WAYPOINT_H
 
-#include <vector>
-#include <string>
 #include <iostream>
 #include <cola2_control/mission_utils/mission_position.h>
 #include <cola2_control/mission_utils/mission_tolerance.h>
@@ -29,7 +27,7 @@ public:
   ~MissionWaypoint();
 
 
-  MissionWaypoint(MissionPosition position_, double speed_, MissionTolerance tolerance_);
+  MissionWaypoint(const MissionPosition& position, const double speed, const MissionTolerance& tolerance);
 
 //  friend std::ostream& operator<<(std::ostream& stream, const MissionWaypoint& wp)
 //  {
@@ -42,11 +40,11 @@ public:
 
   MissionTolerance getTolerance() const;
 
-  void setPosition(const MissionPosition position);
+  void setPosition(const MissionPosition& position);
 
   void setSpeed(const double speed);
 
-  void setTolerance(const MissionTolerance tolerance);
+  void setTolerance(const MissionTolerance& tolerance);
 
   double x();
 

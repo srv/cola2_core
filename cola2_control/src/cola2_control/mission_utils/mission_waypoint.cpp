@@ -12,7 +12,7 @@ MissionWaypoint::~MissionWaypoint()
 {
 }
 
-MissionWaypoint::MissionWaypoint(MissionPosition position, double speed, MissionTolerance tolerance)
+MissionWaypoint::MissionWaypoint(const MissionPosition& position, const double speed, const MissionTolerance& tolerance)
     : MissionManeuver(WAYPOINT_MANEUVER), position_(position), speed_(speed), tolerance_(tolerance)
 {
 }
@@ -47,7 +47,7 @@ MissionTolerance MissionWaypoint::getTolerance() const
   return tolerance_;
 }
 
-void MissionWaypoint::setPosition(const MissionPosition position)
+void MissionWaypoint::setPosition(const MissionPosition& position)
 {
   position_ = position;
 }
@@ -57,7 +57,7 @@ void MissionWaypoint::setSpeed(const double speed)
   speed_ = speed;
 }
 
-void MissionWaypoint::setTolerance(const MissionTolerance tolerance)
+void MissionWaypoint::setTolerance(const MissionTolerance& tolerance)
 {
   tolerance_ = tolerance;
 }

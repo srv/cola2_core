@@ -24,7 +24,6 @@ typedef struct
   double radius;
   double min_surge;
   double max_surge;
-  double safety_distance;
   double max_angle_error;
 } AnchorControllerConfig;
 

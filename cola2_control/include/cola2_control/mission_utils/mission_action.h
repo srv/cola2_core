@@ -22,7 +22,7 @@ private:
 public:
   MissionAction();
 
-  MissionAction(std::string action_id_, std::vector<std::string> parameters_);
+  MissionAction(const std::string& action_id, const std::vector<std::string>& parameters);
 
   ~MissionAction();
 
@@ -39,11 +39,11 @@ public:
 //    }
 //  }
 
-  void setActionId(const std::string value);
+  void setActionId(const std::string& value);
 
   std::string getActionId() const;
 
-  void addParameters(const std::string param);
+  void addParameters(const std::string& param);
 
   std::vector<std::string> getParameters() const;
 

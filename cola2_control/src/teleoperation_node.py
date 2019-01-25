@@ -19,7 +19,7 @@ from cola2_msgs.msg import BodyVelocityReq
 from cola2_msgs.msg import WorldWaypointReq
 from cola2_msgs.msg import GoalDescriptor
 from cola2_msgs.msg import NavSts
-from cola2_msgs.msg import CaptainStatus
+from cola2_msgs.msg import MissionStatus
 from cola2_msgs.srv import MaxJoyVelocity, MaxJoyVelocityResponse
 from cola2_lib.rosutils.diagnostic_helper import DiagnosticHelper
 from cola2_lib.rosutils import param_loader
@@ -96,8 +96,8 @@ class Teleoperation(object):
                          self.nav_sts_update,
                          queue_size=1)
 
-        rospy.Subscriber(namespace + "captain/status",
-                         CaptainStatus,
+        rospy.Subscriber(namespace + "captain/mission_status",
+                         MissionStatus,
                          self.update_mission_status,
                          queue_size=1)
 
@@ -140,14 +140,16 @@ class Teleoperation(object):
         self.last_pose[4] = data.orientation.pitch
         self.last_pose[5] = data.orientation.yaw
 
-    def update_mission_status(self, captain_status):
-        self.mission_active = captain_status.mission_active
+    def update_mission_status(self, mission_status):
+        self.mission_active = mission_status.mission_active
 
     def ack_callback(self, ack_msg):
         """ This is the callback for the ack safety message """
         data = ack_msg.data.split(' ')
         if data[1] == 'ack' and data[0] == str(self.seq + 1):
             self.map_ack_alive = True
+            if not self.map_ack_init:
+                rospy.loginfo("Initial map ack received")
             self.map_ack_init = True
             self.seq = self.seq + 1
             self.last_map_ack = rospy.Time.now().to_sec()

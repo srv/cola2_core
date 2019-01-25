@@ -5,8 +5,6 @@
 #ifndef COLA2_CONTROL_MISSION_TOLERANCE_H
 #define COLA2_CONTROL_MISSION_TOLERANCE_H
 
-#include <vector>
-#include <string>
 #include <iostream>
 
 /**
@@ -26,7 +24,7 @@ public:
 
   MissionTolerance(const MissionTolerance& tolerance);
 
-  MissionTolerance(double x_, double y_, double z_);
+  MissionTolerance(const double x, const double y, const double z);
 
   friend std::ostream& operator<<(std::ostream& stream, const MissionTolerance& tol)
   {

@@ -12,8 +12,8 @@ MissionPark::~MissionPark()
 {
 }
 
-MissionPark::MissionPark(MissionPosition position, unsigned int time, MissionTolerance tolerance)
-    : MissionManeuver(PARK_MANEUVER), position_(position), time_(time), tolerance_(tolerance)
+MissionPark::MissionPark(const MissionPosition& position, const unsigned int t, const MissionTolerance& tolerance)
+    : MissionManeuver(PARK_MANEUVER), position_(position), time_(t), tolerance_(tolerance)
 {
 }
 
@@ -47,17 +47,17 @@ MissionTolerance MissionPark::getTolerance() const
   return tolerance_;
 }
 
-void MissionPark::setPosition(const MissionPosition position)
+void MissionPark::setPosition(const MissionPosition& position)
 {
   position_ = position;
 }
 
-void MissionPark::setTime(const unsigned int time)
+void MissionPark::setTime(const unsigned int t)
 {
-  time_ = time;
+  time_ = t;
 }
 
-void MissionPark::setTolerance(const MissionTolerance tolerance)
+void MissionPark::setTolerance(const MissionTolerance& tolerance)
 {
   tolerance_ = tolerance;
 }

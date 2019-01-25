@@ -129,6 +129,10 @@ add_executable(captain src/captain_node.cpp)
 target_link_libraries(captain ${catkin_LIBRARIES} ${Boost_LIBRARIES} mission_utils)
 add_dependencies(captain ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
+add_executable(external_mission_example src/external_mission_example_node.cpp)
+target_link_libraries(external_mission_example ${catkin_LIBRARIES} ${Boost_LIBRARIES} mission_utils)
+add_dependencies(external_mission_example ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
 add_executable(controller_only_thrusters src/only_thrusters_controller_node.cpp)
 target_link_libraries(controller_only_thrusters ${catkin_LIBRARIES} controllers low_level_controllers ros_control_base only_thrusters_controller_lib)
 add_dependencies(controller_only_thrusters ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
