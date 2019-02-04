@@ -160,13 +160,27 @@ CommsNode::~CommsNode()
 
 bool CommsNode::loadParams()
 {
-  // TODO
+  // Load from ROS param server
+  // clang-format off
+  config_.custom_max_time = cola2::rosutils::getParam("comms/custom_max_time", config_.custom_max_time, 1.0);
+  config_.usbl_safe_always_on = cola2::rosutils::getParam("comms/usbl_safe_always_on", config_.usbl_safe_always_on);
+  config_.send_to_modem_period = cola2::rosutils::getParam("comms/send_to_modem_period", config_.send_to_modem_period, 0.5);
+  config_.max_message_size = cola2::rosutils::getParam("comms/max_message_size", config_.max_message_size);
+  config_.identifier = cola2::rosutils::getParam("comms/identifier", config_.identifier);
+  // clang-format on
 
   // Show loaded config
+  ROS_INFO("Loaded config from param server");
+  ROS_INFO("===============================");
+  ROS_INFO("     custom_max_time: %.2f", config_.custom_max_time);
+  ROS_INFO(" usbl_safe_always_on: %d  ", config_.usbl_safe_always_on);
+  ROS_INFO("send_to_modem_period: %.2f", config_.send_to_modem_period);
+  ROS_INFO("    max_message_size: %d  ", config_.max_message_size);
+  ROS_INFO("          identifier: %s  ", config_.identifier.c_str());
 
   // Checks
-  assert(config_.max_message_size >= fmt_size_);
-  assert(config_.identifier.size() == 1);
+  assert(config_.max_message_size >= fmt_size_);  // enough message space for basic message
+  assert(config_.identifier.size() == 1);         // single char identifier
 }
 
 bool CommsNode::srvReloadParams(std_srvs::Empty::Request &, std_srvs::Empty::Response &)
