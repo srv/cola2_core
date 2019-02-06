@@ -35,7 +35,10 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES cola2_comms
-#  CATKIN_DEPENDS cola2_lib cola2_msgs diagnostic_msgs geometry_msgs roscpp std_msgs std_srvs
+  CATKIN_DEPENDS cola2_msgs
+                 diagnostic_msgs
+                 geometry_msgs
+                 std_msgs
 #  DEPENDS system_lib
 )
 
