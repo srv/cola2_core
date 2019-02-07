@@ -18,6 +18,7 @@
 #include <ros/ros.h>
 #include <std_msgs/String.h>
 #include <std_srvs/Empty.h>
+#include <std_srvs/Trigger.h>
 #include <cstdint>
 #include <ctime>
 #include <string>
@@ -167,7 +168,7 @@ CommsNode::CommsNode() : nh_("~"), diag_help_(nh_, cola2::rosutils::getUnresolve
   std::string sname_recovery = cola2::rosutils::getNamespace() + "/recovery_actions/recover";
   srv_recovery_ = nh_.serviceClient<cola2_msgs::Recovery>(sname_recovery);
   std::string sname_start = cola2::rosutils::getNamespace() + "/captain/enable_default_mission_non_block";
-  srv_start_mission_ = nh_.serviceClient<std_srvs::Empty>(sname_start);
+  srv_start_mission_ = nh_.serviceClient<std_srvs::Trigger>(sname_start);
   while (ros::ok())
   {
     if ((srv_recovery_.waitForExistence(ros::Duration(5.0))) && srv_start_mission_.waitForExistence(ros::Duration(5.0)))
@@ -305,8 +306,8 @@ void CommsNode::cbkFromModem(const std_msgs::String &msg)
       case CustomCommands::START_MISSION:
       {
         ROS_WARN("start mission");
-        std_srvs::EmptyRequest req;
-        std_srvs::EmptyResponse res;
+        std_srvs::TriggerRequest req;
+        std_srvs::TriggerResponse res;
         srv_start_mission_.call(req, res);
         break;
       }
