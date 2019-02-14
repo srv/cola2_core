@@ -26,8 +26,8 @@
 
 namespace
 {
-const auto FMT = PY_STRING("<1s1d2d2f1h");  //!< format of the message transmitted from the vehicle {id, time, lat, lon,
-                                            //!< depth, yaw/accuracy, error_code/command }
+const auto FMT = PY_STRING("<1s1d2d2f1i");  //!< format of the message transmitted from the vehicle {id, time, lat, lon,
+                                            //!< depth, yaw/accuracy, status_code/command }
 const int SIZE = pystruct::calcsize(FMT);   //!< size of the serialized message
 }  // namespace
 
@@ -66,7 +66,7 @@ private:
   ros::Publisher pub_usbl_;           //!< usbl update received from modem
   // Subscribers
   ros::Subscriber sub_from_modem_;     //!< data received by the modem
-  ros::Subscriber sub_safety_status_;  //!< current safety status to get error code
+  ros::Subscriber sub_safety_status_;  //!< current safety status to get status code
   ros::Subscriber sub_navigation_;     //!< vehicle navigation
   ros::Subscriber sub_custom_input_;   //!< binarized user specific input
   // ServiceClients
@@ -85,7 +85,7 @@ private:
   double modem_time_ = 0.0;                               //!< time since last message from modem
   std::string custom_ = "";                               //!< custom extra message received
   double custom_time_ = ros::Time::now().toSec();         //!< time of last custom message
-  int16_t error_code_ = 0;                                //!< error code received
+  int32_t status_code_ = 0;                               //!< status code received
   cola2_msgs::NavSts navigation_ = cola2_msgs::NavSts();  //!< navigation received
   bool init_navigation_ = false;                          //!< navigation arrived
 
@@ -121,7 +121,7 @@ private:
    */
   void cbkCustomInput(const std_msgs::String &msg);
   /**
-   * \brief Callback to obtain the error code from SafetySupervisor to be communicated to surface.
+   * \brief Callback to obtain the status code from SafetySupervisor to be communicated to surface.
    */
   void cbkSafetyStatus(const cola2_msgs::SafetySupervisorStatus &msg);
   /**
@@ -356,7 +356,7 @@ void CommsNode::cbkCustomInput(const std_msgs::String &msg)
 }
 void CommsNode::cbkSafetyStatus(const cola2_msgs::SafetySupervisorStatus &msg)
 {
-  error_code_ = msg.error_code;
+  status_code_ = msg.status_code;
 }
 void CommsNode::cbkNavigation(const cola2_msgs::NavSts &msg)
 {
@@ -379,7 +379,7 @@ void CommsNode::sendMessage(const ros::TimerEvent &event)
   // Create message
   auto packed = pystruct::pack(FMT, config_.identifier, navigation_.header.stamp.toSec(),
                                navigation_.global_position.latitude, navigation_.global_position.longitude,
-                               navigation_.position.depth, navigation_.orientation.yaw, error_code_);
+                               navigation_.position.depth, navigation_.orientation.yaw, status_code_);
   // Convert to string
   std_msgs::String msg;
   msg.data = std::string(std::begin(packed), std::end(packed));
