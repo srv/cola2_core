@@ -132,7 +132,7 @@ void OnlyThrustersController::iteration(double current_time)
       std::vector<bool> disable_axis = velocity_req.getDisabledAxis();
       disable_axis.at(2) = true;
       velocity_req.setDisabledAxis(disable_axis);
-      std::cout << "Disable Z axis because to close to surface\n";
+      // std::cout << "Disable Z axis because to close to surface\n";
     }
 
     // Compute PID between pose error and zero
@@ -149,7 +149,7 @@ void OnlyThrustersController::iteration(double current_time)
 
     // Add Pose controller response to body velocity requests
     velocity_req.setValues(pose_ctrl_tau);
-    std::cout << "pose controller result: \n" << velocity_req << std::endl;
+    // std::cout << "pose controller result: \n" << velocity_req << std::endl;
     twist_merge_.addRequest(velocity_req);
   }
 
@@ -180,7 +180,7 @@ void OnlyThrustersController::iteration(double current_time)
 
     wrench_req.setValues(total);
 
-    std::cout << "Twist controller result: \n" << wrench_req << std::endl;
+    // std::cout << "Twist controller result: \n" << wrench_req << std::endl;
     wrench_merge_.addRequest(wrench_req);
   }
 
