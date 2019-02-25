@@ -177,7 +177,7 @@ class SafetySupervisor(object):
         self.diagnostic.add('last_altitude_data', str(last_altitude))
         if last_altitude > self.min_altitude_update:
             rospy.logerr("last_altiude %s/%s", str(last_altitude), str(self.min_altitude_update))
-            self.status_code[StatusCode.NO_ALTITUDE] = '1'
+            self.status_code[StatusCode.NO_ALTITUDE_ERROR] = '1'
             self.call_recovery_action("No Altitude data!", RecoveryAction.ABORT_AND_SURFACE)
 
         # Rule: No DVL data
