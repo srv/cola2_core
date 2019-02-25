@@ -1539,7 +1539,7 @@ bool Captain::enableSafetyKeepPositionSrv(std_srvs::Trigger::Request&, std_srvs:
   // Call internal goto
   cola2_msgs::Goto::Request goto_req;
   cola2_msgs::Goto::Response goto_res;
-  goto_req.priority = cola2_msgs::GoalDescriptor::PRIORITY_NORMAL;
+  goto_req.priority = cola2_msgs::GoalDescriptor::PRIORITY_SAFETY;
   goto_req.altitude_mode = false;
   goto_req.blocking = false;
   goto_req.keep_position = true;
