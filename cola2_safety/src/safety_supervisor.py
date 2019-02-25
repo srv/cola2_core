@@ -288,9 +288,9 @@ class SafetySupervisor(object):
         sss_msg.recovery_action = self.ra_msg
         self.pub_safety_supervisor_state.publish(sss_msg)
 
-        print("Status code:------------------------------------------------")
-        sc = StatusCode()
-        print( sc.unpack(status_code_int32) )
+        #print("Status code:------------------------------------------------")
+        #sc = StatusCode()
+        #print( sc.unpack(status_code_int32) )
 
     def timer_callback(self, event):
         """ Resets state so that external recovery is not shown anymore """
