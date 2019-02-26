@@ -8,6 +8,9 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <memory>
+#include <stdexcept>
+#include <algorithm>
 #include "tinyxml.h"
 #include <cola2_control/mission_utils/mission_maneuver.h>
 #include <cola2_control/mission_utils/mission_action.h>
@@ -25,53 +28,50 @@
 class Mission
 {
 private:
-  unsigned int step_size_;
-  std::vector<MissionStep*> mission_;
+  std::vector<std::shared_ptr<MissionStep> > mission_;
 
 public:
   Mission();
 
   ~Mission();
 
-  MissionStep* getStep(unsigned int i);
+  void loadMission(const std::string& mission_file_name);
 
-  unsigned int size();
+  void loadStep(TiXmlHandle hDoc, MissionStep& step);
 
-  std::string to_string(const double value) const;
+  void loadManeuverWaypoint(TiXmlHandle hDoc, MissionWaypoint& waypoint);
 
-  void addStep(MissionStep* step);
+  void loadManeuverSection(TiXmlHandle hDoc, MissionSection& section);
 
-  int loadAction(TiXmlHandle hDoc, MissionAction& action);
+  void loadManeuverPark(TiXmlHandle hDoc, MissionPark& park);
 
-  bool loadPosition(TiXmlHandle hDoc, MissionPosition& position);
+  void loadAction(TiXmlHandle hDoc, MissionAction& action);
 
-  bool loadTolerance(TiXmlHandle hDoc, MissionTolerance& tolerance);
+  void loadPosition(TiXmlHandle hDoc, MissionPosition& position);
 
-  bool loadManeuverWaypoint(TiXmlHandle hDoc, MissionWaypoint& waypoint);
+  void loadTolerance(TiXmlHandle hDoc, MissionTolerance& tolerance);
 
-  bool loadManeuverSection(TiXmlHandle hDoc, MissionSection& section);
+  void writeMission(std::string mission_file_name);
 
-  bool loadManeuverPark(TiXmlHandle hDoc, MissionPark& park);
+  void writeMissionStep(TiXmlElement* mission, const MissionStep& step);
 
-  int loadStep(TiXmlHandle hDoc, MissionStep& step);
+  void writeManeuverWaypoint(TiXmlElement* mission, const MissionWaypoint& wp);
 
-  int loadMission(const std::string mission_file_name);
+  void writeManeuverSection(TiXmlElement* mission, const MissionSection& sec);
 
-  int writeAction(TiXmlElement* mission, MissionAction& action);
+  void writeManeuverPark(TiXmlElement* mission, const MissionPark& park);
 
-  int writeManeuverPosition(TiXmlElement* maneuver, const MissionPosition& p, std::string position_tag);
+  void writeAction(TiXmlElement* mission, const MissionAction& action);
 
-  int writeManeuverTolerance(TiXmlElement* maneuver, const MissionTolerance& tol);
+  void writeManeuverPosition(TiXmlElement* maneuver, const MissionPosition& p, std::string position_tag);
 
-  int writeManeuverWaypoint(TiXmlElement* mission, const MissionWaypoint& wp);
+  void writeManeuverTolerance(TiXmlElement* maneuver, const MissionTolerance& tol);
 
-  int writeManeuverSection(TiXmlElement* mission, const MissionSection& sec);
+  void addStep(std::shared_ptr<MissionStep> step);
 
-  int writeManeuverPark(TiXmlElement* mission, const MissionPark& park);
+  std::shared_ptr<MissionStep> getStep(std::size_t i);
 
-  int writeMissionStep(TiXmlElement* mission, const MissionStep& step);
-
-  int writeMission(std::string mission_file_name);
+  std::size_t size();
 };
 
 #endif //COLA2_CONTROL_MISSION_H

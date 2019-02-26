@@ -11,29 +11,42 @@
 
 #include <vector>
 #include <string>
-
+#include <limits>
 
 namespace control
 {
-  typedef struct
+  // Default values
+  const double       d_double(std::numeric_limits<double>::quiet_NaN());
+  const unsigned int d_uint(std::numeric_limits<unsigned int>::quiet_NaN());
+  const bool         d_bool(false);
+  const std::string  d_string("Not init");
+
+  class Point
   {
+   public:
     double x;
     double y;
     double z;
-  } Point;
+    Point(): x(d_double), y(d_double), z(d_double) {}
+  };
 
-  typedef struct
+  class Vector6d
   {
+   public:
     double x;
     double y;
     double z;
     double roll;
     double pitch;
     double yaw;
-  } Vector6d;
+    Vector6d(): x(d_double), y(d_double), z(d_double),
+                roll(d_double), pitch(d_double),
+                yaw(d_double) {}
+  };
 
-  typedef struct
+  class Nav
   {
+   public:
     double x;
     double y;
     double z;
@@ -41,29 +54,37 @@ namespace control
     double pitch;
     double yaw;
     double altitude;
-  } Nav;
+    Nav(): x(d_double), y(d_double), z(d_double),
+           roll(d_double), pitch(d_double), yaw(d_double),
+           altitude(d_double) {}
+  };
 
-  typedef struct
+  class RPY
   {
+   public:
     double roll;
     double pitch;
     double yaw;
-  } RPY;
+    RPY(): roll(d_double), pitch(d_double), yaw(d_double) {}
+  };
 
-  typedef struct
+  class NED
   {
+   public:
     double north;
     double east;
     double depth;
-  } NED;
+    NED(): north(d_double), east(d_double), depth(d_double) {}
+  };
 
-  typedef struct
+  struct PointsList
   {
     std::vector<control::Point> points_list;
-  } PointsList;
+  };
 
-  typedef struct
+  class Waypoint
   {
+   public:
     std::string requester;
     unsigned int priority;
     bool altitude_mode;
@@ -75,56 +96,69 @@ namespace control
     control::Point linear_velocity;
     control::RPY angular_velocity;
     unsigned int controller_type;
-    unsigned int timeout;
+    double timeout;
     control::Vector6d disable_axis;
     bool keep_position;
-  } Waypoint;
+    Waypoint(): requester(d_string), priority(d_uint),
+                altitude_mode(d_bool), altitude(d_double),
+                controller_type(d_uint), timeout(d_double),
+                keep_position(d_bool) {}
+  };
 
-  typedef struct
+  class Section
   {
+   public:
     control::Point initial_position;
     control::Point final_position;
     bool altitude_mode;
     bool disable_z;
     control::Point tolerance;
     double surge_velocity;
-  } Section;
+    double timeout;
+    Section(): altitude_mode(d_bool), disable_z(d_bool),
+               surge_velocity(d_double), timeout(d_double) {}
+  };
 
-  typedef struct
+  class Pose
   {
+   public:
     control::NED position;
     control::RPY orientation;
     control::Vector6d disable_axis;
     double altitude;
     bool altitude_mode;
-  } Pose;
+    Pose(): altitude(d_double), altitude_mode(d_bool) {}
+  };
 
-  typedef struct
+  struct Velocity
   {
     control::Point linear;
     control::Point angular;
     control::Vector6d disable_axis;
-  } Velocity;
+  };
 
-  typedef struct
+  struct State
   {
     control::Pose pose;
     control::Velocity velocity;
-  } State;
+  };
 
-  typedef struct
+  class Feedback
   {
+   public:
     double desired_surge;
     double desired_depth;
     double desired_yaw;
-
     double cross_track_error;
     double depth_error;
     double yaw_error;
     double distance_to_end;
-
     bool success;
-  } Feedback;
+    Feedback(): desired_surge(d_double), desired_depth(d_double),
+                desired_yaw(d_double), cross_track_error(d_double),
+                depth_error(d_double), yaw_error(d_double),
+                distance_to_end(d_double), success(d_bool) {}
+  };
 }
 
 #endif /* __CONTROLLER_TYPES__ */

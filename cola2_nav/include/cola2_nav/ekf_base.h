@@ -103,11 +103,14 @@ public:
    * \brief Get rotation matrix according to filter orientation.
    */
   Eigen::Matrix3d getRotation() const;
-
   /*!
    * \brief Get orientation quaternion according to filter orientation.
    */
   Eigen::Quaterniond getOrientation() const;
+  /*!
+   * \brief Return whether the ekf filter is initialized.
+   */
+  bool isInitialized() const;
 
   // *****************************************
   // To be implemented

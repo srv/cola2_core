@@ -28,8 +28,6 @@ find_package(catkin REQUIRED COMPONENTS
 
 # System dependencies
 find_package(Eigen3 REQUIRED)
-
-# TODO: why is this required?
 set(Eigen3_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIR})
 
 # Declare things to be passed to dependent projects

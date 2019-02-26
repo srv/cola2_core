@@ -5,8 +5,6 @@
 #ifndef COLA2_CONTROL_MISSION_SECTION_H
 #define COLA2_CONTROL_MISSION_SECTION_H
 
-#include <vector>
-#include <string>
 #include <iostream>
 #include <cola2_control/mission_utils/mission_position.h>
 #include <cola2_control/mission_utils/mission_tolerance.h>
@@ -28,8 +26,8 @@ public:
 
   ~MissionSection();
 
-  MissionSection(MissionPosition initial_position_, MissionPosition final_position_, double speed_,
-                 MissionTolerance tolerance_);
+  MissionSection(const MissionPosition& initial_position, const MissionPosition& final_position, const double speed,
+                 const MissionTolerance& tolerance);
 
 //  friend std::ostream& operator<<(std::ostream& stream, const MissionSection& s)
 //  {
@@ -44,9 +42,9 @@ public:
 
   MissionTolerance getTolerance() const;
 
-  void setInitialPosition(const MissionPosition position);
+  void setInitialPosition(const MissionPosition& position);
 
-  void setFinalPosition(const MissionPosition position);
+  void setFinalPosition(const MissionPosition& position);
 
   void setSpeed(const double speed);
 

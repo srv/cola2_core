@@ -11,7 +11,7 @@
 import rospy
 from std_msgs.msg import Bool
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus
-from cola2_msgs.msg import VehicleStatus, CaptainStatus, NavSts
+from cola2_msgs.msg import VehicleStatus, MissionStatus, CaptainStatus, NavSts
 from std_msgs.msg import Int32
 from cola2_lib.rosutils.diagnostic_helper import DiagnosticHelper
 from cola2_lib.rosutils import param_loader
@@ -60,13 +60,21 @@ class VehicleStatusParser:
         # Initialize water vector
         self.water = [False] * len(self.diag_water)
 
+        # Initialize virtual cage state
+        self.status.inside_virtual_cage = True
+
         # Subscriber
         rospy.Subscriber(namespace + "diagnostics_agg",
                          DiagnosticArray,
                          self.update_diagnostics,
                          queue_size=1)
 
-        rospy.Subscriber(namespace + "captain/status",
+        rospy.Subscriber(namespace + "captain/mission_status",
+                         MissionStatus,
+                         self.update_mission_status,
+                         queue_size=1)
+
+        rospy.Subscriber(namespace + "captain/captain_status",
                          CaptainStatus,
                          self.update_captain_status,
                          queue_size=1)
@@ -89,13 +97,18 @@ class VehicleStatusParser:
             self.diagnostic.add("last_nav_data", str(rospy.Time.now().to_sec() - self.last_navigator_callback))
         self.diagnostic.set_level(DiagnosticStatus.OK)
 
+    def update_mission_status(self, mission_status):
+        """Update captain status information."""
+        self.status.active_controller = mission_status.active_controller
+        self.status.altitude_mode = mission_status.altitude_mode
+        self.status.mission_active = mission_status.mission_active
+        self.status.current_step = mission_status.current_step
+        self.status.total_steps = mission_status.total_steps
+
     def update_captain_status(self, captain_status):
         """Update captain status information."""
-        self.status.active_controller = captain_status.active_controller
-        self.status.altitude_mode = captain_status.altitude_mode
-        self.status.mission_active = captain_status.mission_active
-        self.status.current_step = captain_status.current_step
-        self.status.total_steps = captain_status.total_steps
+        self.status.captain_state = captain_status.state
+        self.status.captain_message = captain_status.message
 
     def update_nav_sts(self, nav):
         """Update navigation information."""
@@ -229,6 +242,13 @@ class VehicleStatusParser:
             if (rospy.Time.now() - self.last_water_inside) > dt:
                 self.status.water_detected = True
 
+            # Get virtual cage status
+            if __getDiagnostic__(status, self.diag_inside_virtual_cage[0]):
+                if __getDiagnostic__(status, self.diag_inside_virtual_cage[0], self.diag_inside_virtual_cage[1], 'False') == 'True':
+                    self.status.inside_virtual_cage = True
+                else:
+                    self.status.inside_virtual_cage = False
+
         # Publish status message
         self.status.header.stamp = rospy.Time.now()
         self.status.header.frame_id = rospy.get_namespace() + str('base_link')
@@ -256,7 +276,8 @@ class VehicleStatusParser:
                       'diag_modem_data_age': ('modem_data_age', ["",""]),
                       'diag_temperature': ('temperature', [["",""],["",""]]),
                       'diag_water': ('water', [["", ""], ["", ""]]),
-                      'temperature_name': ('temperature_name', ["",""])
+                      'temperature_name': ('temperature_name', ["",""]),
+                      'diag_inside_virtual_cage': ('inside_virtual_cage', ["",""])
                      }
 
         param_loader.get_ros_params(self, param_dict)

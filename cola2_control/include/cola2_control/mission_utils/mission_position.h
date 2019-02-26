@@ -5,7 +5,6 @@
 #ifndef COLA2_CONTROL_MISSION_POSITION_H
 #define COLA2_CONTROL_MISSION_POSITION_H
 
-#include <vector>
 #include <string>
 #include <iostream>
 
@@ -27,7 +26,7 @@ public:
 
   MissionPosition(const MissionPosition& position);
 
-  MissionPosition(double latitude_, double longitude_, double z_, bool altitude_mode_);
+  MissionPosition(const double latitude, const double longitude, const double z, const bool altitude_mode);
 
   friend std::ostream& operator<<(std::ostream& stream, const MissionPosition& pos)
   {

@@ -355,6 +355,7 @@ void Pilot::sectionServerCallback(const cola2_msgs::WorldSectionGoalConstPtr& da
   section.tolerance.y = data->tolerance.y;
   section.tolerance.z = data->tolerance.z;
   section.surge_velocity = data->surge_velocity;
+  section.timeout = data->timeout;
 
   // Main loop
   double init_time = ros::Time::now().toSec();
@@ -602,7 +603,6 @@ void Pilot::getConfig()
   cola2::rosutils::getParam("~anchor/radius", config_.anchor_config.radius, 1.0);
   cola2::rosutils::getParam("~anchor/min_surge", config_.anchor_config.min_surge, -0.1);
   cola2::rosutils::getParam("~anchor/max_surge", config_.anchor_config.max_surge, 0.3);
-  cola2::rosutils::getParam("~anchor/safety_distance", config_.anchor_config.safety_distance, 50.0);
   cola2::rosutils::getParam("~anchor/max_angle_error", config_.anchor_config.max_angle_error, 0.5);
   // clang-format on
 }

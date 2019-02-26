@@ -8,8 +8,8 @@ MissionSection::MissionSection() : MissionManeuver(SECTION_MANEUVER)
 {
 }
 
-MissionSection::MissionSection(MissionPosition initial_position, MissionPosition final_position, double speed,
-                               MissionTolerance tolerance)
+MissionSection::MissionSection(const MissionPosition& initial_position, const MissionPosition& final_position,
+                               const double speed, const MissionTolerance& tolerance)
     : MissionManeuver(SECTION_MANEUVER)
     , initial_position_(initial_position)
     , final_position_(final_position)
@@ -42,12 +42,12 @@ MissionTolerance MissionSection::getTolerance() const
   return tolerance_;
 }
 
-void MissionSection::setInitialPosition(const MissionPosition position)
+void MissionSection::setInitialPosition(const MissionPosition& position)
 {
   initial_position_ = position;
 }
 
-void MissionSection::setFinalPosition(const MissionPosition position)
+void MissionSection::setFinalPosition(const MissionPosition& position)
 {
   final_position_ = position;
 }

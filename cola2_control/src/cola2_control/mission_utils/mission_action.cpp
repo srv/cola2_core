@@ -9,10 +9,11 @@ MissionAction::MissionAction()
   is_empty_ = true;
 }
 
-MissionAction::MissionAction(std::string action_id, std::vector<std::string> parameters)
+MissionAction::MissionAction(const std::string& action_id,
+                             const std::vector<std::string>& parameters)
     : action_id_(action_id), parameters_(parameters), is_empty_(true)
 {
-  if (parameters_.size() > 0)
+  if (!parameters_.empty())
     is_empty_ = false;
 }
 
@@ -25,12 +26,12 @@ std::string MissionAction::getActionId() const
   return action_id_;
 }
 
-void MissionAction::setActionId(const std::string value)
+void MissionAction::setActionId(const std::string& value)
 {
   action_id_ = value;
 }
 
-void MissionAction::addParameters(const std::string param)
+void MissionAction::addParameters(const std::string& param)
 {
   parameters_.push_back(param);
   is_empty_ = false;
