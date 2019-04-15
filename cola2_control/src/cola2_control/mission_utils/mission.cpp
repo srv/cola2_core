@@ -259,7 +259,7 @@ void Mission::loadAction(TiXmlHandle hDoc, MissionAction& action)
 
   // Check params
   pElem = pElem->NextSiblingElement();
-  if (!pElem || (std::string(pElem->Value()) == "parameters"))  // Was (!pElem || pElem->Value() == "parameters")
+  if (!pElem || (std::string(pElem->Value()) != "parameters"))
     return;  // No parameters
   hDoc = TiXmlHandle(pElem);
 
