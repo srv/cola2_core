@@ -148,27 +148,27 @@ class SimAUVNavSensors(object):
             'longitude': (self.ns + "navigator/ned_longitude", 3.0333),
             'water_density': (self.ns + "navigator/water_density", 1030.0),
             # private
-            'sea_bottom_depth': ("sea_bottom_depth", 1),
-            'sound_speed': ("sound_speed", 1500.0),
-            'gps_period': ("gps_period", 0.5),
-            'depth_period': ("depth_period", 0.5),
-            'dvl_period': ("dvl_period", 0.5),
-            'imu_period': ("imu_period", 0.5),
-            'usbl_period': ("usbl_period", 5.0),
+            'sea_bottom_depth': (self.ns + "sea_bottom_depth", 1),
+            'sound_speed': (self.ns + "sound_speed", 1500.0),
+            'gps_period': (self.ns + "gps_period", 0.5),
+            'depth_period': (self.ns + "depth_period", 0.5),
+            'dvl_period': (self.ns + "dvl_period", 0.5),
+            'imu_period': (self.ns + "imu_period", 0.5),
+            'usbl_period': (self.ns + "usbl_period", 5.0),
             # cov
-            'gps_position_covariance': ("gps_position_covariance", [0.25, 0.25]),
-            'depth_pressure_covariance': ("depth_pressure_covariance", 0.01),
-            'dvl_velocity_covariance': ("dvl_velocity_covariance", [0.0015, 0.0015, 0.0015]),
-            'imu_orientation_covariance': ("imu_orientation_covariance", [0.0001, 0.0001, 0.0001]),
-            'usbl_position_covariance': ("usbl_position_covariance", 0.5),
+            'gps_position_covariance': (self.ns + "gps_position_covariance", [0.25, 0.25]),
+            'depth_pressure_covariance': (self.ns + "depth_pressure_covariance", 0.01),
+            'dvl_velocity_covariance': (self.ns + "dvl_velocity_covariance", [0.0015, 0.0015, 0.0015]),
+            'imu_orientation_covariance': (self.ns + "imu_orientation_covariance", [0.0001, 0.0001, 0.0001]),
+            'usbl_position_covariance': (self.ns + "usbl_position_covariance", 0.5),
             # output cov
-            'output_gps_position_covariance': ("output_gps_position_covariance", [0.5, 0.5]),
-            'output_depth_pressure_covariance': ("output_depth_pressure_covariance", 0.1),
-            'output_dvl_velocity_covariance': ("output_dvl_velocity_covariance", [0.02, 0.02, 0.02]),
-            'output_imu_orientation_covariance': ("output_imu_orientation_covariance", [0.1, 0.1, 0.1]),
-            'output_usbl_position_covariance': ("output_usbl_position_covariance", 3.0),
+            'output_gps_position_covariance': (self.ns + "output_gps_position_covariance", [0.5, 0.5]),
+            'output_depth_pressure_covariance': (self.ns + "output_depth_pressure_covariance", 0.1),
+            'output_dvl_velocity_covariance': (self.ns + "output_dvl_velocity_covariance", [0.02, 0.02, 0.02]),
+            'output_imu_orientation_covariance': (self.ns + "output_imu_orientation_covariance", [0.1, 0.1, 0.1]),
+            'output_usbl_position_covariance': (self.ns + "output_usbl_position_covariance", 3.0),
             # usbl start at depth bigger than
-            'usbl_depth_start': ('usbl_depth_start', 4.0)}
+            'usbl_depth_start': (self.ns + 'usbl_depth_start', 4.0)}
         # Load them
         get_ros_params(self, param_dict)
 
