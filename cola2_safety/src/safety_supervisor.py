@@ -178,14 +178,14 @@ class SafetySupervisor(object):
         if last_altitude > self.min_altitude_update:
             rospy.logerr("last_altiude %s/%s", str(last_altitude), str(self.min_altitude_update))
             self.status_code[StatusCode.NO_ALTITUDE_ERROR] = '1'
-            self.call_recovery_action("No Altitude data!", RecoveryAction.ABORT_AND_SURFACE)
+            self.call_recovery_action("No Altitude data!", RecoveryAction.STOP_THRUSTERS)
 
         # Rule: No DVL data
         last_dvl = vehicle_status.dvl_data_age
         self.diagnostic.add('last_dvl_data', str(last_dvl))
         if last_dvl > self.min_dvl_update:
             self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
-            self.call_recovery_action("No DVL data!", RecoveryAction.ABORT_AND_SURFACE)
+            self.call_recovery_action("No DVL data!", RecoveryAction.STOP_THRUSTERS)
 
         # Rule: No GPS data
         last_gps = vehicle_status.gps_data_age
@@ -220,7 +220,7 @@ class SafetySupervisor(object):
         last_good_dvl_data = vehicle_status.dvl_valid_data_age
         self.diagnostic.add('last_dvl_good_data', str(last_good_dvl_data))
         if last_good_dvl_data > self.min_dvl_good_data:
-            self.call_recovery_action("No DVL good data!", RecoveryAction.ABORT_AND_SURFACE)
+            self.call_recovery_action("No DVL good data!", RecoveryAction.STOP_THRUSTERS)
 
         # Rule: Water Leak
         if vehicle_status.water_detected:
