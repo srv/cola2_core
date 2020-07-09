@@ -513,15 +513,15 @@ void EKFBaseLandmarksROS::updatePositionUSBLMsg(const geometry_msgs::PoseWithCov
       // Current time
       const ros::Time current_time(msg.header.stamp.toSec() + position_increment(0));
       // Construct measurement
-      const Eigen::Vector3d latlonh(msg.pose.pose.position.x, msg.pose.pose.position.y, 0.0);
-      Eigen::Vector3d ned = ned_.geodetic2Ned(latlonh);
+      // const Eigen::Vector3d latlonh(msg.pose.pose.position.x, msg.pose.pose.position.y, 0.0);
+      Eigen::Vector3d ned(msg.pose.pose.position.x, msg.pose.pose.position.y, 0.0);
       ned.head(2) += position_increment.tail(2);  // increment the same we increased
       Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
       for (unsigned int i = 0; i < 3; ++i)
       {
         for (unsigned int j = 0; j < 3; ++j)
         {
-          cov(i, j) = msg.pose.covariance[6 * i + j];  // from 6x6 matrix
+          cov(i, j) = msg.pose.covariance[6 * i + j];  // from 6x6 matrix TODO
         }
       }
       // Publish USBL in NED frame
@@ -533,8 +533,9 @@ void EKFBaseLandmarksROS::updatePositionUSBLMsg(const geometry_msgs::PoseWithCov
       {
         return;  // not possible to transform
       }
-      ned = transforms::position(ned, getOrientation(), trans.translation());
-      cov = transforms::positionCovariance(cov, getOrientationUncertainty(), getOrientation(), trans.translation());
+      // ned = transforms::position(ned, getOrientation(), trans.translation());
+      // cov = transforms::positionCovariance(cov, getOrientationUncertainty(), getOrientation(), trans.translation());
+
       // Predict and update
       const double tim = current_time.toSec();
       if (makePrediction(tim) || !init_ekf_)
