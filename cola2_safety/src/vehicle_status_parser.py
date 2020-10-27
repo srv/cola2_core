@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) 2018 Iqua Robotics SL - All Rights Reserved
 #
 # This file is subject to the terms and conditions defined in file
@@ -227,8 +227,8 @@ class VehicleStatusParser:
                 if __getDiagnostic__(status, self.diag_temperature[i][0]):
                     self.status.temperature[i] = float(__getDiagnostic__(status, self.diag_temperature[i][0], self.diag_temperature[i][1], 0.0))
                     self.last_temperature[i] = rospy.Time.now()
-	        if (rospy.Time.now() - self.last_temperature[i]) > dt:
-	            self.status.temperature[i] = -1000
+            if (rospy.Time.now() - self.last_temperature[i]) > dt:
+                self.status.temperature[i] = -1000
 
             # Water inside
             for i in range(0, len(self.diag_water)):

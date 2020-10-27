@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) 2018 Iqua Robotics SL - All Rights Reserved
 #
 # This file is subject to the terms and conditions defined in file
@@ -39,7 +39,7 @@ class TestThrusters:
         try:
             self.disable_thrusters = rospy.ServiceProxy(
                 rospy.get_namespace() + 'controller/disable_thrusters', Empty)
-        except rospy.ServiceException, e:
+        except (rospy.ServiceException, e):
             rospy.logwarn("%s: Service call failed: %s", self.name, e)
 
         # Create test service
