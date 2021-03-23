@@ -505,8 +505,8 @@ void Pilot::publishFeedback(const control::Feedback& feedback, unsigned int mode
       msg.desired_depth = feedback.desired_depth;
       msg.desired_yaw = feedback.desired_yaw;
       msg.cross_track_error = feedback.cross_track_error;
-      msg.depth_error = feedback.depth_error;
-      msg.yaw_error = feedback.yaw_error;
+      msg.depth_error = feedback.desired_depth - current_state_.pose.position.depth;
+      msg.yaw_error = feedback.desired_yaw - current_state_.pose.orientation.yaw;
       msg.distance_to_section_end = feedback.distance_to_end;
       section_server_->publishFeedback(msg);
       break;
