@@ -35,6 +35,7 @@ class Watchdog(object):
 
         # Create reset timeout service
         self.reset_timeout_srv = rospy.Service(self.name + '/reset_timeout', Empty, self.reset_timeout)
+        self.reset_timeout_srv_ac = rospy.Service(self.name + '/reset_timeout_acoustic', Empty, self.reset_timeout)
 
         # Timer to publish time since init (or last time reset)
         rospy.Timer(rospy.Duration(1.0), self.check_timeout)
@@ -56,7 +57,7 @@ class Watchdog(object):
         """ Service used to reset timeout """
         rospy.loginfo("%s: Reset Timeout!", self.name)
         self.init_time = rospy.Time.now().to_sec()
-        return EmptyResponse()
+        return []
 
 if __name__ == '__main__':
     try:
