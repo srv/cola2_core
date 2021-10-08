@@ -149,6 +149,7 @@ class SafetySupervisor(object):
         # Rule: Battery Level
         battery_charge = vehicle_status.battery_charge
         battery_voltage = vehicle_status.battery_voltage
+
         self.diagnostic.add('battery_charge', str(battery_charge))
         if battery_charge < self.min_battery_charge or battery_voltage < self.min_battery_voltage:
             self.status_code[StatusCode.BATTERY_ERROR] = '1'
@@ -158,27 +159,27 @@ class SafetySupervisor(object):
             self.call_recovery_action("Battery Level Low", RecoveryAction.INFORMATIVE)
 
         # Rule: No IMU data
-        # last_imu = vehicle_status.imu_data_age
-        # self.diagnostic.add('last_imu_data', str(last_imu))
-        # if last_imu > self.min_imu_update:
-        #     rospy.logerr("No IMU data since %s", str(last_imu))
-        #     self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
-        #     self.call_recovery_action("No IMU data!", RecoveryAction.STOP_THRUSTERS)
+        last_imu = vehicle_status.imu_data_age
+        self.diagnostic.add('last_imu_data', str(last_imu))
+        if last_imu > self.min_imu_update:
+            rospy.logerr("No IMU data since %s", str(last_imu))
+            self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
+            self.call_recovery_action("No IMU data!", RecoveryAction.STOP_THRUSTERS)
 
         # Rule: No Depth data
         last_depth = vehicle_status.depth_data_age
         self.diagnostic.add('last_depth_data', str(last_depth))
         if last_depth > self.min_depth_update:
             self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
-            self.call_recovery_action("No Depth data!", RecoveryAction.EMERGENCY_SURFACE)
+            self.call_recovery_action("No Depth data!", RecoveryAction.STOP_THRUSTERS)
 
         # Rule: No Altitude data
-        # last_altitude = vehicle_status.altitude_data_age
-        # self.diagnostic.add('last_altitude_data', str(last_altitude))
-        # if last_altitude > self.min_altitude_update:
-        #     rospy.logerr("last_altiude %s/%s", str(last_altitude), str(self.min_altitude_update))
-        #     self.status_code[StatusCode.NO_ALTITUDE_ERROR] = '1'
-        #     self.call_recovery_action("No Altitude data!", RecoveryAction.STOP_THRUSTERS)
+        last_altitude = vehicle_status.altitude_data_age
+        self.diagnostic.add('last_altitude_data', str(last_altitude))
+        if last_altitude > self.min_altitude_update:
+            rospy.logerr("last_altiude %s/%s", str(last_altitude), str(self.min_altitude_update))
+            self.status_code[StatusCode.NO_ALTITUDE_ERROR] = '1'
+            self.call_recovery_action("No Altitude data!", RecoveryAction.STOP_THRUSTERS)
 
         # Rule: No DVL data
         last_dvl = vehicle_status.dvl_data_age
@@ -188,27 +189,27 @@ class SafetySupervisor(object):
             self.call_recovery_action("No DVL data!", RecoveryAction.STOP_THRUSTERS)
 
         # Rule: No GPS data
-        # last_gps = vehicle_status.gps_data_age
-        # self.diagnostic.add('last_gps_data', str(last_gps))
-        # if (last_gps > self.min_gps_update) and vehicle_status.at_surface:
-        #     self.call_recovery_action("No GPS data!", RecoveryAction.INFORMATIVE)
+        last_gps = vehicle_status.gps_data_age
+        self.diagnostic.add('last_gps_data', str(last_gps))
+        if (last_gps > self.min_gps_update) and vehicle_status.at_surface:
+            self.call_recovery_action("No GPS data!", RecoveryAction.INFORMATIVE)
 
         # Rule: No Navigation data
-        # last_nav = vehicle_status.navigation_data_age
-        # self.diagnostic.add('last_nav_data', str(last_nav))
-        # if last_nav > self.min_nav_update:
-        #     self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
-        #     self.call_recovery_action("No Navigation data!", RecoveryAction.EMERGENCY_SURFACE)
+        last_nav = vehicle_status.navigation_data_age
+        self.diagnostic.add('last_nav_data', str(last_nav))
+        if last_nav > self.min_nav_update:
+            self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
+            self.call_recovery_action("No Navigation data!", RecoveryAction.STOP_THRUSTERS)
 
         # Rule: No WIFI data and not in a mission
-        # last_ack = vehicle_status.wifi_data_age
-        # if not vehicle_status.mission_active:
-        #     self.diagnostic.add('last_ack', str(last_ack))
-        #     if last_ack > self.min_wifi_update:
-        #         self.call_recovery_action("No WiFi data!", RecoveryAction.STOP_THRUSTERS)
-        # else:
-        #     #rospy.loginfo("A mission is active. WiFi timeout disabled.")
-        #     self.diagnostic.add('last_ack', 'Mission active')
+        last_ack = vehicle_status.wifi_data_age
+        if not vehicle_status.mission_active:
+            self.diagnostic.add('last_ack', str(last_ack))
+            if last_ack > self.min_wifi_update:
+                self.call_recovery_action("No WiFi data!", RecoveryAction.INFORMATIVE)
+        else:
+            #rospy.loginfo("A mission is active. WiFi timeout disabled.")
+            self.diagnostic.add('last_ack', 'Mission active')
 
         # Rule: No Modem data
         # last_modem = vehicle_status.modem_data_age
