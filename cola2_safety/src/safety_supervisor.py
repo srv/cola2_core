@@ -146,106 +146,106 @@ class SafetySupervisor(object):
         if vehicle_status.vehicle_initialized:
             self.vehicle_init = True
 
-        # Rule: Battery Level
-        battery_charge = vehicle_status.battery_charge
-        battery_voltage = vehicle_status.battery_voltage
+        # # Rule: Battery Level
+        # battery_charge = vehicle_status.battery_charge
+        # battery_voltage = vehicle_status.battery_voltage
 
-        self.diagnostic.add('battery_charge', str(battery_charge))
-        if battery_charge < self.min_battery_charge or battery_voltage < self.min_battery_voltage:
-            self.status_code[StatusCode.BATTERY_ERROR] = '1'
-            self.call_recovery_action("Battery Level below threshold!", RecoveryAction.STOP_THRUSTERS)
-        elif battery_charge < 1.5*self.min_battery_charge:
-            self.status_code[StatusCode.LOW_BATTERY_WARNING] = '1'
-            self.call_recovery_action("Battery Level Low", RecoveryAction.INFORMATIVE)
+        # self.diagnostic.add('battery_charge', str(battery_charge))
+        # if battery_charge < self.min_battery_charge or battery_voltage < self.min_battery_voltage:
+        #     self.status_code[StatusCode.BATTERY_ERROR] = '1'
+        #     self.call_recovery_action("Battery Level below threshold!", RecoveryAction.STOP_THRUSTERS)
+        # elif battery_charge < 1.5*self.min_battery_charge:
+        #     self.status_code[StatusCode.LOW_BATTERY_WARNING] = '1'
+        #     self.call_recovery_action("Battery Level Low", RecoveryAction.INFORMATIVE)
 
-        # Rule: No IMU data
-        last_imu = vehicle_status.imu_data_age
-        self.diagnostic.add('last_imu_data', str(last_imu))
-        if last_imu > self.min_imu_update:
-            rospy.logerr("No IMU data since %s", str(last_imu))
-            self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
-            self.call_recovery_action("No IMU data!", RecoveryAction.STOP_THRUSTERS)
+        # # Rule: No IMU data
+        # last_imu = vehicle_status.imu_data_age
+        # self.diagnostic.add('last_imu_data', str(last_imu))
+        # if last_imu > self.min_imu_update:
+        #     rospy.logerr("No IMU data since %s", str(last_imu))
+        #     self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
+        #     self.call_recovery_action("No IMU data!", RecoveryAction.STOP_THRUSTERS)
 
-        # Rule: No Depth data
-        last_depth = vehicle_status.depth_data_age
-        self.diagnostic.add('last_depth_data', str(last_depth))
-        if last_depth > self.min_depth_update:
-            self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
-            self.call_recovery_action("No Depth data!", RecoveryAction.STOP_THRUSTERS)
+        # # Rule: No Depth data
+        # last_depth = vehicle_status.depth_data_age
+        # self.diagnostic.add('last_depth_data', str(last_depth))
+        # if last_depth > self.min_depth_update:
+        #     self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
+        #     self.call_recovery_action("No Depth data!", RecoveryAction.STOP_THRUSTERS)
 
-        # Rule: No Altitude data
-        last_altitude = vehicle_status.altitude_data_age
-        self.diagnostic.add('last_altitude_data', str(last_altitude))
-        if last_altitude > self.min_altitude_update:
-            rospy.logerr("last_altiude %s/%s", str(last_altitude), str(self.min_altitude_update))
-            self.status_code[StatusCode.NO_ALTITUDE_ERROR] = '1'
-            self.call_recovery_action("No Altitude data!", RecoveryAction.STOP_THRUSTERS)
+        # # Rule: No Altitude data
+        # last_altitude = vehicle_status.altitude_data_age
+        # self.diagnostic.add('last_altitude_data', str(last_altitude))
+        # if last_altitude > self.min_altitude_update:
+        #     rospy.logerr("last_altiude %s/%s", str(last_altitude), str(self.min_altitude_update))
+        #     self.status_code[StatusCode.NO_ALTITUDE_ERROR] = '1'
+        #     self.call_recovery_action("No Altitude data!", RecoveryAction.STOP_THRUSTERS)
 
-        # Rule: No DVL data
-        last_dvl = vehicle_status.dvl_data_age
-        self.diagnostic.add('last_dvl_data', str(last_dvl))
-        if last_dvl > self.min_dvl_update:
-            self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
-            self.call_recovery_action("No DVL data!", RecoveryAction.STOP_THRUSTERS)
+        # # Rule: No DVL data
+        # last_dvl = vehicle_status.dvl_data_age
+        # self.diagnostic.add('last_dvl_data', str(last_dvl))
+        # if last_dvl > self.min_dvl_update:
+        #     self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
+        #     self.call_recovery_action("No DVL data!", RecoveryAction.STOP_THRUSTERS)
 
-        # Rule: No GPS data
-        last_gps = vehicle_status.gps_data_age
-        self.diagnostic.add('last_gps_data', str(last_gps))
-        if (last_gps > self.min_gps_update) and vehicle_status.at_surface:
-            self.call_recovery_action("No GPS data!", RecoveryAction.INFORMATIVE)
+        # # Rule: No GPS data
+        # last_gps = vehicle_status.gps_data_age
+        # self.diagnostic.add('last_gps_data', str(last_gps))
+        # if (last_gps > self.min_gps_update) and vehicle_status.at_surface:
+        #     self.call_recovery_action("No GPS data!", RecoveryAction.INFORMATIVE)
 
-        # Rule: No Navigation data
-        last_nav = vehicle_status.navigation_data_age
-        self.diagnostic.add('last_nav_data', str(last_nav))
-        if last_nav > self.min_nav_update:
-            self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
-            self.call_recovery_action("No Navigation data!", RecoveryAction.STOP_THRUSTERS)
+        # # Rule: No Navigation data
+        # last_nav = vehicle_status.navigation_data_age
+        # self.diagnostic.add('last_nav_data', str(last_nav))
+        # if last_nav > self.min_nav_update:
+        #     self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
+        #     self.call_recovery_action("No Navigation data!", RecoveryAction.STOP_THRUSTERS)
 
-        # Rule: No WIFI data and not in a mission
-        last_ack = vehicle_status.wifi_data_age
-        if not vehicle_status.mission_active:
-            self.diagnostic.add('last_ack', str(last_ack))
-            if last_ack > self.min_wifi_update:
-                self.call_recovery_action("No WiFi data!", RecoveryAction.INFORMATIVE)
-        else:
-            #rospy.loginfo("A mission is active. WiFi timeout disabled.")
-            self.diagnostic.add('last_ack', 'Mission active')
+        # # Rule: No WIFI data and not in a mission
+        # last_ack = vehicle_status.wifi_data_age
+        # if not vehicle_status.mission_active:
+        #     self.diagnostic.add('last_ack', str(last_ack))
+        #     if last_ack > self.min_wifi_update:
+        #         self.call_recovery_action("No WiFi data!", RecoveryAction.INFORMATIVE)
+        # else:
+        #     #rospy.loginfo("A mission is active. WiFi timeout disabled.")
+        #     self.diagnostic.add('last_ack', 'Mission active')
 
-        # Rule: No Modem data
+        # # Rule: No Modem data
         # last_modem = vehicle_status.modem_data_age
         # self.diagnostic.add('last_modem_data', str(last_modem))
         # if last_modem > self.min_modem_update:
-        #     self.call_recovery_action("No Modem data!", RecoveryAction.STOP_THRUSTERS)
+        #     self.call_recovery_action("No Modem data!", RecoveryAction.INFORMATIVE)
 
-        # Rule: No DVL good data
-        last_good_dvl_data = vehicle_status.dvl_valid_data_age
-        self.diagnostic.add('last_dvl_good_data', str(last_good_dvl_data))
-        if last_good_dvl_data > self.min_dvl_good_data:
-            self.call_recovery_action("No DVL good data!", RecoveryAction.STOP_THRUSTERS)
+        # # Rule: No DVL good data
+        # last_good_dvl_data = vehicle_status.dvl_valid_data_age
+        # self.diagnostic.add('last_dvl_good_data', str(last_good_dvl_data))
+        # if last_good_dvl_data > self.min_dvl_good_data:
+        #     self.call_recovery_action("No DVL good data!", RecoveryAction.STOP_THRUSTERS)
 
-        # Rule: Water Leak
-        if vehicle_status.water_detected:
-            self.diagnostic.add('water_detected', 'True')
-            self.status_code[StatusCode.WATER_INSIDE] = '1'
-            self.call_recovery_action("Water Inside!", RecoveryAction.STOP_THRUSTERS)
-        else:
-            self.diagnostic.add('water_detected', 'False')
+        # # Rule: Water Leak
+        # if vehicle_status.water_detected:
+        #     self.diagnostic.add('water_detected', 'True')
+        #     self.status_code[StatusCode.WATER_INSIDE] = '1'
+        #     self.call_recovery_action("Water Inside!", RecoveryAction.STOP_THRUSTERS)
+        # else:
+        #     self.diagnostic.add('water_detected', 'False')
 
         # Rule: Outside Virtual Cage
         if not vehicle_status.inside_virtual_cage:
             if self.virtual_cage_calls_keep_position:
                 self.call_recovery_action("Outside virtual cage!", RecoveryAction.STOP_THRUSTERS)
 
-        # Rule: High Temperature
-        temperatures = vehicle_status.temperature
-        if temperatures:
-            for t in range(0, len(temperatures)):
-                if temperatures[t] > self.max_temperatures_values[t]:
-                    self.status_code[StatusCode.HIGH_TEMPERATURE] = '1'
-                    self.call_recovery_action(vehicle_status.temperature_name[t] + " high temperature",
-                                              RecoveryAction.STOP_THRUSTERS)
-                else:
-                    self.diagnostic.add('vehicle_temperature', 'Ok')
+        # # Rule: High Temperature
+        # temperatures = vehicle_status.temperature
+        # if temperatures:
+        #     for t in range(0, len(temperatures)):
+        #         if temperatures[t] > self.max_temperatures_values[t]:
+        #             self.status_code[StatusCode.HIGH_TEMPERATURE] = '1'
+        #             self.call_recovery_action(vehicle_status.temperature_name[t] + " high temperature",
+        #                                       RecoveryAction.STOP_THRUSTERS)
+        #         else:
+        #             self.diagnostic.add('vehicle_temperature', 'Ok')
 
         # Rule: Watchdog
         elapsed_time = vehicle_status.elapsed_time
