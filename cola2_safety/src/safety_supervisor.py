@@ -57,6 +57,7 @@ class SafetySupervisor(object):
         self.old_str_err = ""
 
         self.timeout_reset = 10
+        self.disable_thrusters_srv = rospy.ServiceProxy('/turbot/controller/disable_thrusters', Empty)
 
         # Get config parameters
         self.get_config()
@@ -224,35 +225,51 @@ class SafetySupervisor(object):
         #     self.call_recovery_action("No DVL good data!", RecoveryAction.STOP_THRUSTERS)
 
         # # Rule: Water Leak
-        # if vehicle_status.water_detected:
-        #     self.diagnostic.add('water_detected', 'True')
-        #     self.status_code[StatusCode.WATER_INSIDE] = '1'
-        #     self.call_recovery_action("Water Inside!", RecoveryAction.STOP_THRUSTERS)
-        # else:
-        #     self.diagnostic.add('water_detected', 'False')
+        if vehicle_status.water_detected:
+            self.diagnostic.add('water_detected', 'True')
+            self.status_code[StatusCode.WATER_INSIDE] = '1'
+            self.call_recovery_action("Water Inside!", RecoveryAction.STOP_THRUSTERS)
+            print("WATER INSIDE")
+            try:
+                self.disable_thrusters_srv(EmptyRequest())
+            except rospy.exceptions.ROSException:
+                rospy.logerr("Error disabling thrusters")
+        else:
+            self.diagnostic.add('water_detected', 'False')
 
         # Rule: Outside Virtual Cage
-        if not vehicle_status.inside_virtual_cage:
-            if self.virtual_cage_calls_keep_position:
-                self.call_recovery_action("Outside virtual cage!", RecoveryAction.STOP_THRUSTERS)
+        # if not vehicle_status.inside_virtual_cage:
+        #     if self.virtual_cage_calls_keep_position:
+        #         self.call_recovery_action("Outside virtual cage!", RecoveryAction.STOP_THRUSTERS)
 
         # # Rule: High Temperature
-        # temperatures = vehicle_status.temperature
-        # if temperatures:
-        #     for t in range(0, len(temperatures)):
-        #         if temperatures[t] > self.max_temperatures_values[t]:
-        #             self.status_code[StatusCode.HIGH_TEMPERATURE] = '1'
-        #             self.call_recovery_action(vehicle_status.temperature_name[t] + " high temperature",
-        #                                       RecoveryAction.STOP_THRUSTERS)
-        #         else:
-        #             self.diagnostic.add('vehicle_temperature', 'Ok')
+        temperatures = vehicle_status.temperature
+        if temperatures:
+            for t in range(0, len(temperatures)):
+                if temperatures[t] > self.max_temperatures_values[t]:
+                    self.status_code[StatusCode.HIGH_TEMPERATURE] = '1'
+                    self.call_recovery_action(vehicle_status.temperature_name[t] + " high temperature",
+                                              RecoveryAction.STOP_THRUSTERS)
+                    print("HIGH TEMPERATURE!!!!")
+                    try:
+                        self.disable_thrusters_srv(EmptyRequest())
+                    except rospy.exceptions.ROSException:
+                        rospy.logerr("Error disabling thrusters")
+                else:
+                    self.diagnostic.add('vehicle_temperature', 'Ok')
 
         # Rule: Watchdog
         elapsed_time = vehicle_status.elapsed_time
         self.diagnostic.add('elapsed_time', str(elapsed_time))
         if float(elapsed_time) > self.timeout and self.timeout_reset < 0:
+            rospy.loginfo("Call watchdog")
             self.status_code[StatusCode.WATCHDOG_TIMER] = '1'
             self.call_recovery_action("Watchdog timeout reached!", RecoveryAction.STOP_THRUSTERS)
+            print("WATCHDOG!!!!")
+            try:
+                self.disable_thrusters_srv(EmptyRequest())
+            except rospy.exceptions.ROSException:
+                rospy.logerr("Error disabling thrusters")
         else:
             self.timeout_reset = self.timeout_reset - 1
 
