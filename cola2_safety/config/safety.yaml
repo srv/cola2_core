@@ -1,5 +1,5 @@
 # Timeout and minimum update times for the safety_supervisor        
-safety/timeout: 3600  # Seconds
+safety/timeout: 36000000  # Seconds
 safety/min_imu_update: 10.0
 safety/min_depth_update: 10.0                      
 safety/min_altitude_update: 60.0                

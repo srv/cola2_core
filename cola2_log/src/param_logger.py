@@ -27,7 +27,7 @@ class ParamLoggerNode(object):
         self.pub = rospy.Publisher('~params_string', String, queue_size=1, latch=True)
         self.srv = rospy.Service('~publish_params', Trigger, self.srv_publish)
         # call it once at begining
-        self.publish()
+        # self.publish()
 
     def publish(self):
         """Publish all collected parameters."""

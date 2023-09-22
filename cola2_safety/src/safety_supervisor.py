@@ -234,7 +234,7 @@ class SafetySupervisor(object):
         # Rule: Outside Virtual Cage
         if not vehicle_status.inside_virtual_cage:
             if self.virtual_cage_calls_keep_position:
-                self.call_recovery_action("Outside virtual cage!", RecoveryAction.STOP_THRUSTERS)
+                self.call_recovery_action("Outside virtual cage!", RecoveryAction.INFORMATIVE)
 
         # # Rule: High Temperature
         # temperatures = vehicle_status.temperature
@@ -252,7 +252,7 @@ class SafetySupervisor(object):
         self.diagnostic.add('elapsed_time', str(elapsed_time))
         if float(elapsed_time) > self.timeout and self.timeout_reset < 0:
             self.status_code[StatusCode.WATCHDOG_TIMER] = '1'
-            self.call_recovery_action("Watchdog timeout reached!", RecoveryAction.STOP_THRUSTERS)
+            # self.call_recovery_action("Watchdog timeout reached!", RecoveryAction.INFORMATIVE)
         else:
             self.timeout_reset = self.timeout_reset - 1
 
@@ -375,7 +375,7 @@ class SafetySupervisor(object):
             ra.error_level = level
             req.requested_action = ra
             ans = self.recover_action_srv(req)
-            rospy.logerr("Recovery action called --> %s", ans)
+            # rospy.logerr("Recovery action called --> %s", ans)
 
             # Save last called action
             self.old_level = level
