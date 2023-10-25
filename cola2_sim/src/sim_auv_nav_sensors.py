@@ -198,11 +198,11 @@ class SimAUVNavSensors(object):
         # Compute position with noise
         north = self.odom.pose.pose.position.x + np.random.normal(0.0, self.gps_position_covariance[0])
         east = self.odom.pose.pose.position.y + np.random.normal(0.0, self.gps_position_covariance[1])
-        ned = np.array([[north, east, 0.0]]).T
+        ned = np.array([north, east, 0.0]).T
         # Transform to sensor
         rot = tf.transformations.euler_matrix(*self.rpy)[:3, :3]
         gps_xyz = rot.dot(self.tf_gps[0])
-        ned = ned - np.array([[gps_xyz[0], gps_xyz[1], 0.0]]).T
+        ned = ned - np.array([gps_xyz[0][0], gps_xyz[1][0], 0.0]).T
         # Transform to lat lon
         lat, lon, _ = self.ned.ned2geodetic([ned[0], ned[1], 0.0])
         # Create message
