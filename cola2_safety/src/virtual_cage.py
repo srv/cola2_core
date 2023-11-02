@@ -50,7 +50,7 @@ class VirtualCage(object):
         self.enabled = True
 
         # Create dynamic reconfigure service
-        self.dynamic_reconfigure_srv = Server(VirtualCageInfoConfig, self.dynamic_reconfigure_callback)
+        # self.dynamic_reconfigure_srv = Server(VirtualCageInfoConfig, self.dynamic_reconfigure_callback)
         rospy.sleep(2)  # TODO: solve this. The dynamic_reconfigure calls its callback some time after creation
                         # and overides config
 

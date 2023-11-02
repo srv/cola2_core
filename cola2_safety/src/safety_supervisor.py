@@ -57,6 +57,7 @@ class SafetySupervisor(object):
         self.old_str_err = ""
 
         self.timeout_reset = 10
+        self.disable_thrusters_srv = rospy.ServiceProxy('/turbot/controller/disable_thrusters', Empty)
 
         # Get config parameters
         self.get_config()
@@ -146,103 +147,114 @@ class SafetySupervisor(object):
         if vehicle_status.vehicle_initialized:
             self.vehicle_init = True
 
-        # Rule: Battery Level
-        battery_charge = vehicle_status.battery_charge
-        battery_voltage = vehicle_status.battery_voltage
-        self.diagnostic.add('battery_charge', str(battery_charge))
-        if battery_charge < self.min_battery_charge or battery_voltage < self.min_battery_voltage:
-            self.status_code[StatusCode.BATTERY_ERROR] = '1'
-            self.call_recovery_action("Battery Level below threshold!", RecoveryAction.ABORT_AND_SURFACE)
-        elif battery_charge < 1.5*self.min_battery_charge:
-            self.status_code[StatusCode.LOW_BATTERY_WARNING] = '1'
-            self.call_recovery_action("Battery Level Low", RecoveryAction.INFORMATIVE)
+        # # Rule: Battery Level
+        # battery_charge = vehicle_status.battery_charge
+        # battery_voltage = vehicle_status.battery_voltage
 
-        # Rule: No IMU data
-        last_imu = vehicle_status.imu_data_age
-        self.diagnostic.add('last_imu_data', str(last_imu))
-        if last_imu > self.min_imu_update:
-            rospy.logerr("No IMU data since %s", str(last_imu))
-            self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
-            self.call_recovery_action("No IMU data!", RecoveryAction.ABORT_AND_SURFACE)
+        # self.diagnostic.add('battery_charge', str(battery_charge))
+        # if battery_charge < self.min_battery_charge or battery_voltage < self.min_battery_voltage:
+        #     self.status_code[StatusCode.BATTERY_ERROR] = '1'
+        #     self.call_recovery_action("Battery Level below threshold!", RecoveryAction.STOP_THRUSTERS)
+        # elif battery_charge < 1.5*self.min_battery_charge:
+        #     self.status_code[StatusCode.LOW_BATTERY_WARNING] = '1'
+        #     self.call_recovery_action("Battery Level Low", RecoveryAction.INFORMATIVE)
 
-        # Rule: No Depth data
-        last_depth = vehicle_status.depth_data_age
-        self.diagnostic.add('last_depth_data', str(last_depth))
-        if last_depth > self.min_depth_update:
-            self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
-            self.call_recovery_action("No Depth data!", RecoveryAction.EMERGENCY_SURFACE)
+        # # Rule: No IMU data
+        # last_imu = vehicle_status.imu_data_age
+        # self.diagnostic.add('last_imu_data', str(last_imu))
+        # if last_imu > self.min_imu_update:
+        #     rospy.logerr("No IMU data since %s", str(last_imu))
+        #     self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
+        #     self.call_recovery_action("No IMU data!", RecoveryAction.STOP_THRUSTERS)
 
-        # Rule: No Altitude data
-        last_altitude = vehicle_status.altitude_data_age
-        self.diagnostic.add('last_altitude_data', str(last_altitude))
-        if last_altitude > self.min_altitude_update:
-            rospy.logerr("last_altiude %s/%s", str(last_altitude), str(self.min_altitude_update))
-            self.status_code[StatusCode.NO_ALTITUDE_ERROR] = '1'
-            self.call_recovery_action("No Altitude data!", RecoveryAction.STOP_THRUSTERS)
+        # # Rule: No Depth data
+        # last_depth = vehicle_status.depth_data_age
+        # self.diagnostic.add('last_depth_data', str(last_depth))
+        # if last_depth > self.min_depth_update:
+        #     self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
+        #     self.call_recovery_action("No Depth data!", RecoveryAction.STOP_THRUSTERS)
 
-        # Rule: No DVL data
-        last_dvl = vehicle_status.dvl_data_age
-        self.diagnostic.add('last_dvl_data', str(last_dvl))
-        if last_dvl > self.min_dvl_update:
-            self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
-            self.call_recovery_action("No DVL data!", RecoveryAction.STOP_THRUSTERS)
+        # # Rule: No Altitude data
+        # last_altitude = vehicle_status.altitude_data_age
+        # self.diagnostic.add('last_altitude_data', str(last_altitude))
+        # if last_altitude > self.min_altitude_update:
+        #     rospy.logerr("last_altiude %s/%s", str(last_altitude), str(self.min_altitude_update))
+        #     self.status_code[StatusCode.NO_ALTITUDE_ERROR] = '1'
+        #     self.call_recovery_action("No Altitude data!", RecoveryAction.STOP_THRUSTERS)
 
-        # Rule: No GPS data
-        last_gps = vehicle_status.gps_data_age
-        self.diagnostic.add('last_gps_data', str(last_gps))
-        if (last_gps > self.min_gps_update) and vehicle_status.at_surface:
-            self.call_recovery_action("No GPS data!", RecoveryAction.INFORMATIVE)
+        # # Rule: No DVL data
+        # last_dvl = vehicle_status.dvl_data_age
+        # self.diagnostic.add('last_dvl_data', str(last_dvl))
+        # if last_dvl > self.min_dvl_update:
+        #     self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
+        #     self.call_recovery_action("No DVL data!", RecoveryAction.STOP_THRUSTERS)
 
-        # Rule: No Navigation data
-        last_nav = vehicle_status.navigation_data_age
-        self.diagnostic.add('last_nav_data', str(last_nav))
-        if last_nav > self.min_nav_update:
-            self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
-            self.call_recovery_action("No Navigation data!", RecoveryAction.EMERGENCY_SURFACE)
+        # # Rule: No GPS data
+        # last_gps = vehicle_status.gps_data_age
+        # self.diagnostic.add('last_gps_data', str(last_gps))
+        # if (last_gps > self.min_gps_update) and vehicle_status.at_surface:
+        #     self.call_recovery_action("No GPS data!", RecoveryAction.INFORMATIVE)
 
-        # Rule: No WIFI data and not in a mission
-        last_ack = vehicle_status.wifi_data_age
-        if not vehicle_status.mission_active:
-            self.diagnostic.add('last_ack', str(last_ack))
-            if last_ack > self.min_wifi_update:
-                self.call_recovery_action("No WiFi data!", RecoveryAction.ABORT_AND_SURFACE)
-        else:
-            #rospy.loginfo("A mission is active. WiFi timeout disabled.")
-            self.diagnostic.add('last_ack', 'Mission active')
+        # # Rule: No Navigation data
+        # last_nav = vehicle_status.navigation_data_age
+        # self.diagnostic.add('last_nav_data', str(last_nav))
+        # if last_nav > self.min_nav_update:
+        #     self.status_code[StatusCode.NAVIGATION_ERROR] = '1'
+        #     self.call_recovery_action("No Navigation data!", RecoveryAction.STOP_THRUSTERS)
 
-        # Rule: No Modem data
-        last_modem = vehicle_status.modem_data_age
-        self.diagnostic.add('last_modem_data', str(last_modem))
-        if last_modem > self.min_modem_update:
-            self.call_recovery_action("No Modem data!", RecoveryAction.ABORT_AND_SURFACE)
+        # # Rule: No WIFI data and not in a mission
+        # last_ack = vehicle_status.wifi_data_age
+        # if not vehicle_status.mission_active:
+        #     self.diagnostic.add('last_ack', str(last_ack))
+        #     if last_ack > self.min_wifi_update:
+        #         self.call_recovery_action("No WiFi data!", RecoveryAction.INFORMATIVE)
+        # else:
+        #     #rospy.loginfo("A mission is active. WiFi timeout disabled.")
+        #     self.diagnostic.add('last_ack', 'Mission active')
 
-        # Rule: No DVL good data
-        last_good_dvl_data = vehicle_status.dvl_valid_data_age
-        self.diagnostic.add('last_dvl_good_data', str(last_good_dvl_data))
-        if last_good_dvl_data > self.min_dvl_good_data:
-            self.call_recovery_action("No DVL good data!", RecoveryAction.STOP_THRUSTERS)
+        # # Rule: No Modem data
+        # last_modem = vehicle_status.modem_data_age
+        # self.diagnostic.add('last_modem_data', str(last_modem))
+        # if last_modem > self.min_modem_update:
+        #     self.call_recovery_action("No Modem data!", RecoveryAction.INFORMATIVE)
 
-        # Rule: Water Leak
+        # # Rule: No DVL good data
+        # last_good_dvl_data = vehicle_status.dvl_valid_data_age
+        # self.diagnostic.add('last_dvl_good_data', str(last_good_dvl_data))
+        # if last_good_dvl_data > self.min_dvl_good_data:
+        #     self.call_recovery_action("No DVL good data!", RecoveryAction.STOP_THRUSTERS)
+
+        # # Rule: Water Leak
         if vehicle_status.water_detected:
             self.diagnostic.add('water_detected', 'True')
             self.status_code[StatusCode.WATER_INSIDE] = '1'
-            self.call_recovery_action("Water Inside!", RecoveryAction.ABORT_AND_SURFACE)
+            self.call_recovery_action("Water Inside!", RecoveryAction.STOP_THRUSTERS)
+            print("WATER INSIDE")
+            try:
+                self.disable_thrusters_srv(EmptyRequest())
+            except rospy.exceptions.ROSException:
+                rospy.logerr("Error disabling thrusters")
         else:
             self.diagnostic.add('water_detected', 'False')
 
         # Rule: Outside Virtual Cage
-        if not vehicle_status.inside_virtual_cage:
-            if self.virtual_cage_calls_keep_position:
-                self.call_recovery_action("Outside virtual cage!", RecoveryAction.ABORT_AND_SURFACE)
+        # if not vehicle_status.inside_virtual_cage:
+        #     if self.virtual_cage_calls_keep_position:
+        #         self.call_recovery_action("Outside virtual cage!", RecoveryAction.STOP_THRUSTERS)
 
-        # Rule: High Temperature
+        # # Rule: High Temperature
         temperatures = vehicle_status.temperature
         if temperatures:
             for t in range(0, len(temperatures)):
                 if temperatures[t] > self.max_temperatures_values[t]:
                     self.status_code[StatusCode.HIGH_TEMPERATURE] = '1'
                     self.call_recovery_action(vehicle_status.temperature_name[t] + " high temperature",
-                                              RecoveryAction.ABORT_AND_SURFACE)
+                                              RecoveryAction.STOP_THRUSTERS)
+                    print("HIGH TEMPERATURE!!!!")
+                    try:
+                        self.disable_thrusters_srv(EmptyRequest())
+                    except rospy.exceptions.ROSException:
+                        rospy.logerr("Error disabling thrusters")
                 else:
                     self.diagnostic.add('vehicle_temperature', 'Ok')
 
@@ -250,8 +262,14 @@ class SafetySupervisor(object):
         elapsed_time = vehicle_status.elapsed_time
         self.diagnostic.add('elapsed_time', str(elapsed_time))
         if float(elapsed_time) > self.timeout and self.timeout_reset < 0:
+            rospy.loginfo("Call watchdog")
             self.status_code[StatusCode.WATCHDOG_TIMER] = '1'
-            self.call_recovery_action("Watchdog timeout reached!", RecoveryAction.ABORT_AND_SURFACE)
+            self.call_recovery_action("Watchdog timeout reached!", RecoveryAction.STOP_THRUSTERS)
+            print("WATCHDOG!!!!")
+            try:
+                self.disable_thrusters_srv(EmptyRequest())
+            except rospy.exceptions.ROSException:
+                rospy.logerr("Error disabling thrusters")
         else:
             self.timeout_reset = self.timeout_reset - 1
 
@@ -263,7 +281,7 @@ class SafetySupervisor(object):
             # Flag corresponding bit of status code according to recovery action level
             if self.ra_msg.error_level == RecoveryAction.ABORT_MISSION:
                 self.status_code[StatusCode.RA_ABORT_MISSION] = '1'
-            elif self.ra_msg.error_level == RecoveryAction.ABORT_AND_SURFACE:
+            elif self.ra_msg.error_level == RecoveryAction.STOP_THRUSTERS:
                 self.status_code[StatusCode.RA_ABORT_SURFACE] = '1'
             elif self.ra_msg.error_level == RecoveryAction.EMERGENCY_SURFACE:
                 self.status_code[StatusCode.RA_EMERGENCY_SURFACE] = '1'
@@ -326,24 +344,24 @@ class SafetySupervisor(object):
 
 
         # Dynamic reconfigure for defining min altitude and max depth
-        try:
-            client2 = dynamic_reconfigure.client.Client("safe_depth_altitude", timeout=10)
-            client2.update_configuration({"min_altitude": self.min_altitude,
-                                          "max_depth": self.max_depth})
+        # try:
+        #     client2 = dynamic_reconfigure.client.Client("safe_depth_altitude", timeout=10)
+        #     client2.update_configuration({"min_altitude": self.min_altitude,
+        #                                   "max_depth": self.max_depth})
 
-        except rospy.exceptions.ROSException:
-            rospy.logerr('Error modifying safe_depth_altitude params.')
+        # except rospy.exceptions.ROSException:
+        #     rospy.logerr('Error modifying safe_depth_altitude params.')
 
         # Dynamic reconfigure for defining virtual cage limits
-        try:
-            client3 = dynamic_reconfigure.client.Client("virtual_cage", timeout=10)
-            client3.update_configuration({"north_origin": self.working_area_north_origin,
-                                          "east_origin": self.working_area_east_origin,
-                                          "north_longitude": self.working_area_north_length,
-                                          "east_longitude": self.working_area_east_length,
-                                          "enable": True})
-        except rospy.exceptions.ROSException:
-            rospy.logerr('Error modifying virtual_cage params.')
+        # try:
+        #     client3 = dynamic_reconfigure.client.Client("virtual_cage", timeout=10)
+        #     client3.update_configuration({"north_origin": self.working_area_north_origin,
+        #                                   "east_origin": self.working_area_east_origin,
+        #                                   "north_longitude": self.working_area_north_length,
+        #                                   "east_longitude": self.working_area_east_length,
+        #                                   "enable": True})
+        # except rospy.exceptions.ROSException:
+        #     rospy.logerr('Error modifying virtual_cage params.')
 
     def call_recovery_action(self, str_err="Error!", level=RecoveryAction.INFORMATIVE):
         """
@@ -363,7 +381,7 @@ class SafetySupervisor(object):
             # Flag corresponding bit of status code according to recovery action level
             if level == RecoveryAction.ABORT_MISSION:
                 self.status_code[StatusCode.RA_ABORT_MISSION] = '1'
-            elif level == RecoveryAction.ABORT_AND_SURFACE:
+            elif level == RecoveryAction.STOP_THRUSTERS:
                 self.status_code[StatusCode.RA_ABORT_SURFACE] = '1'
             elif level == RecoveryAction.EMERGENCY_SURFACE:
                 self.status_code[StatusCode.RA_EMERGENCY_SURFACE] = '1'

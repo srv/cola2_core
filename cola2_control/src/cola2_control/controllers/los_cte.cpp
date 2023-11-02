@@ -83,8 +83,9 @@ void LosCteController::compute(const control::State& current_state, const contro
   double s = (current_state.pose.position.north - section.initial_position.x) * cbeta +
              (current_state.pose.position.east - section.initial_position.y) * sbeta;
 
-  // double e = -(current_state.pose.position.north - section.initial_position.x) * sbeta +
-  //            (current_state.pose.position.east - section.initial_position.y) * cbeta;
+  double e = -(current_state.pose.position.north - section.initial_position.x) * sbeta +
+             (current_state.pose.position.east - section.initial_position.y) * cbeta;
+  feedback.cross_track_error = e;
 
   // Orthogonal projection
   double x_proj = section.initial_position.x + (s + config_.delta) * cbeta;
@@ -222,6 +223,7 @@ void LosCteController::compute(const control::State& current_state, const contro
 
   // Fill additional feedback vars
   feedback.distance_to_end = dist_final;
+
 
   // Fill marker
   control::Point initial_point;

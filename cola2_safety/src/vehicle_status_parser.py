@@ -250,6 +250,7 @@ class VehicleStatusParser:
                     self.status.inside_virtual_cage = False
 
         # Publish status message
+        self.vehicle_init = True
         self.status.header.stamp = rospy.Time.now()
         self.status.header.frame_id = rospy.get_namespace() + str('base_link')
         # Fill fixed temperature ids to be published inside the VehicleStatus message
