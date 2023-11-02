@@ -69,7 +69,7 @@ class LogitechFX10(JoystickBase):
         # Create client to services:
         # ... start button service
         if self.start_service != "":
-            rospy.wait_for_service(self.start_service, 10)
+            rospy.wait_for_service(self.start_service, 60)
             try:
                 self.enable_keep_pose = rospy.ServiceProxy(self.start_service, Trigger)
             except rospy.ServiceException, e:
@@ -77,7 +77,7 @@ class LogitechFX10(JoystickBase):
 
         # ... stop button service
         if self.stop_service != '':
-            rospy.wait_for_service(self.stop_service, 10)
+            rospy.wait_for_service(self.stop_service, 60)
             try:
                 self.disable_keep_pose = rospy.ServiceProxy(self.stop_service, Trigger)
             except rospy.ServiceException, e:
@@ -85,7 +85,7 @@ class LogitechFX10(JoystickBase):
 
         # ... enable thrusters service
         rospy.wait_for_service(
-            namespace + 'controller/enable_thrusters', 10)
+            namespace + 'controller/enable_thrusters', 60)
         try:
             self.enable_thrusters = rospy.ServiceProxy(
                 namespace + 'controller/enable_thrusters', Empty)
@@ -94,7 +94,7 @@ class LogitechFX10(JoystickBase):
 
         # ... disable thrusters service
         rospy.wait_for_service(
-            namespace + 'controller/disable_thrusters', 10)
+            namespace + 'controller/disable_thrusters', 60)
         try:
             self.disable_thrusters = rospy.ServiceProxy(
                 namespace + 'controller/disable_thrusters', Empty)
