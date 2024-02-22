@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 2.8.3)
 project(cola2_control)
 
 add_compile_options(-std=c++11 -Wall -Wextra)
@@ -26,36 +26,35 @@ find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure
 
   # COLA2 Dependencies
-  cola2_lib
+  cola2_lib_ros
   cola2_msgs
 )
 
 # System dependencies
-find_package(TinyXML REQUIRED)
 find_package(Boost REQUIRED)
+find_package(COLA2_LIB REQUIRED)
 
 # This package has a setup.py. This macro ensures modules and global scripts
 # declared therein get installed
 catkin_python_setup()
 
-
 generate_dynamic_reconfigure_options(
-        cfg/controller_only_thrusters.cfg
+        cfg/controller.cfg
 )
 
 # Declare things to be passed to dependent projects
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES controllers mission_utils low_level_controllers ros_control_base
+  LIBRARIES controllers low_level_controllers ros_control_base only_thrusters_controller_lib
   # TODO: go and check what is in the headers
   CATKIN_DEPENDS roscpp
                  roslib
                  std_msgs
                  sensor_msgs
                  actionlib
-                 cola2_lib
+                 cola2_lib_ros
                  cola2_msgs
-  DEPENDS TinyXML Boost
+  DEPENDS Boost COLA2_LIB
 )
 
 # Specify locations of header files. Your package locations should be listed
@@ -68,27 +67,11 @@ include_directories(
 # Declare C++ libraries
 add_library(controllers SHARED
   src/${PROJECT_NAME}/controllers/anchor.cpp
-  src/${PROJECT_NAME}/controllers/goto.cpp
-  src/${PROJECT_NAME}/controllers/holonomic_goto.cpp
-  src/${PROJECT_NAME}/controllers/los_cte.cpp
+  src/${PROJECT_NAME}/controllers/holonomic_keep_position.cpp
+  src/${PROJECT_NAME}/controllers/section.cpp
 )
 target_link_libraries(controllers ${catkin_LIBRARIES})
 add_dependencies(controllers ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-add_library(mission_utils SHARED
-  src/${PROJECT_NAME}/mission_utils/mission_maneuver.cpp
-  src/${PROJECT_NAME}/mission_utils/mission_position.cpp
-  src/${PROJECT_NAME}/mission_utils/mission_tolerance.cpp
-  src/${PROJECT_NAME}/mission_utils/mission_waypoint.cpp
-  src/${PROJECT_NAME}/mission_utils/mission_section.cpp
-  src/${PROJECT_NAME}/mission_utils/mission_park.cpp
-  src/${PROJECT_NAME}/mission_utils/mission_configuration.cpp
-  src/${PROJECT_NAME}/mission_utils/mission_action.cpp
-  src/${PROJECT_NAME}/mission_utils/mission_step.cpp
-  src/${PROJECT_NAME}/mission_utils/mission.cpp
-)
-target_link_libraries(mission_utils ${catkin_LIBRARIES} ${TinyXML_LIBRARIES})
-add_dependencies(mission_utils ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 add_library(low_level_controllers SHARED
   src/${PROJECT_NAME}/low_level_controllers/auv_controller_base.cpp
@@ -117,25 +100,25 @@ add_dependencies(only_thrusters_controller_lib ${${PROJECT_NAME}_EXPORTED_TARGET
 
 
 # Add executables
-add_executable(keyboard src/keyboard.cpp)
-target_link_libraries(keyboard ${catkin_LIBRARIES} ${Boost_LIBRARIES})
-add_dependencies(keyboard ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_executable(keyboard_node src/keyboard_node.cpp)
+target_link_libraries(keyboard_node ${catkin_LIBRARIES} ${Boost_LIBRARIES})
+add_dependencies(keyboard_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-add_executable(pilot src/pilot_node.cpp)
-target_link_libraries(pilot ${catkin_LIBRARIES} ${Boost_LIBRARIES} controllers low_level_controllers)
-add_dependencies(pilot ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_executable(pilot_node src/pilot_node.cpp)
+target_link_libraries(pilot_node ${catkin_LIBRARIES} ${Boost_LIBRARIES} controllers low_level_controllers ${COLA2_LIB_LIBRARIES})
+add_dependencies(pilot_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-add_executable(captain src/captain_node.cpp)
-target_link_libraries(captain ${catkin_LIBRARIES} ${Boost_LIBRARIES} mission_utils)
-add_dependencies(captain ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_executable(captain_node src/captain_node.cpp)
+target_link_libraries(captain_node ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${COLA2_LIB_LIBRARIES})
+add_dependencies(captain_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-add_executable(external_mission_example src/external_mission_example_node.cpp)
-target_link_libraries(external_mission_example ${catkin_LIBRARIES} ${Boost_LIBRARIES} mission_utils)
-add_dependencies(external_mission_example ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_executable(controller_node src/controller_node.cpp)
+target_link_libraries(controller_node ${catkin_LIBRARIES} controllers low_level_controllers ros_control_base only_thrusters_controller_lib)
+add_dependencies(controller_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-add_executable(controller_only_thrusters src/only_thrusters_controller_node.cpp)
-target_link_libraries(controller_only_thrusters ${catkin_LIBRARIES} controllers low_level_controllers ros_control_base only_thrusters_controller_lib)
-add_dependencies(controller_only_thrusters ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_executable(teleoperation_node src/teleoperation_node.cpp)
+target_link_libraries(teleoperation_node ${catkin_LIBRARIES} controllers low_level_controllers ros_control_base only_thrusters_controller_lib)
+add_dependencies(teleoperation_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 # Mark executable scripts (Python etc.) for installation. In contrast to
 # setup.py, you can choose the destination

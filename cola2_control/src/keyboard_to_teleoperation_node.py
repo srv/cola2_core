@@ -1,12 +1,11 @@
-#!/usr/bin/env python3
-# Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+#!/usr/bin/env python
+# Copyright (c) 2020 Iqua Robotics SL - All Rights Reserved
 #
 # This file is subject to the terms and conditions defined in file
 # 'LICENSE.txt', which is part of this source code package.
 
-"""@@>This node converts joystic messages so that the teleoperation node can understand them. From this node it is also possible to call services or anything else reading the buttons.<@@"""
-
 import rospy
+from std_srvs.srv import Trigger
 from cola2_control.joystickbase import JoystickBase
 
 
@@ -32,6 +31,8 @@ class KeyboardToTeleoperation(JoystickBase):
     KEY_DOWN = 6
     KEY_RIGHT = 7
     KEY_LEFT = 8
+    KEY_M = 17
+    KEY_N = 18
     TWIST_U = 0
     TWIST_V = 1
     TWIST_W = 2
@@ -44,6 +45,24 @@ class KeyboardToTeleoperation(JoystickBase):
 
         # To transform button into axis
         self.desired_vel = [0.0, 0.0, 0.0, 0.0]  # u, v, w, r
+
+        # ... enable thrusters service
+        rospy.wait_for_service(
+            rospy.get_namespace() + 'teleoperation/enable_thrusters', 10)
+        try:
+            self.enable_thrusters = rospy.ServiceProxy(
+                rospy.get_namespace() + 'teleoperation/enable_thrusters', Trigger)
+        except rospy.ServiceException as e:
+            rospy.logwarn("%s: Service call failed: %s", self.name, e)
+
+        # ... disable thrusters service
+        rospy.wait_for_service(
+            rospy.get_namespace() + 'teleoperation/disable_thrusters', 10)
+        try:
+            self.disable_thrusters = rospy.ServiceProxy(
+                rospy.get_namespace() + 'teleoperation/disable_thrusters', Trigger)
+        except rospy.ServiceException as e:
+            rospy.logwarn("%s: Service call failed: %s", self.name, e)
 
     def update_joy(self, joy):
         """ Transform keyboard joy data into 12 axis data (pose + twist)
@@ -86,6 +105,13 @@ class KeyboardToTeleoperation(JoystickBase):
         self.joy_msg.axes[JoystickBase.AXIS_TWIST_W] = self.desired_vel[self.TWIST_W]
         self.joy_msg.axes[JoystickBase.AXIS_TWIST_R] = self.desired_vel[self.TWIST_R]
 
+        # Enable or disable thrusters
+        if joy.buttons[self.KEY_M] == 1.0:
+            rospy.loginfo("ENABLE THRUSTERS!")
+            self.enable_thrusters()
+        if joy.buttons[self.KEY_N] == 1.0:
+            rospy.loginfo("DISABLE THRUSTERS!")
+            self.disable_thrusters()
 
 if __name__ == '__main__':
     """ Initialize the keyboard_to_teleoperation node. """

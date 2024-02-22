@@ -1,49 +1,60 @@
-# WARNING!!!
-# The thrusters allocation matrix "b" is defined in the code. It can not be changed using parameters.
+# Frames
+world_frame_id: "world_ned"
 
-dynamics/use_force_topic: true
-#
-dynamics/number_of_thrusters: 5
-dynamics/thrusters_tau: 0.1
-dynamics/number_of_fins: 0
-dynamics/a_fins: 0
-dynamics/k_cd_fins: 0
-dynamics/k_cl_fins: 0
-dynamics/max_fins_angle: 0
-#
-dynamics/period: 0.01
-dynamics/mass: 98.0
-dynamics/buoyancy: 100.0
-dynamics/gravity_center: [0.0, 0.0, 0.05]
-dynamics/g: 9.81
-dynamics/radius: 0.4 # 0.286
-#
-dynamics/max_thrusters_rpm: 1200
-dynamics/ctf: 0.00006835
-dynamics/ctb: 0.00006835
-dynamics/dzv: 0.05
-dynamics/dv: 0.35
-dynamics/dh: 0.4
-dynamics/density: 1000.0
-#
-dynamics/thrusters_matrix: [-1, -1, 0, 0, 0,  0, 0, 0, 0, 1,  0, 0, -1, -1, 0,  0, 0, 0, 0, 0,  0, 0, 0.35, -0.35, 0,  -0.4, 0.4, 0, 0, 0]
-#
-dynamics/tensor: [8.0, 0.0, 0.0, 0.0, 8.0, 0.0, 0.0, 0.0, 8.0]
-dynamics/damping: [.0, -65.0, .0, -130.0, -130.0, -130.0]
-dynamics/quadratic_damping: [-148.0, -148.0, -148.0, -180.0, -180.0, -180.0]
-#
-#
-## Meters and Rads [X, Y, Z, Roll, Pitch, Yaw]
-dynamics/initial_pose: [0.0, 0.0, 0.4, 0.0, 0.0, 0.0]
-dynamics/initial_velocity: [0, 0, 0, 0, 0, 0]
-#
-## Collisions from UWSim.
-dynamics/contact_sensor_available: False
-#
-## WATER CURRENTs SIMULATION
-dynamics/current_mean: [0.05, 0.0, 0]
-dynamics/current_sigma: [0.01, 0.01, 0.01]
-dynamics/current_min: [-0.1, -0.0, -0.0]
-dynamics/current_max: [0.1, 0.0, 0.0]
-dynamics/current_enabled: False
+# Period
+period: 0.05
 
+# Initial state in meters and rads [X, Y, Z, Roll, Pitch, Yaw]
+initial_pose: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+initial_velocity: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+# Vehicle properties
+density: 1030.0
+mass: 56
+buoyancy: 56.3
+buoyancy_center: [0.0, 0.0, -0.02]
+radius: 0.115
+tensor: [0.4, 0.0, 0.0, 0.0, 18.0, 0.0, 0.0, 0.0, 18.0]
+damping: [0.0, -4.0, -4.0, -1.0, 0.0, 0.0]
+quadratic_damping: [-25.0, -250.0, -250.0, -5.0, -10.8, -10.8]
+
+# Thrusters info (not used if use_force_topic is set to true)
+number_of_thrusters: 3
+thrusters_tau: 0.1  # Physical property of the thruster
+thrusters_max_step: 0.1
+thrusters_limiter: [0.6, 1.0, 1.0]
+thrusters_symmetric: true
+thrusters_matrix: [0.0, 1.0, 1.0,
+                   0.0, 0.0, 0.0,
+                   1.0, 0.0, 0.0,
+                   0.0, 0.0, 0.0,
+                   0.0, 0.0, 0.0,
+                   0.0, -0.16783, 0.16783]
+
+# Thruster 1
+thruster_1_poly_positive: [0.0499, 0.0701, -0.00581, 0.000247, -0.00000467, 0.0000000325]
+thruster_1_poly_negative: [0.0220, 0.176, -0.0261, 0.00199, -0.00007026, 0.000000926]
+thruster_1_max_force_positive: 55.0
+thruster_1_max_force_negative: 28.5
+
+# Thruster 2
+thruster_2_poly_positive: [0.06815, 0.05144, -0.00278, 0.0000848, -0.00000118, 0.00000000612]
+thruster_2_poly_negative: [0.0772, 0.1186, -0.0139, 0.000920, -0.0000281, 0.000000322]
+thruster_2_max_force_positive: 71.5
+thruster_2_max_force_negative: 30.0
+
+# Thruster 3
+thruster_3_poly_positive: [0.06815, 0.05144, -0.00278, 0.0000848, -0.00000118, 0.00000000612]
+thruster_3_poly_negative: [0.0772, 0.1186, -0.0139, 0.000920, -0.0000281, 0.000000322]
+thruster_3_max_force_positive: 71.5
+thruster_3_max_force_negative: 30.0
+
+# Fins info (not used if fins_topic is set to "")
+fins_topic: ""
+a_fins: 0.0094
+k_cd_fins: 1.8  # Parameters for NACA 0015 airfoil
+k_cl_fins: 1.1
+max_fins_angle: 0.3941  # 20 degrees = pi / 9 = 0.3491
+
+# If this parameter is set, the input of the model is force
+use_force_topic: false

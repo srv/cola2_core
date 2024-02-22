@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+ * Copyright (c) 2020 Iqua Robotics SL - All Rights Reserved
  *
  * This file is subject to the terms and conditions defined in file
  * 'LICENSE.txt', which is part of this source code package.
@@ -13,8 +13,8 @@
 
 #include <algorithm>
 #include <map>
-#include <utility>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <cola2_control/low_level_controllers/merge.h>
@@ -42,6 +42,11 @@ protected:
   Merge twist_merge_;
   std::vector<double> twist_feedback_;
   std::vector<double> max_wrench_;
+
+  // Set zero velocity
+  double set_zero_velocity_depth_;
+  int set_zero_velocity_priority_;
+  std::vector<bool> set_zero_velocity_axes_;
 
   // Wrench
   Merge wrench_merge_;
@@ -95,6 +100,12 @@ public:
 
   void setFinAllocator(const bool is_enabled);
 
+  void setSetZeroVelocityDepth(const double depth);
+
+  void setSetZeroVelocityPriority(const int priority);
+
+  void setSetZeroVelocityAxes(const std::vector<bool>& priority);
+
   bool isPoseControllerEnable() const;
 
   bool isVelocityControllerEnable() const;
@@ -110,6 +121,12 @@ public:
   bool getIsThrusterAllocatorEnable() const;
 
   bool getIsFinAllocatorEnable() const;
+
+  double getSetZeroVelocityDepth() const;
+
+  int getSetZeroVelocityPriority() const;
+
+  std::vector<bool> getSetZeroVelocityAxes() const;
 
   void setIsPoseControllerEnable(const bool& value);
 

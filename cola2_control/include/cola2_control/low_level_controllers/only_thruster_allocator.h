@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+ * Copyright (c) 2020 Iqua Robotics SL - All Rights Reserved
  *
  * This file is subject to the terms and conditions defined in file
  * 'LICENSE.txt', which is part of this source code package.
@@ -13,15 +13,15 @@
 #include <cola2_control/low_level_controllers/request.h>
 #include <cola2_lib/utils/saturate.h>
 #include <algorithm>
-#include <vector>
+#include <cassert>
 #include <eigen3/Eigen/Dense>
 #include <map>
 #include <string>
-#include <cassert>
+#include <vector>
 
 class OnlyThrusterAllocator
 {
-private:
+protected:
   std::size_t n_thrusters_;
   std::vector<double> max_force_thruster_positive_v_;
   std::vector<double> max_force_thruster_negative_v_;
@@ -56,8 +56,7 @@ public:
   void setParams(const std::vector<double>& max_force_thruster_positive_v,
                  const std::vector<double>& max_force_thruster_negative_v,
                  const std::vector<std::vector<double> >& poly_positive_v,
-                 const std::vector<std::vector<double> >& poly_negative_v,
-                 const std::vector<double>& tcm_values);
+                 const std::vector<std::vector<double> >& poly_negative_v, const std::vector<double>& tcm_values);
 
   /**
    * Computes the setpoint for each thrusters taking into account the force + torque (wrench) to be

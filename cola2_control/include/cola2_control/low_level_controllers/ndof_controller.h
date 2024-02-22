@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+ * Copyright (c) 2020 Iqua Robotics SL - All Rights Reserved
  *
  * This file is subject to the terms and conditions defined in file
  * 'LICENSE.txt', which is part of this source code package.
@@ -9,19 +9,18 @@
 #ifndef COLA2_LIB_INCLUDE_COLA2_LIB_COLA2_CONTROL_NDOFCONTROLLER_H_
 #define COLA2_LIB_INCLUDE_COLA2_LIB_COLA2_CONTROL_NDOFCONTROLLER_H_
 
-#include <assert.h>
-#include <map>
-#include <string>
-#include <vector>
-#include <memory>
 #include <cola2_control/low_level_controllers/controller_base.h>
 #include <cola2_control/low_level_controllers/request.h>
-#include <boost/thread/csbl/memory/unique_ptr.hpp>
+#include <cassert>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
 
 class NDofController
 {
 private:
-  std::vector< std::shared_ptr<IController> > controllers_;
+  std::vector<std::shared_ptr<IController> > controllers_;
   unsigned int n_dof_;
 
 public:

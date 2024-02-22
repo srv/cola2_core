@@ -1,8 +1,16 @@
-# Acceptance distance to validate a waypoint. If the robot is inside the region
-# defined by the tolerance, the captain continues with the following waypoint
-# in a mission
-captain/tolerance: [1.5, 1.5, 1.0, 0.0, 0.0, 0.1]
+# Maximum allowed distance to a waypoint. Just for safety reasons
+max_distance_to_waypoint: 750.0
 
-# Path from where missions are loaded
-captain/vehicle_config_launch_mission_package: "cola2_girona500"
+# Depth of the safety keep position
+safety_keep_position_depth: 0.0
 
+# If true, the safety keep position goes to the NED origin. If false, it just keeps position
+safety_keep_position_goes_to_ned_origin: false
+
+# If true, the standalone keep positions will reset when a navigation jump is detected
+reset_keep_position_on_navigation_jump: true
+
+# No altitude reactive behavior
+idle_no_altitude_goes_up: false
+enable_no_altitude_goes_up_service: "safe_depth_altitude/enable_no_altitude_goes_up"
+disable_no_altitude_goes_up_service: "safe_depth_altitude/disable_no_altitude_goes_up"

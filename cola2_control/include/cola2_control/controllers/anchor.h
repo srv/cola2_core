@@ -1,18 +1,17 @@
-
 /*
- * Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+ * Copyright (c) 2020 Iqua Robotics SL - All Rights Reserved
  *
  * This file is subject to the terms and conditions defined in file
  * 'LICENSE.txt', which is part of this source code package.
  */
 
-#ifndef __CONTROLLER_ANCHOR__
-#define __CONTROLLER_ANCHOR__
+#ifndef COLA2_CONTROL_INCLUDE_COLA2_CONTROL_CONTROLLERS_ANCHOR_H_
+#define COLA2_CONTROL_INCLUDE_COLA2_CONTROL_CONTROLLERS_ANCHOR_H_
 
 #include <cola2_control/controllers/types.h>
 #include <cola2_lib/utils/angles.h>
-#include <math.h>
 #include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -22,37 +21,36 @@ typedef struct
 {
   double kp;
   double radius;
-  double min_surge;
-  double max_surge;
-  double max_angle_error;
+  double min_surge_velocity;
+  double max_surge_velocity;
 } AnchorControllerConfig;
 
 /**
- * \brief COLA2 Anchor controller.
- * To keep a non holonomic vehicle in a point.
+ * \brief COLA2 Anchor controller
+ * To keep a non holonomic vehicle in a point
  */
 class AnchorController
 {
-private:
+ protected:
   AnchorControllerConfig config_;
 
-public:
+ public:
   /**
-   * Constructor. Requires an AnchorControllerConfig structure.
+   * Constructor. Requires an AnchorControllerConfig structure
    */
-  AnchorController(AnchorControllerConfig);
+  explicit AnchorController(AnchorControllerConfig);
 
   /**
-   * Given the current control::State and the desired control::Waypoint
-   * computes the action to keep the vehicle anchored.
+   * Given the current control::State and the desired control::Request
+   * computes the action to keep the vehicle anchored
    */
-  void compute(const control::State&, const control::Waypoint&, control::State&, control::Feedback&,
+  void compute(const control::State&, const control::Request&, control::State&, control::Feedback&,
                control::PointsList&);
 
   /**
-   * Set configuration by means of a AnchorControllerConfig struct.
+   * Set configuration by means of a AnchorControllerConfig struct
    */
   void setConfig(const AnchorControllerConfig&);
 };
 
-#endif /* __CONTROLLER_ANCHOR__ */
+#endif  // COLA2_CONTROL_INCLUDE_COLA2_CONTROL_CONTROLLERS_ANCHOR_H_

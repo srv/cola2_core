@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+ * Copyright (c) 2020 Iqua Robotics SL - All Rights Reserved
  *
  * This file is subject to the terms and conditions defined in file
  * 'LICENSE.txt', which is part of this source code package.
@@ -7,13 +7,13 @@
 
 #include <cola2_control/low_level_controllers/only_thruster_allocator.h>
 
-OnlyThrusterAllocator::OnlyThrusterAllocator(unsigned int n_thrusters) :
-    n_thrusters_(static_cast<std::size_t>(n_thrusters)),
-    max_force_thruster_positive_v_(n_thrusters_, 0.0),
-    max_force_thruster_negative_v_(n_thrusters_, 0.0),
-    poly_positive_v_(n_thrusters_, Poly("thruster_allocator_positive_poly")),
-    poly_negative_v_(n_thrusters_, Poly("thruster_allocator_negative_poly")),
-    is_init_(false)
+OnlyThrusterAllocator::OnlyThrusterAllocator(unsigned int n_thrusters)
+  : n_thrusters_(static_cast<std::size_t>(n_thrusters))
+  , max_force_thruster_positive_v_(n_thrusters_, 0.0)
+  , max_force_thruster_negative_v_(n_thrusters_, 0.0)
+  , poly_positive_v_(n_thrusters_, Poly("thruster_allocator_positive_poly"))
+  , poly_negative_v_(n_thrusters_, Poly("thruster_allocator_negative_poly"))
+  , is_init_(false)
 {
 }
 
@@ -27,7 +27,7 @@ void OnlyThrusterAllocator::setParams(const std::vector<double>& max_force_thrus
                                       const std::vector<std::vector<double> >& poly_negative_v,
                                       const std::vector<double>& tcm_values)
 {
-  std::cout << "OnlyThrusterAllocator set params\n";
+  // std::cout << "OnlyThrusterAllocator set params\n";
 
   // Check sizes
   assert(max_force_thruster_positive_v.size() == n_thrusters_);
@@ -61,7 +61,7 @@ void OnlyThrusterAllocator::setParams(const std::vector<double>& max_force_thrus
   }
 
   // TCM inverse
-  std::cout << "tcm_values.size(): " << tcm_values.size() << "\n";
+  // std::cout << "tcm_values.size(): " << tcm_values.size() << "\n";
   Eigen::MatrixXd tcm(6, n_thrusters_);
   for (std::size_t i = 0; i < 6; ++i)
   {
@@ -71,17 +71,18 @@ void OnlyThrusterAllocator::setParams(const std::vector<double>& max_force_thrus
     }
   }
 
-  std::cout << "TCM:\n" << tcm << "\n";
+  // std::cout << "TCM:\n" << tcm << "\n";
   tcm_inv_ = (tcm.transpose() * tcm).inverse() * tcm.transpose();
-  std::cout << "TCM inv:\n" << tcm_inv_ << "\n";
+  // std::cout << "TCM inv:\n" << tcm_inv_ << "\n";
 
-  std::cout << "OnlyThrusterAllocator initialized!\n";
+  // std::cout << "OnlyThrusterAllocator initialized!\n";
   is_init_ = true;
 }
 
 Eigen::VectorXd OnlyThrusterAllocator::compute(const Request& wrench_req)
 {
-  if (!is_init_) return Eigen::VectorXd::Zero(n_thrusters_);
+  if (!is_init_)
+    return Eigen::VectorXd::Zero(n_thrusters_);
 
   // Take wrench request if disabled false, otherwise, take 0.0
   Eigen::VectorXd wrench = Eigen::VectorXd::Zero(6);
@@ -133,7 +134,7 @@ Eigen::VectorXd OnlyThrusterAllocator::forceToSetpoint(Eigen::VectorXd thruster_
 Eigen::VectorXd OnlyThrusterAllocator::wrenchToThrusterForces(const Eigen::VectorXd& wrench)
 {
   // Define order to specify which DoFs are the most important
-  const std::vector<std::size_t> order = {5, 0, 1, 2, 3, 4};
+  const std::vector<std::size_t> order = { 5, 0, 1, 2, 3, 4 };
 
   // Initial setpoint
   Eigen::VectorXd setpoint = Eigen::VectorXd::Zero(n_thrusters_);
@@ -153,8 +154,9 @@ Eigen::VectorXd OnlyThrusterAllocator::wrenchToThrusterForces(const Eigen::Vecto
         if (setpoint[j] + setpoint_to_add[j] > max_force_thruster_positive_v_[j])
         {
           double factor = (max_force_thruster_positive_v_[j] - setpoint[j]) / setpoint_to_add[j];
-          std::cout << "Factor = " << factor << std::endl;
-          if (factor < min_factor) min_factor = factor;
+          // std::cout << "Factor = " << factor << std::endl;
+          if (factor < min_factor)
+            min_factor = factor;
         }
       }
       else if (setpoint_to_add[j] < 0.0)
@@ -162,8 +164,9 @@ Eigen::VectorXd OnlyThrusterAllocator::wrenchToThrusterForces(const Eigen::Vecto
         if (setpoint[j] + setpoint_to_add[j] < -max_force_thruster_negative_v_[j])
         {
           double factor = (setpoint[j] + max_force_thruster_negative_v_[j]) / (-setpoint_to_add[j]);
-          std::cout << "Factor = " << factor << std::endl;
-          if (factor < min_factor) min_factor = factor;
+          // std::cout << "Factor = " << factor << std::endl;
+          if (factor < min_factor)
+            min_factor = factor;
         }
       }
     }

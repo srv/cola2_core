@@ -1,30 +1,23 @@
-#!/usr/bin/env python3
-# Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+#!/usr/bin/env python
+# Copyright (c) 2020 Iqua Robotics SL - All Rights Reserved
 #
 # This file is subject to the terms and conditions defined in file
 # 'LICENSE.txt', which is part of this source code package.
 
-
-"""
-@@>LogitechFX10 controler node.<@@
-"""
-
 import rospy
 from cola2_control.joystickbase import JoystickBase
-from cola2_lib.rosutils import param_loader
-from std_srvs.srv import Empty, Trigger, TriggerRequest, TriggerResponse
+from cola2_ros import param_loader
+from std_srvs.srv import Trigger, TriggerRequest, TriggerResponse
 
 
 class LogitechFX10(JoystickBase):
-    """LogitechFX10 controler node."""
-
     """
-        This class inherent from JoystickBase. It has to overload the
-        method update_joy(self, joy) that receives a sensor_msgs/Joy
-        message and fill the var self.joy_msg as described in the class
-        JoystickBase.
-        From this class it is also possible to call services or anything
-        else reading the buttons in the update_joy method.
+    LogitechFX10 controler node
+
+    This class inherent from JoystickBase. It has to overload the method update_joy(self, joy) that receives a
+    sensor_msgs/Joy message and fill the var self.joy_msg as described in the class JoystickBase.
+
+    From this class it is also possible to call services or anything else reading the buttons in the update_joy method.
     """
 
     # JOYSTICK  DEFINITION:
@@ -69,36 +62,40 @@ class LogitechFX10(JoystickBase):
         # Create client to services:
         # ... start button service
         if self.start_service != "":
-            rospy.wait_for_service(self.start_service, 10)
-            try:
-                self.enable_keep_pose = rospy.ServiceProxy(self.start_service, Trigger)
-            except rospy.ServiceException, e:
-                rospy.logwarn("%s: Service call failed: %s", self.name, e)
+            done = False
+            while not done and not rospy.is_shutdown():
+                try:
+                    rospy.wait_for_service(self.start_service, 10)
+                    self.enable_keep_pose = rospy.ServiceProxy(self.start_service, Trigger)
+                    done = True
+                except rospy.ROSException as e:
+                    rospy.logwarn("%s: Service call failed: %s", self.name, e)
+                    rospy.sleep(1.0)
 
         # ... stop button service
         if self.stop_service != '':
             rospy.wait_for_service(self.stop_service, 10)
             try:
                 self.disable_keep_pose = rospy.ServiceProxy(self.stop_service, Trigger)
-            except rospy.ServiceException, e:
+            except rospy.ServiceException as e:
                 rospy.logwarn("%s: Service call failed: %s", self.name, e)
 
         # ... enable thrusters service
         rospy.wait_for_service(
-            namespace + 'controller/enable_thrusters', 10)
+            namespace + 'teleoperation/enable_thrusters', 10)
         try:
             self.enable_thrusters = rospy.ServiceProxy(
-                namespace + 'controller/enable_thrusters', Empty)
-        except rospy.ServiceException, e:
+                namespace + 'teleoperation/enable_thrusters', Trigger)
+        except rospy.ServiceException as e:
             rospy.logwarn("%s: Service call failed: %s", self.name, e)
 
         # ... disable thrusters service
         rospy.wait_for_service(
-            namespace + 'controller/disable_thrusters', 10)
+            namespace + 'teleoperation/disable_thrusters', 10)
         try:
             self.disable_thrusters = rospy.ServiceProxy(
-                namespace + 'controller/disable_thrusters', Empty)
-        except rospy.ServiceException, e:
+                namespace + 'teleoperation/disable_thrusters', Trigger)
+        except rospy.ServiceException as e:
             rospy.logwarn("%s: Service call failed: %s", self.name, e)
 
     def update_joy(self, joy):

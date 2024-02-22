@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+ * Copyright (c) 2020 Iqua Robotics SL - All Rights Reserved
  *
  * This file is subject to the terms and conditions defined in file
  * 'LICENSE.txt', which is part of this source code package.
@@ -9,8 +9,8 @@
 #ifndef COLA2_LIB_INCLUDE_COLA2_LIB_COLA2_CONTROL_REQUEST_H_
 #define COLA2_LIB_INCLUDE_COLA2_LIB_COLA2_CONTROL_REQUEST_H_
 
-#include <assert.h>
 #include <algorithm>
+#include <cassert>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -30,6 +30,8 @@ public:
           const unsigned int n_dof = 6);
 
   Request(const Request& other);
+
+  void operator=(const Request& rhs);
 
   void combineRequest(const Request& req, std::string mode);
 

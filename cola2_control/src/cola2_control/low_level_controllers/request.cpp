@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+ * Copyright (c) 2020 Iqua Robotics SL - All Rights Reserved
  *
  * This file is subject to the terms and conditions defined in file
  * 'LICENSE.txt', which is part of this source code package.
@@ -26,6 +26,16 @@ Request::Request(const Request& other)
   , priority_(other.priority_)
   , n_dof_(other.n_dof_)
 {
+}
+
+void Request::operator=(const Request& rhs)
+{
+  requester_ = rhs.requester_;
+  stamp_ = rhs.stamp_;
+  disabled_axis_ = rhs.disabled_axis_;
+  values_ = rhs.values_;
+  priority_ = rhs.priority_;
+  n_dof_ = rhs.n_dof_;
 }
 
 void Request::combineRequest(const Request& req, std::string mode)

@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
-# Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+#!/usr/bin/env python
+# Copyright (c) 2020 Iqua Robotics SL - All Rights Reserved
 #
 # This file is subject to the terms and conditions defined in file
 # 'LICENSE.txt', which is part of this source code package.

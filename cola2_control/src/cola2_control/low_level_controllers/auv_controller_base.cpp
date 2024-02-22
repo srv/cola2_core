@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+ * Copyright (c) 2020 Iqua Robotics SL - All Rights Reserved
  *
  * This file is subject to the terms and conditions defined in file
  * 'LICENSE.txt', which is part of this source code package.
@@ -20,6 +20,8 @@ IAUVController::IAUVController(double period, int n_dof, int n_thrusters, int n_
   , twist_merge_("twist_merge", "twist", period * 3)
   , twist_feedback_(n_dof, 0.0)
   , max_wrench_(n_dof, 100.0)
+  , set_zero_velocity_depth_(1.0)
+  , set_zero_velocity_priority_(5)
   , wrench_merge_("wrench_merge", "wrench", period * 3)
   , thruster_setpoints_(n_thrusters)
   , fin_setpoints_(n_fins)
@@ -139,6 +141,21 @@ void IAUVController::setFinAllocator(const bool is_enabled)
   is_fin_allocator_enable_ = is_enabled;
 }
 
+void IAUVController::setSetZeroVelocityDepth(const double depth)
+{
+  set_zero_velocity_depth_ = depth;
+}
+
+void IAUVController::setSetZeroVelocityPriority(const int priority)
+{
+  set_zero_velocity_priority_ = priority;
+}
+
+void IAUVController::setSetZeroVelocityAxes(const std::vector<bool>& axes)
+{
+  set_zero_velocity_axes_ = axes;
+}
+
 bool IAUVController::isPoseControllerEnable() const
 {
   return is_pose_controller_enable_;
@@ -177,6 +194,21 @@ bool IAUVController::getIsThrusterAllocatorEnable() const
 bool IAUVController::getIsFinAllocatorEnable() const
 {
   return is_fin_allocator_enable_;
+}
+
+double IAUVController::getSetZeroVelocityDepth() const
+{
+  return set_zero_velocity_depth_;
+}
+
+int IAUVController::getSetZeroVelocityPriority() const
+{
+  return set_zero_velocity_priority_;
+}
+
+std::vector<bool> IAUVController::getSetZeroVelocityAxes() const
+{
+  return set_zero_velocity_axes_;
 }
 
 void IAUVController::setIsPoseControllerEnable(const bool& value)

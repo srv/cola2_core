@@ -1,46 +1,39 @@
-
 /*
- * Copyright (c) 2018 Iqua Robotics SL - All Rights Reserved
+ * Copyright (c) 2020 Iqua Robotics SL - All Rights Reserved
  *
  * This file is subject to the terms and conditions defined in file
  * 'LICENSE.txt', which is part of this source code package.
  */
 
-/*@@>Directed by the captain, publishes position and velocity setpoints to the position and velocity controllers.<@@*/
-
-#include <ros/ros.h>
-#include <string>
-#include <vector>
-#include <stdexcept>
 #include <actionlib/server/simple_action_server.h>
-#include <cola2_msgs/WorldSectionAction.h>
-#include <cola2_msgs/WorldWaypointAction.h>
-#include <boost/shared_ptr.hpp>
-#include <boost/bind.hpp>
-#include <cola2_msgs/NavSts.h>
-#include <cola2_msgs/WorldWaypointReq.h>
+#include <cola2_control/controllers/anchor.h>
+#include <cola2_control/controllers/holonomic_keep_position.h>
+#include <cola2_control/controllers/section.h>
+#include <cola2_control/controllers/types.h>
+#include <cola2_lib/utils/ned.h>
+#include <cola2_lib_ros/diagnostic_helper.h>
+#include <cola2_lib_ros/navigation_helper.h>
+#include <cola2_lib_ros/param_loader.h>
+#include <cola2_lib_ros/this_node.h>
 #include <cola2_msgs/BodyVelocityReq.h>
-#include <std_srvs/Empty.h>
+#include <cola2_msgs/NavSts.h>
+#include <cola2_msgs/PilotAction.h>
+#include <cola2_msgs/WorldWaypointReq.h>
+#include <geometry_msgs/PointStamped.h>
+#include <ros/ros.h>
 #include <std_srvs/Trigger.h>
 #include <visualization_msgs/Marker.h>
-#include <cola2_control/controllers/types.h>
-#include <cola2_control/controllers/los_cte.h>
-#include <cola2_control/controllers/goto.h>
-#include <cola2_control/controllers/holonomic_goto.h>
-#include <cola2_control/controllers/anchor.h>
-#include <cola2_lib/rosutils/param_loader.h>
-#include <cola2_lib/rosutils/diagnostic_helper.h>
-#include <dynamic_reconfigure/server.h>
-//#include <cola2_control/PilotConfig.h>
-#include <geometry_msgs/PointStamped.h>
-#include <cola2_lib/rosutils/this_node.h>
 
-const unsigned int SECTION_MODE = 0;
-const unsigned int WAYPOINT_MODE = 1;
+#include <boost/bind.hpp>  // Because of the actionlib callback...
+#include <cstdint>
+#include <exception>
+#include <memory>
+#include <string>
+#include <vector>
 
 class Pilot
 {
-private:
+protected:
   // Node handle
   ros::NodeHandle nh_;
 
@@ -52,160 +45,157 @@ private:
   ros::Publisher pub_goal_;
   ros::ServiceServer srv_reload_params_;
   ros::ServiceClient srv_publish_params_;
+  ros::Timer diagnostics_timer_;
+  cola2::ros::DiagnosticHelper diagnostic_;
 
-  // Actionlib servers
-  boost::shared_ptr<actionlib::SimpleActionServer<cola2_msgs::WorldSectionAction> > section_server_;
-  boost::shared_ptr<actionlib::SimpleActionServer<cola2_msgs::WorldWaypointAction> > waypoint_server_;
+  // Actionlib server
+  std::shared_ptr<actionlib::SimpleActionServer<cola2_msgs::PilotAction> > pilot_server_;
 
-  // Reconfigure parameters
-  // dynamic_reconfigure::Server<cola2_control::PilotConfig> _param_server;
-  // dynamic_reconfigure::Server<cola2_control::PilotConfig>::CallbackType _f;
-
-  // Other vars
+  // Current state
   control::State current_state_;
+  double last_nav_received_;
 
   // Controllers
-  std::unique_ptr<LosCteController> los_cte_controller_;
-  std::unique_ptr<GotoController> goto_controller_;
-  std::unique_ptr<HolonomicGotoController> holonomic_goto_controller_;
-  std::unique_ptr<AnchorController> anchor_controller_;
-
-  // Mutex between section, waypoint and path controllers
-  // TODO: To be done
+  std::shared_ptr<SectionController> section_controller_;
+  std::shared_ptr<HolonomicKeepPositionController> holonomic_keep_position_controller_;
+  std::shared_ptr<AnchorController> anchor_controller_;
 
   // Config
   struct
   {
-    LosCteControllerConfig los_cte_config;
-    GotoControllerConfig goto_config;
-    HolonomicGotoControllerConfig holonomic_goto_config;
+    SectionControllerConfig section_config;
+    HolonomicKeepPositionControllerConfig holonomic_keep_position_config;
     AnchorControllerConfig anchor_config;
   } config_;
 
   // Methods
+  /**
+   * \brief Diagnostics timer
+   */
+  void diagnosticsTimer(const ros::TimerEvent&);
+
   /**
    * Callback to topic VEHICLE_NAMESPACE/navigator/navigation
    */
   void navCallback(const cola2_msgs::NavSts&);
 
   /**
-   * Callback for actionlib Section.
+   * Callback for actionlib Pilot
    */
-  void sectionServerCallback(const cola2_msgs::WorldSectionGoalConstPtr&);
+  void pilotServerCallback(const cola2_msgs::PilotGoalConstPtr&);
 
   /**
-   * Callback for actionlib Waypoint
+   * Helper method to publish control commands: WorldWaypointReq and BodyForceReq
    */
-  void waypointServerCallback(const cola2_msgs::WorldWaypointGoalConstPtr&);
+  void publishControlCommands(const control::State&, const std::uint64_t, const ros::Time&) const;
 
   /**
-   * Helper method to publis control commands: WorldWaypointReq and BodyForceReq
+   * Publish feedback for actionlibs
    */
-  void publishControlCommands(const control::State&, unsigned int);
+  void publishFeedback(const control::Feedback&) const;
 
   /**
-   * Publish feedback for actionlibs.
+   * Publish an RViz marker to the direction that the AUV is going
    */
-  void publishFeedback(const control::Feedback&, unsigned int);
+  void publishMarker(const double, const double, const double) const;
 
   /**
-   * Publish an RViz marker to the direction that the AUV is going.
+   * Publishes a Section RViz marker
    */
-  void publishMarker(double, double, double);
+  void publishMarkerSections(const control::PointsList) const;
 
   /**
-   * Publishes a Section RViz marker.
-   */
-  void publishMarkerSections(const control::PointsList);
-
-  /**
-   * Load parameters from ROS param server.
+   * Load parameters from ROS param server
    */
   void getConfig();
 
   /**
-   * Sevice to reload parameters from ROS param server.
+   * Service to reload parameters from ROS param server
    */
-  bool reloadConfigServiceCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&);
-
-  //void setParams(cola2_control::PilotConfig&, uint32_t);
+  bool reloadParamsCallback(std_srvs::Trigger::Request&, std_srvs::Trigger::Response&);
 
   /**
    * Publishes the waypoint that the AUV is going to as a geometry_msgs::PointStamped
    * REDUNDANT WITH publishMarker??
    */
-  void publishGoal(const double, const double, const double);
+  void publishGoal(const double, const double, const double) const;
 
 public:
   /**
-   * Class constructor.
+   * Class constructor
    */
   Pilot();
 };
 
-Pilot::Pilot(): nh_("~")
+Pilot::Pilot() : nh_("~"), diagnostic_(nh_, "pilot", cola2::ros::getUnresolvedNodeName()), last_nav_received_(0.0)
 {
+  // Wait for time
+  while (ros::Time::now().toSec() == 0.0)
+  {
+    ros::spinOnce();
+    ROS_INFO_THROTTLE(1.0, "Waiting for valid time source");
+  }
+
   // Get config
   getConfig();
 
   // Initialize controllers
-  // Line of Sight with Cross Tracking Error Controller
-  los_cte_controller_ = std::unique_ptr<LosCteController>(new LosCteController(config_.los_cte_config));
-  // Go to waypoint
-  goto_controller_ = std::unique_ptr<GotoController>(new GotoController(config_.goto_config));
-  // Holonomic Goto waypoint
-  holonomic_goto_controller_ = std::unique_ptr<HolonomicGotoController>(new HolonomicGotoController(config_.holonomic_goto_config));
-  // Anchor controller (for keep position in non holonomic vehicles)
-  anchor_controller_ = std::unique_ptr<AnchorController>(new AnchorController(config_.anchor_config));
-
-  // Service client to publish parameters
-  std::string publish_params_srv_name = cola2::rosutils::getNamespace() + "/param_logger/publish_params";
-  srv_publish_params_ = nh_.serviceClient<std_srvs::Trigger>(publish_params_srv_name);
-  while (ros::ok())
-  {
-    if (srv_publish_params_.waitForExistence(ros::Duration(5.0))) break;
-    ROS_INFO_STREAM("Waiting for client to service " << publish_params_srv_name);
-  }
+  section_controller_ = std::make_shared<SectionController>(config_.section_config);
+  holonomic_keep_position_controller_ =
+      std::make_shared<HolonomicKeepPositionController>(config_.holonomic_keep_position_config);
+  anchor_controller_ = std::make_shared<AnchorController>(config_.anchor_config);
 
   // Reload parameters service
-  srv_reload_params_ = nh_.advertiseService("reload_params", &Pilot::reloadConfigServiceCallback, this);
+  srv_reload_params_ = nh_.advertiseService("reload_params", &Pilot::reloadParamsCallback, this);
 
   // Publishers
-  pub_wwr_ = nh_.advertise<cola2_msgs::WorldWaypointReq>(cola2::rosutils::getNamespace() + "/controller/world_waypoint_req", 1);
-  pub_bvr_ = nh_.advertise<cola2_msgs::BodyVelocityReq>(cola2::rosutils::getNamespace() + "/controller/body_velocity_req", 1);
+  pub_wwr_ =
+      nh_.advertise<cola2_msgs::WorldWaypointReq>(cola2::ros::getNamespace() + "/controller/world_waypoint_req", 1);
+  pub_bvr_ =
+      nh_.advertise<cola2_msgs::BodyVelocityReq>(cola2::ros::getNamespace() + "/controller/body_velocity_req", 1);
   pub_marker_ = nh_.advertise<visualization_msgs::Marker>("waypoint_marker", 1);
   pub_goal_ = nh_.advertise<geometry_msgs::PointStamped>("goal", 1, true);
 
   // Subscriber
-  sub_nav_ = nh_.subscribe(cola2::rosutils::getNamespace() + "/navigator/navigation", 1, &Pilot::navCallback, this);
+  sub_nav_ = nh_.subscribe(cola2::ros::getNamespace() + "/navigator/navigation", 1, &Pilot::navCallback, this);
 
-  // Actionlib server. Smart pointer is used so that server construction is
-  // delayed after configuration is loaded
-  // SECTION action lib
-  section_server_ = boost::shared_ptr<actionlib::SimpleActionServer<cola2_msgs::WorldSectionAction> >(
-      new actionlib::SimpleActionServer<cola2_msgs::WorldSectionAction>(
-          nh_, "world_section_req", boost::bind(&Pilot::sectionServerCallback, this, _1), false));
-  section_server_->start();
+  // Service client to publish parameters
+  std::string publish_params_srv_name = cola2::ros::getNamespace() + "/param_logger/publish_params";
+  srv_publish_params_ = nh_.serviceClient<std_srvs::Trigger>(publish_params_srv_name);
+  while ((!ros::isShuttingDown()) && (!srv_publish_params_.waitForExistence(ros::Duration(5.0))))
+  {
+    ROS_INFO_STREAM("Waiting for client to service " << publish_params_srv_name);
+  }
 
-  // WAYPOINT action lib
-  waypoint_server_ = boost::shared_ptr<actionlib::SimpleActionServer<cola2_msgs::WorldWaypointAction> >(
-      new actionlib::SimpleActionServer<cola2_msgs::WorldWaypointAction>(
-          nh_, "world_waypoint_req", boost::bind(&Pilot::waypointServerCallback, this, _1), false));
-  waypoint_server_->start();
+  // Actionlib server. Smart pointer is used so that server construction is delayed after configuration is loaded
+  pilot_server_ = std::make_shared<actionlib::SimpleActionServer<cola2_msgs::PilotAction> >(
+      nh_, "actionlib", boost::bind(&Pilot::pilotServerCallback, this, _1), false);
+  pilot_server_->start();
 
-  // Init dynamic reconfigure
-  // f_ = boost::bind(&Pilot::setParams, this, _1, _2);
-  // param_server_.setCallback(f_);
+  // Diagnostics timer
+  diagnostics_timer_ = nh_.createTimer(ros::Duration(0.5), &Pilot::diagnosticsTimer, this);
 
-  // Display message
-  ROS_INFO_STREAM("Initialized.");
+  diagnostic_.setEnabled(true);
+  ROS_INFO_STREAM("Initialized");
+}
 
-  ros::spin();
+void Pilot::diagnosticsTimer(const ros::TimerEvent& event)
+{
+  diagnostic_.setLevelAndMessage(diagnostic_msgs::DiagnosticStatus::OK);
+  diagnostic_.publish(event.current_real);
 }
 
 void Pilot::navCallback(const cola2_msgs::NavSts& data)
 {
+  // Check for valid navigation
+  if (!cola2::ros::navigationIsValid(data))
+  {
+    return;
+  }
+
   // Obtain navigation data
+  current_state_.pose.position.ned_origin_latitude = data.origin.latitude;
+  current_state_.pose.position.ned_origin_longitude = data.origin.longitude;
   current_state_.pose.position.north = data.position.north;
   current_state_.pose.position.east = data.position.east;
   current_state_.pose.position.depth = data.position.depth;
@@ -216,223 +206,149 @@ void Pilot::navCallback(const cola2_msgs::NavSts& data)
   current_state_.velocity.linear.x = data.body_velocity.x;
   current_state_.velocity.linear.y = data.body_velocity.y;
   current_state_.velocity.linear.z = data.body_velocity.z;
+  last_nav_received_ = data.header.stamp.toSec();
 }
 
-void Pilot::waypointServerCallback(const cola2_msgs::WorldWaypointGoalConstPtr& data)
+void Pilot::pilotServerCallback(const cola2_msgs::PilotGoalConstPtr& data)
 {
-  // TODO: Avoid having a waypoint, or a section controller running simultaneously
-
-  // Conversion from actionlib goal to internal Section type
-  control::Waypoint waypoint;
-  waypoint.altitude = data->altitude;
-  waypoint.altitude_mode = data->altitude_mode;
-  waypoint.controller_type = data->controller_type;
-  waypoint.disable_axis.x = data->disable_axis.x;
-  waypoint.disable_axis.y = data->disable_axis.y;
-  waypoint.disable_axis.z = data->disable_axis.z;
-  waypoint.disable_axis.roll = data->disable_axis.roll;
-  waypoint.disable_axis.pitch = data->disable_axis.pitch;
-  waypoint.disable_axis.yaw = data->disable_axis.yaw;
-  waypoint.position.north = data->position.north;
-  waypoint.position.east = data->position.east;
-  waypoint.position.depth = data->position.depth;
-  waypoint.orientation.roll = data->orientation.roll;
-  waypoint.orientation.pitch = data->orientation.pitch;
-  waypoint.orientation.yaw = data->orientation.yaw;
-  waypoint.position_tolerance.x = data->position_tolerance.x;
-  waypoint.position_tolerance.y = data->position_tolerance.y;
-  waypoint.position_tolerance.z = data->position_tolerance.z;
-  waypoint.orientation_tolerance.roll = data->orientation_tolerance.roll;
-  waypoint.orientation_tolerance.pitch = data->orientation_tolerance.pitch;
-  waypoint.orientation_tolerance.yaw = data->orientation_tolerance.yaw;
-  waypoint.priority = data->goal.priority;
-  waypoint.requester = data->goal.requester;
-  waypoint.timeout = data->timeout;
-  waypoint.linear_velocity.x = data->linear_velocity.x;
-  waypoint.linear_velocity.y = data->linear_velocity.y;
-  waypoint.linear_velocity.z = data->linear_velocity.z;
-  waypoint.angular_velocity.roll = data->angular_velocity.roll;
-  waypoint.angular_velocity.pitch = data->angular_velocity.pitch;
-  waypoint.angular_velocity.yaw = data->angular_velocity.yaw;
-
-  // Main loop
-  double init_time = ros::Time::now().toSec();
-  ros::Rate r(10);  // 10Hz
-  while (ros::ok())
+  // Copy most of the input data to the request data type
+  control::Request request;
+  request.initial_depth = data->initial_depth;
+  request.final_depth = data->final_depth;
+  request.final_yaw = data->final_yaw;
+  request.final_altitude = data->final_altitude;
+  if (data->heave_mode == cola2_msgs::PilotGoal::DEPTH)
+    request.heave_mode = control::Request::DEPTH;
+  else if (data->heave_mode == cola2_msgs::PilotGoal::ALTITUDE)
+    request.heave_mode = control::Request::ALTITUDE;
+  else if (data->heave_mode == cola2_msgs::PilotGoal::BOTH)
+    request.heave_mode = control::Request::BOTH;
+  else
   {
-    // Declare some vars
-    control::State controller_output;
-    control::Feedback feedback;
-    cola2_msgs::WorldWaypointResult result_msg;
-    control::PointsList points;
-
-    // Run controller
-    try
-    {
-      switch (data->controller_type)
-      {
-        case cola2_msgs::WorldWaypointGoal::GOTO:
-          ROS_DEBUG_STREAM("GOTO controller");
-          goto_controller_->compute(current_state_, waypoint, controller_output, feedback, points);
-          break;
-        case cola2_msgs::WorldWaypointGoal::HOLONOMIC_GOTO:
-          ROS_DEBUG_STREAM("HOLONOMIC_GOTO controller");
-          holonomic_goto_controller_->compute(current_state_, waypoint, controller_output, feedback, points);
-          break;
-        case cola2_msgs::WorldWaypointGoal::ANCHOR:
-          ROS_DEBUG_STREAM("ANCHOR controller");
-          anchor_controller_->compute(current_state_, waypoint, controller_output, feedback, points);
-          break;
-        default:
-          std::cout << "Controller: " << data->controller_type << "\n";
-          throw std::runtime_error("Unknown controller");
-      }
-    }
-    catch (std::exception& e)
-    {
-      // Check for failure
-      ROS_ERROR_STREAM("Controller failure\n" << e.what());
-      result_msg.final_status = cola2_msgs::WorldWaypointResult::FAILURE;
-      waypoint_server_->setAborted(result_msg);
-      break;
-    }
-
-    // Publishers
-    publishControlCommands(controller_output, data->goal.priority);
-    publishFeedback(feedback, WAYPOINT_MODE);
-    publishMarker(waypoint.position.north, waypoint.position.east, waypoint.position.depth);
-    publishMarkerSections(points);
-    publishGoal(waypoint.position.north, waypoint.position.east, waypoint.position.depth);
-
-    // Check for success
-    if (feedback.success)
-    {
-      ROS_INFO_STREAM("Waypoint success");
-      result_msg.final_status = cola2_msgs::WorldWaypointResult::SUCCESS;
-      waypoint_server_->setSucceeded(result_msg);
-      break;
-    }
-
-    // Check for preempted. This happens upon user request (by preempting
-    // or cancelling the goal, or when a new SectionGoal is received
-    if (waypoint_server_->isPreemptRequested())
-    {
-      ROS_INFO_STREAM("Waypoint preempted");
-      waypoint_server_->setPreempted();
-      break;
-    }
-
-    // Check for timeout --> If keep position, timeout = 0.0
-    if (data->timeout > 0.0)
-    {
-      if ((ros::Time::now().toSec() - init_time) > data->timeout)
-      {
-        ROS_WARN_STREAM("Waypoint timeout");
-        result_msg.final_status = cola2_msgs::WorldWaypointResult::TIMEOUT;
-        waypoint_server_->setAborted(result_msg);
-        break;
-      }
-    }
-    // Sleep
-    r.sleep();
+    ROS_ERROR_STREAM("Unable to process actionlib request. Unknown heave mode: " << data->heave_mode);
+    cola2_msgs::PilotResult result_msg;
+    result_msg.state = cola2_msgs::PilotResult::FAILURE;
+    pilot_server_->setAborted(result_msg);
+    return;
   }
-}
-
-void Pilot::sectionServerCallback(const cola2_msgs::WorldSectionGoalConstPtr& data)
-{
-  // TODO: Avoid having a waypoint or a section controller running simultaneously
-
-  // Conversion from actionlib goal to internal Section type
-  control::Section section;
-  section.initial_position.x = data->initial_position.x;
-  section.initial_position.y = data->initial_position.y;
-  section.initial_position.z = data->initial_position.z;
-  section.final_position.x = data->final_position.x;
-  section.final_position.y = data->final_position.y;
-  section.final_position.z = data->final_position.z;
-  section.altitude_mode = data->altitude_mode;
-  section.tolerance.x = data->tolerance.x;
-  section.tolerance.y = data->tolerance.y;
-  section.tolerance.z = data->tolerance.z;
-  section.surge_velocity = data->surge_velocity;
-  section.timeout = data->timeout;
+  request.surge_velocity = data->surge_velocity;
+  request.tolerance_xy = data->tolerance_xy;
+  request.timeout = data->timeout;
+  if (data->controller_type == cola2_msgs::PilotGoal::SECTION)
+    request.controller_type = control::Request::SECTION;
+  else if (data->controller_type == cola2_msgs::PilotGoal::ANCHOR)
+    request.controller_type = control::Request::ANCHOR;
+  else if (data->controller_type == cola2_msgs::PilotGoal::HOLONOMIC_KEEP_POSITION)
+    request.controller_type = control::Request::HOLONOMIC_KEEP_POSITION;
+  else
+  {
+    ROS_ERROR_STREAM("Unable to process actionlib request. Unknown controller type: " << data->controller_type);
+    cola2_msgs::PilotResult result_msg;
+    result_msg.state = cola2_msgs::PilotResult::FAILURE;
+    pilot_server_->setAborted(result_msg);
+    return;
+  }
+  request.requester = data->goal.requester;
+  request.priority = data->goal.priority;
 
   // Main loop
-  double init_time = ros::Time::now().toSec();
-  ros::Rate r(10);  // 10Hz
-  while (ros::ok())
+  const double init_time = ros::Time::now().toSec();
+  ros::Rate r(10);
+  while (!ros::isShuttingDown())
   {
-    // Declare some vars
+    // Get iteration time stamp
+    const ros::Time iteration_stamp = ros::Time::now();
+
+    // Check for preempted. This happens upon user request (by preempting
+    // or canceling the goal, or when a new goal is received
+    if (pilot_server_->isPreemptRequested())
+    {
+      ROS_INFO_STREAM("Preempted");
+      pilot_server_->setPreempted();
+      return;
+    }
+
+    // Check timeout
+    if (iteration_stamp.toSec() - init_time > request.timeout)
+    {
+      ROS_WARN_STREAM("Timeout");
+      cola2_msgs::PilotResult result_msg;
+      result_msg.state = cola2_msgs::PilotResult::TIMEOUT;
+      pilot_server_->setAborted(result_msg);
+      return;
+    }
+
+    // Check navigation
+    if (iteration_stamp.toSec() - last_nav_received_ > 2.0)
+    {
+      ROS_ERROR_STREAM("Pilot actionlib failed due to missing navigation");
+      cola2_msgs::PilotResult result_msg;
+      result_msg.state = cola2_msgs::PilotResult::FAILURE;
+      pilot_server_->setAborted(result_msg);
+      return;
+    }
+
+    // Now that we know that we have recent navigation, convert from latitude and longitude to north and east
+    cola2::utils::NED ned(current_state_.pose.position.ned_origin_latitude,
+                          current_state_.pose.position.ned_origin_longitude, 0.0);
+    double dummy_depth;
+    ned.geodetic2Ned(data->initial_latitude, data->initial_longitude, 0.0, request.initial_north, request.initial_east,
+                     dummy_depth);
+    ned.geodetic2Ned(data->final_latitude, data->final_longitude, 0.0, request.final_north, request.final_east,
+                     dummy_depth);
+    request.ned_origin_latitude = current_state_.pose.position.ned_origin_latitude;
+    request.ned_origin_longitude = current_state_.pose.position.ned_origin_longitude;
+
+    // Declare the output of the controllers
     control::State controller_output;
     control::Feedback feedback;
-    cola2_msgs::WorldSectionResult result_msg;
     control::PointsList points;
 
     // Run controller
     try
     {
-      switch (data->controller_type)
-      {
-        case cola2_msgs::WorldSectionGoal::LOSCTE:
-          ROS_DEBUG_STREAM("LOSCTE controller");
-          los_cte_controller_->compute(current_state_, section, controller_output, feedback, points);
-          break;
-        default:
-          throw std::runtime_error("Unknown controller");
-      }
+      if (request.controller_type == control::Request::SECTION)
+        section_controller_->compute(current_state_, request, controller_output, feedback, points);
+      else if (request.controller_type == control::Request::ANCHOR)
+        anchor_controller_->compute(current_state_, request, controller_output, feedback, points);
+      else
+        holonomic_keep_position_controller_->compute(current_state_, request, controller_output, feedback, points);
     }
-    catch (std::exception& e)
+    catch (const std::exception& ex)
     {
-      // Check for failure
-      ROS_ERROR_STREAM("Controller failure\n" << e.what());
-      result_msg.final_status = cola2_msgs::WorldSectionResult::FAILURE;
-      section_server_->setAborted(result_msg);
-      break;
+      ROS_ERROR_STREAM("Controller failure: " << ex.what());
+      cola2_msgs::PilotResult result_msg;
+      result_msg.state = cola2_msgs::PilotResult::FAILURE;
+      pilot_server_->setAborted(result_msg);
+      return;
     }
 
-    // Publishers
-    publishControlCommands(controller_output, data->priority);
-    publishFeedback(feedback, SECTION_MODE);
-    publishMarker(section.final_position.x, section.final_position.y, section.final_position.z);
+    // Publish
+    publishControlCommands(controller_output, request.priority, iteration_stamp);
+    publishFeedback(feedback);
+    publishMarker(request.final_north, request.final_east, request.final_depth);
     publishMarkerSections(points);
-    publishGoal(section.final_position.x, section.final_position.y, section.final_position.z);
+    publishGoal(request.final_north, request.final_east, request.final_depth);
 
     // Check for success
     if (feedback.success)
     {
-      ROS_INFO_STREAM("Section success");
-      result_msg.final_status = cola2_msgs::WorldSectionResult::SUCCESS;
-      section_server_->setSucceeded(result_msg);
+      ROS_INFO_STREAM("Success");
+      cola2_msgs::PilotResult result_msg;
+      result_msg.state = cola2_msgs::PilotResult::SUCCESS;
+      pilot_server_->setSucceeded(result_msg);
       break;
     }
 
-    // Check for preempted. This happens upon user request (by preempting
-    // or cancelling the goal, or when a new SectionGoal is received
-    if (section_server_->isPreemptRequested())
-    {
-      ROS_WARN_STREAM("Section preempted");
-      section_server_->setPreempted();
-      break;
-    }
-
-    // Check for timeout
-    if (data->timeout > 0.0)
-    {
-      if ((ros::Time::now().toSec() - init_time) > data->timeout)
-      {
-        ROS_WARN_STREAM("Section timeout");
-        result_msg.final_status = cola2_msgs::WorldSectionResult::TIMEOUT;
-        section_server_->setAborted(result_msg);
-        break;
-      }
-    }
+    // Diagnostic
+    diagnostic_.reportValidData(iteration_stamp);
 
     // Sleep
     r.sleep();
   }
 }
 
-void Pilot::publishGoal(const double x, const double y, const double z)
+void Pilot::publishGoal(const double x, const double y, const double z) const
 {
   geometry_msgs::PointStamped goal;
   goal.header.frame_id = "world_ned";
@@ -443,14 +359,12 @@ void Pilot::publishGoal(const double x, const double y, const double z)
   pub_goal_.publish(goal);
 }
 
-void Pilot::publishControlCommands(const control::State& controller_output, const unsigned int priority)
+void Pilot::publishControlCommands(const control::State& controller_output, const std::uint64_t priority,
+                                   const ros::Time& now) const
 {
-  // Get time
-  ros::Time now = ros::Time::now();
-
-  // Create ROS msgs for wwr
+  // Create and publish world waypoint request
   cola2_msgs::WorldWaypointReq wwr;
-  wwr.header.frame_id = "/world_ned";
+  wwr.header.frame_id = "world_ned";
   wwr.header.stamp = now;
   wwr.goal.priority = priority;
   wwr.goal.requester = ros::this_node::getName() + "_pose_req";
@@ -468,10 +382,11 @@ void Pilot::publishControlCommands(const control::State& controller_output, cons
   wwr.orientation.yaw = controller_output.pose.orientation.yaw;
   wwr.altitude_mode = controller_output.pose.altitude_mode;
   wwr.altitude = controller_output.pose.altitude;
+  pub_wwr_.publish(wwr);
 
-  // Create ROS msgs for bvr
+  // Create and publish body velocity request
   cola2_msgs::BodyVelocityReq bvr;
-  bvr.header.frame_id = cola2::rosutils::getNamespace() + "/base_link";
+  bvr.header.frame_id = cola2::ros::getNamespaceNoInitialDash() + "/base_link";
   bvr.header.stamp = now;
   bvr.goal.priority = priority;
   bvr.goal.requester = ros::this_node::getName() + "_velocity_req";
@@ -487,44 +402,18 @@ void Pilot::publishControlCommands(const control::State& controller_output, cons
   bvr.twist.angular.x = controller_output.velocity.angular.x;
   bvr.twist.angular.y = controller_output.velocity.angular.y;
   bvr.twist.angular.z = controller_output.velocity.angular.z;
-
-  // Publish output
-  pub_wwr_.publish(wwr);
   pub_bvr_.publish(bvr);
 }
 
-void Pilot::publishFeedback(const control::Feedback& feedback, unsigned int mode = SECTION_MODE)
+void Pilot::publishFeedback(const control::Feedback& feedback) const
 {
-  // Conversion from internal feedback type to actionlib feedback
-  switch (mode)
-  {
-    case SECTION_MODE:
-    {
-      cola2_msgs::WorldSectionFeedback msg;
-      msg.desired_surge = feedback.desired_surge;
-      msg.desired_depth = feedback.desired_depth;
-      msg.desired_yaw = feedback.desired_yaw;
-      msg.cross_track_error = feedback.cross_track_error;
-      msg.depth_error = feedback.depth_error;
-      msg.yaw_error = feedback.yaw_error;
-      msg.distance_to_section_end = feedback.distance_to_end;
-      section_server_->publishFeedback(msg);
-      break;
-    }
-    case WAYPOINT_MODE:
-    {
-      cola2_msgs::WorldWaypointFeedback msg;
-      // TODO: To be completed
-      msg.distance_to_waypoint = feedback.distance_to_end;
-      waypoint_server_->publishFeedback(msg);
-      break;
-    }
-    default:
-      ROS_WARN_STREAM("Error, invalid feedback message!\n");
-  }
+  cola2_msgs::PilotFeedback msg;
+  msg.distance_to_end = feedback.distance_to_end;
+  msg.cross_track_error = feedback.cross_track_error;
+  pilot_server_->publishFeedback(msg);
 }
 
-void Pilot::publishMarker(double north, double east, double depth)
+void Pilot::publishMarker(const double north, const double east, const double depth) const
 {
   // Publish marker. Marker is published periodically so that RViz always
   // receives it, even if RViz is started after the ActionGoal arrives
@@ -538,9 +427,6 @@ void Pilot::publishMarker(double north, double east, double depth)
   marker.pose.position.y = east;
   marker.pose.position.z = depth;
   marker.pose.orientation.w = 1.0;
-  marker.pose.orientation.x = 0.0;
-  marker.pose.orientation.y = 0.0;
-  marker.pose.orientation.z = 0.0;
   marker.scale.x = 1.0;
   marker.scale.y = 1.0;
   marker.scale.z = 1.0;
@@ -548,12 +434,12 @@ void Pilot::publishMarker(double north, double east, double depth)
   marker.color.g = 0.0;
   marker.color.b = 0.0;
   marker.color.a = 0.5;
-  marker.lifetime = ros::Duration(1.0);
+  marker.lifetime = ros::Duration(2.0);
   marker.frame_locked = false;
   pub_marker_.publish(marker);
 }
 
-void Pilot::publishMarkerSections(const control::PointsList points)
+void Pilot::publishMarkerSections(const control::PointsList points) const
 {
   // Create visualization marker
   visualization_msgs::Marker marker;
@@ -562,9 +448,11 @@ void Pilot::publishMarkerSections(const control::PointsList points)
   marker.ns = ros::this_node::getName();
   marker.type = visualization_msgs::Marker::LINE_LIST;
   marker.action = visualization_msgs::Marker::ADD;
+  marker.pose.orientation.w = 1.0;
 
   // Add points to it
-  for (const auto &i : points.points_list) {
+  for (const auto& i : points.points_list)
+  {
     geometry_msgs::Point p;
     p.x = i.x;
     p.y = i.y;
@@ -577,7 +465,7 @@ void Pilot::publishMarkerSections(const control::PointsList points)
   marker.color.g = 0.8;
   marker.color.b = 0.0;
   marker.color.a = 0.5;
-  marker.lifetime = ros::Duration(1.0);
+  marker.lifetime = ros::Duration(2.0);
   marker.frame_locked = false;
   pub_marker_.publish(marker);
 }
@@ -585,68 +473,50 @@ void Pilot::publishMarkerSections(const control::PointsList points)
 void Pilot::getConfig()
 {
   // Load config from param server
-  // LOS-CTE controller
   // clang-format off
-  cola2::rosutils::getParam("~los_cte/delta", config_.los_cte_config.delta, 5.0);
-  cola2::rosutils::getParam("~los_cte/distance_to_max_velocity", config_.los_cte_config.distance_to_max_velocity,                           5.0);
-  cola2::rosutils::getParam("~los_cte/max_surge_velocity", config_.los_cte_config.max_surge_velocity, 0.5);
-  cola2::rosutils::getParam("~los_cte/min_surge_velocity", config_.los_cte_config.min_surge_velocity, 0.2);
-  cola2::rosutils::getParam("~los_cte/min_velocity_ratio", config_.los_cte_config.min_velocity_ratio, 0.1);
-
-  // GOTO controller
-  cola2::rosutils::getParam("~goto/max_angle_error", config_.goto_config.max_angle_error, 0.3);
-  cola2::rosutils::getParam("~goto/max_surge", config_.goto_config.max_surge, 0.5);
-  cola2::rosutils::getParam("~goto/surge_proportional_gain", config_.goto_config.surge_proportional_gain, 0.25);
+  // LOS-CTE controller
+  cola2::ros::getParam("~section/tolerance_z", config_.section_config.tolerance_z, 1.0);
+  cola2::ros::getParam("~section/delta", config_.section_config.delta, 5.0);
+  cola2::ros::getParam("~section/distance_to_max_velocity", config_.section_config.distance_to_max_velocity, 5.0);
+  cola2::ros::getParam("~section/max_surge_velocity", config_.section_config.max_surge_velocity, 0.5);
+  cola2::ros::getParam("~section/min_surge_velocity", config_.section_config.min_surge_velocity, 0.2);
 
   // ANCHOR controller
-  cola2::rosutils::getParam("~anchor/kp", config_.anchor_config.kp, 0.1);
-  cola2::rosutils::getParam("~anchor/radius", config_.anchor_config.radius, 1.0);
-  cola2::rosutils::getParam("~anchor/min_surge", config_.anchor_config.min_surge, -0.1);
-  cola2::rosutils::getParam("~anchor/max_surge", config_.anchor_config.max_surge, 0.3);
-  cola2::rosutils::getParam("~anchor/max_angle_error", config_.anchor_config.max_angle_error, 0.5);
+  cola2::ros::getParam("~anchor/kp", config_.anchor_config.kp, 0.1);
+  cola2::ros::getParam("~anchor/radius", config_.anchor_config.radius, 1.0);
+  cola2::ros::getParam("~anchor/min_surge_velocity", config_.anchor_config.min_surge_velocity, -0.1);
+  cola2::ros::getParam("~anchor/max_surge_velocity", config_.anchor_config.max_surge_velocity, 0.3);
   // clang-format on
 }
 
-bool Pilot::reloadConfigServiceCallback(std_srvs::Empty::Request&, std_srvs::Empty::Response&)
+bool Pilot::reloadParamsCallback(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& res)
 {
-    getConfig();
-    los_cte_controller_->setConfig(config_.los_cte_config);
-    goto_controller_->setConfig(config_.goto_config);
-    holonomic_goto_controller_->setConfig(config_.holonomic_goto_config);
-    anchor_controller_->setConfig(config_.anchor_config);
-    ROS_INFO_STREAM("Params reloaded");
+  getConfig();
+  section_controller_->setConfig(config_.section_config);
+  holonomic_keep_position_controller_->setConfig(config_.holonomic_keep_position_config);
+  anchor_controller_->setConfig(config_.anchor_config);
 
-    // Publish params after param reload
-    std_srvs::Trigger trigger;
-    srv_publish_params_.call(trigger);
-    if (!trigger.response.success)
-    {
-      ROS_WARN_STREAM("Publish params did not succeed -> " << trigger.response.message);
-    }
-    return true;
+  // Publish params after param reload
+  std_srvs::Trigger trigger;
+  srv_publish_params_.call(trigger);
+  if (trigger.response.success)
+  {
+    res.message = "Params reloaded";
+    ROS_INFO_STREAM(res.message);
+  }
+  else
+  {
+    res.message = "Params reloaded, but publish params service did not succeed: " + trigger.response.message;
+    ROS_WARN_STREAM(res.message);
+  }
+  res.success = trigger.response.success;
+  return true;
 }
-
-/*
-void Pilot::setParams(cola2_control::PilotConfig& config, uint32_t level)
-{
-  ROS_INFO_STREAM("New parameters received!\n");
-  config_.los_cte_config.delta = config.los_cte_delta;
-  config_.los_cte_config.distance_to_max_velocity = config.los_cte_distance_to_max_velocity;
-  config_.los_cte_config.max_surge_velocity = config.los_cte_max_surge_velocity;
-  config_.los_cte_config.min_surge_velocity = config.los_cte_min_surge_velocity;
-  config_.los_cte_config.min_velocity_ratio = config.los_cte_min_velocity_ratio;
-  _los_cte_controller->setConfig(_config.los_cte_config);
-
-  config_.goto_config.max_angle_error = config.goto_max_angle_error;
-  config_.goto_config.max_surge = config.goto_max_surge;
-  config_.goto_config.surge_proportional_gain = config.goto_surge_proportional_gain;
-  _goto_controller->setConfig(_config.goto_config);
-}
-*/
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "pilot_new");
+  ros::init(argc, argv, "pilot");
   Pilot pilot;
+  ros::spin();
   return 0;
 }
