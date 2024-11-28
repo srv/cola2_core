@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>cola2_core</name>
-  <version>1.0.0</version>
+  <version>24.1.6</version>
   <description>The cola2_core meta package</description>
   <maintainer email="software@iquarobotics.com">Iqua Robotics</maintainer>
   <license>Iqua Robotics</license>

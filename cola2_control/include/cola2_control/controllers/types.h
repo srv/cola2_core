@@ -1,164 +1,174 @@
 
 /*
- * Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+ * Copyright (c) 2020 Iqua Robotics SL - All Rights Reserved
  *
  * This file is subject to the terms and conditions defined in file
  * 'LICENSE.txt', which is part of this source code package.
  */
 
-#ifndef __CONTROLLER_TYPES__
-#define __CONTROLLER_TYPES__
+#ifndef COLA2_CONTROL_INCLUDE_COLA2_CONTROL_CONTROLLERS_TYPES_H_
+#define COLA2_CONTROL_INCLUDE_COLA2_CONTROL_CONTROLLERS_TYPES_H_
 
-#include <vector>
-#include <string>
+#include <cstdint>
 #include <limits>
+#include <string>
+#include <vector>
 
 namespace control
 {
-  // Default values
-  const double       d_double(std::numeric_limits<double>::quiet_NaN());
-  const unsigned int d_uint(std::numeric_limits<unsigned int>::quiet_NaN());
-  const bool         d_bool(false);
-  const std::string  d_string("Not init");
+// Default values
+const double d_double(std::numeric_limits<double>::quiet_NaN());
+const std::uint64_t d_uint(std::numeric_limits<std::uint64_t>::quiet_NaN());
+const bool d_bool(false);
+const std::string d_string("Not init");
 
-  class Point
+class Point
+{
+ public:
+  double x;
+  double y;
+  double z;
+  Point() : x(d_double), y(d_double), z(d_double)
   {
-   public:
-    double x;
-    double y;
-    double z;
-    Point(): x(d_double), y(d_double), z(d_double) {}
-  };
+  }
+};
 
-  class Vector6d
+class Vector6d
+{
+ public:
+  double x;
+  double y;
+  double z;
+  double roll;
+  double pitch;
+  double yaw;
+  Vector6d() : x(d_double), y(d_double), z(d_double), roll(d_double), pitch(d_double), yaw(d_double)
   {
-   public:
-    double x;
-    double y;
-    double z;
-    double roll;
-    double pitch;
-    double yaw;
-    Vector6d(): x(d_double), y(d_double), z(d_double),
-                roll(d_double), pitch(d_double),
-                yaw(d_double) {}
-  };
+  }
+};
 
-  class Nav
+class Nav
+{
+ public:
+  double ned_origin_latitude;
+  double ned_origin_longitude;
+  double north;
+  double east;
+  double depth;
+  double roll;
+  double pitch;
+  double yaw;
+  double altitude;
+  Nav() : ned_origin_latitude(d_double), ned_origin_longitude(d_double), north(d_double), east(d_double),
+    depth(d_double), roll(d_double), pitch(d_double), yaw(d_double), altitude(d_double)
   {
-   public:
-    double x;
-    double y;
-    double z;
-    double roll;
-    double pitch;
-    double yaw;
-    double altitude;
-    Nav(): x(d_double), y(d_double), z(d_double),
-           roll(d_double), pitch(d_double), yaw(d_double),
-           altitude(d_double) {}
-  };
+  }
+};
 
-  class RPY
+class RPY
+{
+ public:
+  double roll;
+  double pitch;
+  double yaw;
+  RPY() : roll(d_double), pitch(d_double), yaw(d_double)
   {
-   public:
-    double roll;
-    double pitch;
-    double yaw;
-    RPY(): roll(d_double), pitch(d_double), yaw(d_double) {}
-  };
+  }
+};
 
-  class NED
+class NED
+{
+ public:
+  double ned_origin_latitude;
+  double ned_origin_longitude;
+  double north;
+  double east;
+  double depth;
+  NED() : ned_origin_latitude(d_double), ned_origin_longitude(d_double), north(d_double),
+    east(d_double), depth(d_double)
   {
-   public:
-    double north;
-    double east;
-    double depth;
-    NED(): north(d_double), east(d_double), depth(d_double) {}
-  };
+  }
+};
 
-  struct PointsList
+struct PointsList
+{
+  std::vector<control::Point> points_list;
+};
+
+class Request
+{
+ public:
+  double ned_origin_latitude;
+  double ned_origin_longitude;
+  double initial_north;
+  double initial_east;
+  double initial_depth;
+  double final_north;
+  double final_east;
+  double final_depth;
+  double final_yaw;
+  double final_altitude;
+  std::uint64_t heave_mode;
+  static const std::uint64_t DEPTH = 0;
+  static const std::uint64_t ALTITUDE = 1;
+  static const std::uint64_t BOTH = 2;
+  double surge_velocity;
+  double tolerance_xy;
+  double timeout;
+  std::uint64_t controller_type;
+  static const std::uint64_t SECTION = 0;
+  static const std::uint64_t ANCHOR = 1;
+  static const std::uint64_t HOLONOMIC_KEEP_POSITION = 2;
+  std::string requester;
+  std::uint64_t priority;
+  Request() : ned_origin_latitude(d_double), ned_origin_longitude(d_double), initial_north(d_double),
+    initial_east(d_double), initial_depth(d_double), final_north(d_double), final_east(d_double),
+    final_depth(d_double), final_yaw(d_double), final_altitude(d_double), heave_mode(d_uint),
+    surge_velocity(d_double), tolerance_xy(d_double), timeout(d_double), controller_type(d_uint),
+    requester(d_string), priority(d_uint)
   {
-    std::vector<control::Point> points_list;
-  };
+  }
+};
 
-  class Waypoint
+class Pose
+{
+ public:
+  control::NED position;
+  control::RPY orientation;
+  control::Vector6d disable_axis;
+  double altitude;
+  bool altitude_mode;
+  Pose() : altitude(d_double), altitude_mode(d_bool)
   {
-   public:
-    std::string requester;
-    unsigned int priority;
-    bool altitude_mode;
-    control::NED position;
-    double altitude;
-    control::RPY orientation;
-    control::Point position_tolerance;
-    control::RPY orientation_tolerance;
-    control::Point linear_velocity;
-    control::RPY angular_velocity;
-    unsigned int controller_type;
-    double timeout;
-    control::Vector6d disable_axis;
-    bool keep_position;
-    Waypoint(): requester(d_string), priority(d_uint),
-                altitude_mode(d_bool), altitude(d_double),
-                controller_type(d_uint), timeout(d_double),
-                keep_position(d_bool) {}
-  };
+  }
+};
 
-  class Section
+struct Velocity
+{
+  control::Point linear;
+  control::Point angular;
+  control::Vector6d disable_axis;
+};
+
+struct State
+{
+  control::Pose pose;
+  control::Velocity velocity;
+};
+
+class Feedback
+{
+ public:
+  double cross_track_error;
+  double distance_to_end;
+  bool success;
+  Feedback()
+    : cross_track_error(d_double)
+    , distance_to_end(d_double)
+    , success(d_bool)
   {
-   public:
-    control::Point initial_position;
-    control::Point final_position;
-    bool altitude_mode;
-    bool disable_z;
-    control::Point tolerance;
-    double surge_velocity;
-    double timeout;
-    Section(): altitude_mode(d_bool), disable_z(d_bool),
-               surge_velocity(d_double), timeout(d_double) {}
-  };
+  }
+};
+}  // namespace control
 
-  class Pose
-  {
-   public:
-    control::NED position;
-    control::RPY orientation;
-    control::Vector6d disable_axis;
-    double altitude;
-    bool altitude_mode;
-    Pose(): altitude(d_double), altitude_mode(d_bool) {}
-  };
-
-  struct Velocity
-  {
-    control::Point linear;
-    control::Point angular;
-    control::Vector6d disable_axis;
-  };
-
-  struct State
-  {
-    control::Pose pose;
-    control::Velocity velocity;
-  };
-
-  class Feedback
-  {
-   public:
-    double desired_surge;
-    double desired_depth;
-    double desired_yaw;
-    double cross_track_error;
-    double depth_error;
-    double yaw_error;
-    double distance_to_end;
-    bool success;
-    Feedback(): desired_surge(d_double), desired_depth(d_double),
-                desired_yaw(d_double), cross_track_error(d_double),
-                depth_error(d_double), yaw_error(d_double),
-                distance_to_end(d_double), success(d_bool) {}
-  };
-}
-
-#endif /* __CONTROLLER_TYPES__ */
+#endif  // COLA2_CONTROL_INCLUDE_COLA2_CONTROL_CONTROLLERS_TYPES_H_

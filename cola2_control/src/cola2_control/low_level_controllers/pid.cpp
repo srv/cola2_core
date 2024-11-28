@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+ * Copyright (c) 2020 Iqua Robotics SL - All Rights Reserved
  *
  * This file is subject to the terms and conditions defined in file
  * 'LICENSE.txt', which is part of this source code package.
@@ -67,7 +67,7 @@ double PID::compute(double time_in_sec, double setpoint, double feedback)
   double edotk = 0.0;
   if (derivative_term_from_feedback_)
   {
-    edotk = (feedback - feedback_old_) / dt;
+    edotk = -(feedback - feedback_old_) / dt;
   }
   else
   {
@@ -106,12 +106,12 @@ double PID::compute(double time_in_sec, double setpoint, double feedback)
       eik = 0.0;
     }
     // Compute tau
-    tau = kp_ * (ek - td_ * edotk) + integral_part + fff_;
+    tau = kp_ * (ek + td_ * edotk) + integral_part + fff_;
   }
   else
   {
     // Compute tau without integral part
-    tau = kp_ * (ek - td_ * edotk) + fff_;
+    tau = kp_ * (ek + td_ * edotk) + fff_;
   }
   // std::cout << "PID " << name_ << " tau: " << tau << std::endl;
 

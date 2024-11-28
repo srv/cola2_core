@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+ * Copyright (c) 2020 Iqua Robotics SL - All Rights Reserved
  *
  * This file is subject to the terms and conditions defined in file
  * 'LICENSE.txt', which is part of this source code package.
@@ -7,16 +7,20 @@
 
 #include "cola2_nav/ekf_surface_2d.h"
 
-EKFSurface2D::EKFSurface2D() : EKFBaseLandmarksROS(6)
+EKFSurface2D::EKFSurface2D() : EKFBaseROS(6)
 {
   // state vector contains [x y yaw vx vy vyaw] = size -> 6
-  // no landmarks allowed
   P_(0, 0) = 0.1;  // cov x
   P_(1, 1) = 0.1;  // cov y
   P_(2, 2) = 0.1;  // cov yaw
   P_(3, 3) = 0.0;  // cov vx (vehicle frame)
   P_(4, 4) = 0.0;  // cov vy (vehicle frame)
   P_(5, 5) = 0.0;  // cov vyaw
+}
+
+void EKFSurface2D::setPositionXY(const Eigen::Vector2d& xy)
+{
+  x_.head(2) = xy;
 }
 
 void EKFSurface2D::normalizeState()
@@ -28,9 +32,9 @@ void EKFSurface2D::normalizeState()
 void EKFSurface2D::computePredictionMatrices(const double dt)
 {
   const Eigen::Vector3d rpy = getEuler();
-  const double sy = sin(rpy(2));  // sin(yaw)
-  const double cy = cos(rpy(2));  // cos(yaw)
-  const unsigned int size = state_vector_size_;
+  const double sy = std::sin(rpy(2));  // std::sin(yaw)
+  const double cy = std::cos(rpy(2));  // std::cos(yaw)
+  const unsigned int size = x_.rows();
   const double dt2 = (dt * dt) / 2.0;
   const Eigen::Vector3d vel = getVelocity();
   const double vx = vel(0);
@@ -96,7 +100,7 @@ bool EKFSurface2D::updatePositionXY(const double t, const Eigen::Vector2d& pose_
     return true;
   }
   // Update
-  const unsigned int size = state_vector_size_;
+  const unsigned int size = x_.rows();
   const Eigen::Vector2d h = x_.head(2);                // h(x)
   Eigen::MatrixXd H = Eigen::MatrixXd::Zero(2, size);  // H = dh(x)/dx
   H(0, 0) = 1;
@@ -136,7 +140,7 @@ bool EKFSurface2D::updateOrientation(const double t, const Eigen::Vector3d& rpy,
   rpy_ = rpy;
   rpy_cov_ = cov;
   // Update
-  const unsigned int size = state_vector_size_;
+  const unsigned int size = x_.rows();
   const Eigen::Vector1d h = x_.segment<1>(2);          // h(x)
   Eigen::MatrixXd H = Eigen::MatrixXd::Zero(1, size);  // H = dh(x)/dx
   H(0, 2) = 1;
@@ -169,7 +173,7 @@ bool EKFSurface2D::updateVelocity(const double t, const Eigen::Vector3d& vel, co
     return true;
   }
   // Update
-  const unsigned int size = state_vector_size_;
+  const unsigned int size = x_.rows();
   const Eigen::Vector2d h = x_.segment<2>(3);          // h(x)
   Eigen::MatrixXd H = Eigen::MatrixXd::Zero(2, size);  // H = dh(x) / dx
   H(0, 3) = 1;
@@ -184,18 +188,11 @@ bool EKFSurface2D::updateOrientationRate(const double t, const Eigen::Vector3d& 
   ang_vel_ = rate;
   ang_vel_cov_ = cov;
   // Üpdate
-  const unsigned int size = state_vector_size_;
+  const unsigned int size = x_.rows();
   const Eigen::Vector1d h = x_.tail(1);
   Eigen::MatrixXd H = Eigen::MatrixXd::Zero(1, size);
   H(0, 5) = 1;
   return applyUpdate(rate.tail(1) - h, H, cov.bottomRightCorner(1, 1), Eigen::Matrix1d::Identity(), 16.0);
-}
-
-bool EKFSurface2D::updateLandmarkMeasure(const double, const Eigen::Vector3d&, const Eigen::Vector3d&,
-                                         const std::string&, const Eigen::Matrix6d&)
-{
-  ROS_FATAL("updateLandmarkMeasure() not implemented");
-  return false;
 }
 
 Eigen::Vector3d EKFSurface2D::getPosition() const

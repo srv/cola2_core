@@ -1,1 +1,2 @@
-default_param_handler/config_pkg: "cola2_girona500"
+config_pkg: "cola2_sparus2"
+config_folder: config

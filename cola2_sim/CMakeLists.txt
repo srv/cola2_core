@@ -17,7 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_runtime
 
   # COLA2 Dependencies
-  cola2_lib
+  cola2_lib_ros
   cola2_msgs
   cola2_control
 )
@@ -55,6 +55,10 @@ include_directories(
 # Declare things to be passed to dependent projects
 catkin_package()
 
-add_executable(dynamics_cpp src/dynamics.cpp)
-target_link_libraries(dynamics_cpp ${catkin_LIBRARIES})
-add_dependencies(dynamics_cpp ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_executable(dynamics_node src/dynamics_node.cpp)
+target_link_libraries(dynamics_node ${catkin_LIBRARIES})
+add_dependencies(dynamics_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+add_executable(sim_internal_sensors_node src/sim_internal_sensors_node.cpp)
+target_link_libraries(sim_internal_sensors_node ${catkin_LIBRARIES})
+add_dependencies(sim_internal_sensors_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})

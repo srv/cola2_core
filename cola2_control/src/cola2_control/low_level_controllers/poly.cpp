@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+ * Copyright (c) 2020 Iqua Robotics SL - All Rights Reserved
  *
  * This file is subject to the terms and conditions defined in file
  * 'LICENSE.txt', which is part of this source code package.
@@ -25,7 +25,7 @@ double Poly::compute(double, double setpoint, double)
 
   for (unsigned int i = 0; i < setpoint_coefs_.size(); i++)
   {
-    tau = tau + pow(static_cast<double>(fabs(setpoint)), static_cast<double>(i)) * setpoint_coefs_.at(i);
+    tau = tau + std::pow(static_cast<double>(std::fabs(setpoint)), static_cast<double>(i)) * setpoint_coefs_.at(i);
   }
   if (negative_setpoint)
     tau = -1.0 * tau;
@@ -36,7 +36,7 @@ double Poly::compute(double, double setpoint, double)
 
 bool Poly::setParameters(std::map<std::string, double> params)
 {
-  std::cout << "Set params for " << name_ << ": " << static_cast<int>(params["1"]) << "\n";
+  // std::cout << "Set params for " << name_ << ": " << static_cast<int>(params["1"]) << "\n";
   setpoint_coefs_.clear();
   try
   {

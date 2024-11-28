@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+ * Copyright (c) 2020 Iqua Robotics SL - All Rights Reserved
  *
  * This file is subject to the terms and conditions defined in file
  * 'LICENSE.txt', which is part of this source code package.
@@ -16,7 +16,7 @@ void IController::reset()
 {
 }
 
-double IController::compute(double, double , double)
+double IController::compute(double, double, double)
 {
   return 0.0;
 }

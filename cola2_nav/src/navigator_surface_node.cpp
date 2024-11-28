@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+ * Copyright (c) 2020 Iqua Robotics SL - All Rights Reserved
  *
  * This file is subject to the terms and conditions defined in file
  * 'LICENSE.txt', which is part of this source code package.
@@ -33,12 +33,12 @@ NavigatorSurfaceNode::NavigatorSurfaceNode()
 {
   // clang-format off
   // Init subscribers
-  sub_gps_ = nh_.subscribe("gps", 2, &EKFBaseLandmarksROS::updatePositionGPSMsg, reinterpret_cast<EKFBaseLandmarksROS*>(this));
-  sub_dvl_ = nh_.subscribe("dvl", 2, &EKFBaseLandmarksROS::updateVelocityDVLMsg, reinterpret_cast<EKFBaseLandmarksROS*>(this));
-  sub_imu_ = nh_.subscribe("imu", 2, &EKFBaseLandmarksROS::updateIMUMsg, reinterpret_cast<EKFBaseLandmarksROS*>(this));
+  sub_gps_ = nh_.subscribe("gps", 2, &EKFBaseROS::updatePositionGPSMsg, reinterpret_cast<EKFBaseROS*>(this));
+  sub_dvl_ = nh_.subscribe("dvl", 2, &EKFBaseROS::updateVelocityDVLMsg, reinterpret_cast<EKFBaseROS*>(this));
+  sub_imu_ = nh_.subscribe("imu", 2, &EKFBaseROS::updateIMUMsg, reinterpret_cast<EKFBaseROS*>(this));
   // Other data
-  sub_sound_velocity_ = nh_.subscribe("sound_velocity", 2, &EKFBaseLandmarksROS::updateSoundVelocityMsg, reinterpret_cast<EKFBaseLandmarksROS*>(this));
-  sub_altitude_ = nh_.subscribe("altitude", 2, &EKFBaseLandmarksROS::updateAltitudeMsg, reinterpret_cast<EKFBaseLandmarksROS*>(this));
+  sub_sound_velocity_ = nh_.subscribe("sound_velocity", 2, &EKFBaseROS::updateSoundVelocityMsg, reinterpret_cast<EKFBaseROS*>(this));
+  sub_altitude_ = nh_.subscribe("altitude", 2, &EKFBaseROS::updateAltitudeMsg, reinterpret_cast<EKFBaseROS*>(this));
   // clang-format on
 }
 

@@ -1,14 +1,14 @@
 
 /*
- * Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+ * Copyright (c) 2020 Iqua Robotics SL - All Rights Reserved
  *
  * This file is subject to the terms and conditions defined in file
  * 'LICENSE.txt', which is part of this source code package.
  */
 
 #include <cola2_control/low_level_controllers/auv_controller_base.h>
-#include <cola2_control/low_level_controllers/only_thrusters_controller.h>
 #include <cola2_control/low_level_controllers/only_thruster_allocator.h>
+#include <cola2_control/low_level_controllers/only_thrusters_controller.h>
 
 OnlyThrustersController::OnlyThrustersController(double period, unsigned int n_thrusters)
   : IAUVController(period, 6, n_thrusters)
@@ -88,8 +88,8 @@ void OnlyThrustersController::initTwistPolyController()
 }
 
 void OnlyThrustersController::setControllerParams(const std::vector<std::map<std::string, double> > p_params,
-                                              const std::vector<std::map<std::string, double> > t_params,
-                                              const std::vector<std::map<std::string, double> > poly_params)
+                                                  const std::vector<std::map<std::string, double> > t_params,
+                                                  const std::vector<std::map<std::string, double> > poly_params)
 {
   pose_controller_.setControllerParams(p_params);
   twist_controller_.setControllerParams(t_params);
@@ -119,7 +119,7 @@ void OnlyThrustersController::iteration(double current_time)
 
     // Disable Pitch control
     std::vector<bool> disable_axis = velocity_req.getDisabledAxis();
-    disable_axis.at(4) = true;
+    // disable_axis.at(4) = true;
     velocity_req.setDisabledAxis(disable_axis);
 
     // Compute pose error
@@ -128,7 +128,7 @@ void OnlyThrustersController::iteration(double current_time)
     // If desired pose in is near to 0 and current pose is near to 0 disable Z axis
     if (pose_feedback_.at(2) < 1.0 && desired_pose.getValues().at(2) < 1.0)
     {
-      // Disable Pitch control
+      // Disable Heave control
       std::vector<bool> disable_axis = velocity_req.getDisabledAxis();
       disable_axis.at(2) = true;
       velocity_req.setDisabledAxis(disable_axis);
@@ -136,9 +136,15 @@ void OnlyThrustersController::iteration(double current_time)
     }
 
     // Compute PID between pose error and zero
-    desired_pose.setValues(pose_error);
+    // desired_pose.setValues(pose_error);
     std::vector<double> zero(6, 0.0);
-    std::vector<double> pose_ctrl_tau = pose_controller_.compute(current_time, desired_pose, zero);
+    // std::vector<double> pose_ctrl_tau = pose_controller_.compute(current_time, desired_pose, zero);
+    Request zero_request_with_correct_disable_axis(desired_pose);
+    zero_request_with_correct_disable_axis.setValues(zero);
+    const std::vector<double> negative_pose_error = { -pose_error[0], -pose_error[1], -pose_error[2],
+                                                      -pose_error[3], -pose_error[4], -pose_error[5] };
+    std::vector<double> pose_ctrl_tau =
+        pose_controller_.compute(current_time, zero_request_with_correct_disable_axis, negative_pose_error);
 
     // Normalize output to max velocity
     assert(pose_ctrl_tau.size() == max_velocity_.size());
@@ -146,6 +152,24 @@ void OnlyThrustersController::iteration(double current_time)
     {
       pose_ctrl_tau.at(i) = pose_ctrl_tau.at(i) * max_velocity_.at(i);
     }
+
+    // Depth PID instead of heave PID. Use pitch to convert from vertical velocity in world
+    // frame to surge and heave velocities
+    /*std::cerr << "-------------------" << std::endl;
+    std::cerr << "Depth velocity: " << pose_ctrl_tau[2] << std::endl;*/
+    const double V_depth_measured = -twist_feedback_[0] * std::sin(pose_feedback_[4]);
+    const double V_depth_error = pose_ctrl_tau[2] - V_depth_measured;
+    pose_ctrl_tau[0] -= V_depth_error * std::sin(pose_feedback_[4]);
+    pose_ctrl_tau[2] = V_depth_error * std::cos(pose_feedback_[4]);
+    /*pose_ctrl_tau[0] -= pose_ctrl_tau[2] * std::sin(pose_feedback_[4]);
+    pose_ctrl_tau[2] *= std::cos(pose_feedback_[4]);*/
+    disable_axis = velocity_req.getDisabledAxis();
+    disable_axis[0] = !((!disable_axis[0]) || (!disable_axis[2]));
+    velocity_req.setDisabledAxis(disable_axis);
+    /*std::cerr << "Surge velocity: " << pose_ctrl_tau[0] << std::endl;
+    std::cerr << "Heave velocity: " << pose_ctrl_tau[2] << std::endl;
+    std::cerr << "disable_axis[0] = " << (disable_axis[0] ? "True" : "False") << std::endl;
+    std::cerr << "disable_axis[2] = " << (disable_axis[2] ? "True" : "False") << std::endl;*/
 
     // Add Pose controller response to body velocity requests
     velocity_req.setValues(pose_ctrl_tau);
@@ -155,6 +179,44 @@ void OnlyThrustersController::iteration(double current_time)
 
   // Merge twist request
   Request desired_twist = twist_merge_.merge(current_time);
+
+  // Set zero velocity if depth is greater than threshold
+  if (pose_feedback_.at(2) > set_zero_velocity_depth_)
+  {
+    // Get values and disable axis
+    std::vector<double> values = desired_twist.getValues();
+    std::vector<bool> disable_axis = desired_twist.getDisabledAxis();
+
+    // Modify according to config
+    bool all_disabled = true;
+    bool at_least_one_modified = false;
+    for (std::size_t i = 0; i < disable_axis.size(); ++i)
+    {
+      if (!disable_axis[i])
+      {
+        all_disabled = false;
+      }
+      else if (set_zero_velocity_axes_[i])
+      {
+        at_least_one_modified = true;
+        values[i] = 0.0;
+        disable_axis[i] = false;
+      }
+    }
+
+    // Set the modified values
+    desired_twist.setValues(values);
+    desired_twist.setDisabledAxis(disable_axis);
+
+    // Change priority and requester if necessary
+    if (at_least_one_modified && all_disabled)
+    {
+      desired_twist.setPriority(set_zero_velocity_priority_);
+      desired_twist.setRequester("set_zero_velocity");
+    }
+  }
+
+  // Assign merged twist
   merged_twist_ = desired_twist;
 
   if (getIsVelocityControllerEnable())
@@ -172,7 +234,8 @@ void OnlyThrustersController::iteration(double current_time)
     for (unsigned int i = 0; i < pid_twist.size(); i++)
     {
       // std::cout << i << ") PID: " << pid_twist.at(i) << ", Poly: " << poly_twist.at(i) << "\n";
-      total.push_back(cola2::utils::saturate(cola2::utils::saturate(pid_twist.at(i), 1.0) * max_wrench_.at(i) + poly_twist.at(i), max_wrench_.at(i)));
+      total.push_back(cola2::utils::saturate(
+          cola2::utils::saturate(pid_twist.at(i), 1.0) * max_wrench_.at(i) + poly_twist.at(i), max_wrench_.at(i)));
       // std::cout << "PID " << i << ": " <<  pid_twist.at(i) << "\n";
       // std::cout << "Poly " << i << ": " <<  poly_twist.at(i) << "\n";
       // std::cout << "total " << i << ": " <<  total.at(i) << "\n";
@@ -189,7 +252,7 @@ void OnlyThrustersController::iteration(double current_time)
 }
 
 std::vector<double> OnlyThrustersController::computeError(const std::vector<double> setpoint,
-                                                      const std::vector<double> feedback)
+                                                          const std::vector<double> feedback)
 {
   // WARNING: This function is intended for 6 DoF controllers only!
   assert(setpoint.size() == 6);
@@ -206,15 +269,15 @@ std::vector<double> OnlyThrustersController::computeError(const std::vector<doub
 }
 
 void OnlyThrustersController::poseError(const std::vector<double> setpoint, const std::vector<double> feedback,
-                                    std::vector<double>& error)
+                                        std::vector<double>& error)
 {
   double yaw = feedback.at(5);
   Eigen::MatrixXd m(3, 3);
-  m(0, 0) = cos(yaw);
-  m(0, 1) = -sin(yaw);
+  m(0, 0) = std::cos(yaw);
+  m(0, 1) = -std::sin(yaw);
   m(0, 2) = 0.0;
-  m(1, 0) = sin(yaw);
-  m(1, 1) = cos(yaw);
+  m(1, 0) = std::sin(yaw);
+  m(1, 1) = std::cos(yaw);
   m(1, 2) = 0.0;
   m(2, 0) = 0.0;
   m(2, 1) = 0.0;

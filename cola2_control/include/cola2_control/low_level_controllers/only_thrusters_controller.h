@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) 2017 Iqua Robotics SL - All Rights Reserved
+ * Copyright (c) 2020 Iqua Robotics SL - All Rights Reserved
  *
  * This file is subject to the terms and conditions defined in file
  * 'LICENSE.txt', which is part of this source code package.
@@ -12,10 +12,10 @@
 #include <cola2_control/low_level_controllers/auv_controller_base.h>
 #include <cola2_control/low_level_controllers/merge.h>
 #include <cola2_control/low_level_controllers/ndof_controller.h>
+#include <cola2_control/low_level_controllers/only_thruster_allocator.h>
 #include <cola2_control/low_level_controllers/pid.h>
 #include <cola2_control/low_level_controllers/poly.h>
 #include <cola2_lib/utils/angles.h>
-#include <cola2_control/low_level_controllers/only_thruster_allocator.h>
 #include <algorithm>
 #include <eigen3/Eigen/Dense>
 #include <memory>
