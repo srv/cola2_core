@@ -6,9 +6,9 @@
 # This file is subject to the terms and conditions defined in file
 # 'LICENSE.txt', which is part of this source code package.
 
-import os
 import rospy
 import rosparam
+import tempfile
 from std_msgs.msg import String
 from std_srvs.srv import Trigger, TriggerResponse
 from cola2_ros.diagnostic_helper import DiagnosticHelper
@@ -49,15 +49,13 @@ class ParamLoggerNode(object):
     def publish(self):
         """ Publish all collected parameters """
         # Dump to temp file
-        rosparam.dump_params("temp.yaml", "/")
+        with tempfile.NamedTemporaryFile(delete=False) as fh:
+            rosparam.dump_params(fh.name, "/")
 
-        # Read file into a string message
-        msg = String()
-        msg.data = open("temp.yaml").read()
-        self.pub.publish(msg)
-
-        # Delete temp file
-        os.remove("temp.yaml")
+            # Read file into a string message
+            msg = String()
+            msg.data = fh.read().decode()
+            self.pub.publish(msg)
 
     def srv_publish(self, req):
         """ Publish params when service is called """
