@@ -175,7 +175,7 @@ bool SafeDepthAltitude::enableNoAltitudeGoesUpCallback(std_srvs::Trigger::Reques
 
 bool SafeDepthAltitude::disableNoAltitudeGoesUpCallback(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& res)
 {
-  ROS_INFO("No altitude goes up reactive behavior disabled");
+  // ROS_INFO("No altitude goes up reactive behavior disabled");
   no_altitude_goes_up_ = false;
   res.message = "Success";
   res.success = true;

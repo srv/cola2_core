@@ -523,7 +523,7 @@ void Teleoperation::outputCallback(const sensor_msgs::Joy& data)
     if (data.buttons[i] == 1)
     {
       pose_controlled_axis_[i - 6] = false;
-      ROS_INFO_STREAM("Axis " << i - 6 << " now is velocity");
+      // ROS_INFO_STREAM("Axis " << i - 6 << " now is velocity");
     }
   }
 

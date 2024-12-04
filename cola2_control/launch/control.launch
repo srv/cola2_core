@@ -1,7 +1,7 @@
 <launch>
   <!-- captain -->
   <rosparam ns="captain" command="load" file="$(find cola2_control)/config/captain.yaml"/>
-  <node name="captain" pkg="cola2_control" type="captain_node" output="screen">
+  <node name="captain" pkg="cola2_control" type="captain_node" output="log">
     <param name="vehicle_config_launch_mission_package" value="cola2_sparus2"/>
   </node>
   <!-- pilot -->

@@ -933,7 +933,7 @@ void EKFBaseROS::publishNavigation(const ros::Time& stamp)
   // Check if gps samples need to be reset when filter already init and been diving for a while
   if ((gps_samples_ != 0) && ((stamp.toSec() - last_gps_sample_time_) > 10.0))
   {
-    ROS_INFO("reset gps samples");
+    // ROS_INFO("reset gps samples");
     gps_samples_ = 0;
   }
 
