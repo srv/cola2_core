@@ -4,21 +4,24 @@
 # This file is subject to the terms and conditions defined in file
 # 'LICENSE.txt', which is part of this source code package.
 
+import os
+import signal
+import datetime
+import subprocess
+
 import rospy
-from cola2_ros.diagnostic_helper import DiagnosticHelper
-from diagnostic_msgs.msg import DiagnosticStatus
 from std_srvs.srv import Trigger
 from std_srvs.srv import TriggerResponse
-import signal
-import subprocess
-import os
-import time
+from diagnostic_msgs.msg import DiagnosticStatus
+
+from cola2_ros.diagnostic_helper import DiagnosticHelper
 
 class LogBag:
     """LogBag class."""
 
     def __init__(self):
         """Class constructor."""
+
         # Set up diagnostics
         self.diagnostic = DiagnosticHelper("bag_recorder", rospy.get_name())
         self.diagnostic.set_enabled(True)
@@ -46,9 +49,41 @@ class LogBag:
 
     def enable_logs(self, req):
         """Run launch/bag.launch file."""
-        # Check if bags folder exists
+
+        # Check if datasets folder exists
         home_path = os.path.expanduser('~')
-        bags_path = os.path.join(home_path, 'bags')
+        datasets_path = os.path.join(home_path, 'datasets')
+        if not os.path.isdir(datasets_path):
+            os.makedirs(datasets_path)
+        
+        # Get day and hour
+        now = datetime.datetime.now()
+        full_day = now.strftime("%Y_%m_%d")
+        full_hour = now.strftime("%H_%M_%S")
+
+        # Check if day and hour folders exists
+        datasets_day_hour_path = os.path.join(datasets_path, full_day, full_hour)
+        if not os.path.isdir(datasets_day_hour_path):
+            os.makedirs(datasets_day_hour_path)
+
+        # Create sensors folder
+        sensors = ['flir_spinnaker_camera', 'flir_spinnaker_stereo_camera', 'mk_ii', 'norbit_wbms_multibeam']
+        for sensor in sensors:
+            sensor_path = os.path.join(datasets_day_hour_path, sensor)
+            if not os.path.isdir(sensor_path):
+                os.makedirs(sensor_path)
+            if 'flir_spinnaker_camera' == sensor:
+                rospy.set_param('flir_spinnaker_camera_blackfly_s_starboard_22240996/store_path', sensor_path)
+                rospy.set_param('flir_spinnaker_camera_blackfly_s_port_22240995/store_path', sensor_path)
+            elif 'flir_spinnaker_stereo_camera' == sensor:
+                rospy.set_param('flir_spinnaker_stereo_camera/store_path', sensor_path)
+            elif 'mk_ii' == sensor:
+                rospy.set_param('marinesonic_scoutmkii_sidescan/log_path', sensor_path)
+            elif 'norbit_wbms_multibeam' == sensor:
+                rospy.set_param('norbit_wbms_multibeam/store_path', sensor_path)
+
+        # Create bags folder
+        bags_path = os.path.join(datasets_day_hour_path, 'bags')
         if not os.path.isdir(bags_path):
             os.makedirs(bags_path)
 
@@ -56,7 +91,7 @@ class LogBag:
         caller_id = req._connection_header['callerid']
 
         # Start launch file subprocess
-        command = ("roslaunch cola2_" + self.robot_name + " bag.launch robot_name:={:s} launch_number:={:s}").format(self.robot_name, str(self.launch_number))
+        command = ("roslaunch cola2_sparus2 bag.launch robot_name:={:s} launch_number:={:s} output_path:={:s}").format(self.robot_name, str(self.launch_number), bags_path)
         self.launch_number = self.launch_number + 1
         #subprocess.Popen(command, stdin=subprocess.PIPE, shell=True, cwd="./")
         pro = subprocess.Popen(command, stdin=subprocess.PIPE, shell=True, cwd="./", preexec_fn=os.setsid)
@@ -75,6 +110,7 @@ class LogBag:
 
     def disable_logs(self, req):
         """Stop launch/bag.launch file."""
+
         # Get caller id
         caller_id = req._connection_header['callerid']
 
