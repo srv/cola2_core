@@ -30,14 +30,6 @@ class LogBag:
         self.start_bag = rospy.Service('~enable_logs', Trigger, self.enable_logs)
         self.stop_bag = rospy.Service('~disable_logs', Trigger, self.disable_logs)
 
-        # Sensors
-        self.__reload_flir_spinnaker_stereo_camera_params__ = rospy.ServiceProxy('/sparus2/flir_spinnaker_stereo_camera/reload_params', Trigger)
-        rospy.wait_for_service('/sparus2/flir_spinnaker_stereo_camera/reload_params', 2)
-        self.__reload_mk_ii_params__ = rospy.ServiceProxy('/sparus2/marinesonic_scoutmkii_sidescan/reload_params', Trigger)
-        rospy.wait_for_service('/sparus2/marinesonic_scoutmkii_sidescan/reload_params', 2)
-        self.__reload_norbit_wbms_multibeam_params__ = rospy.ServiceProxy('/sparus2/norbit_wbms_multibeam/reload_params', Trigger)
-        rospy.wait_for_service('/sparus2/norbit_wbms_multibeam/reload_params', 2)
-
         # Initialize dictionary that will contain the stack of subprocesses
         self.launch_number = 0
         self.stacks = {}
@@ -49,6 +41,15 @@ class LogBag:
         if ns and ns[-1] == '/':
             ns = ns[:-1]
         self.robot_name = ns
+
+        # Get launched sensors
+        self.sensors = {}
+        sensor_names = rospy.get_param('sensors', [])
+        for sensor_name in sensor_names:
+            print(sensor_name)
+            service_name = sensor_name + '/reload_params'
+            self.sensors[sensor_name] = rospy.ServiceProxy(service_name, Trigger)
+            rospy.wait_for_service(service_name, 2)
 
         # Start timer
         rospy.Timer(rospy.Duration(1), self.diagnostics_timer)
@@ -74,21 +75,13 @@ class LogBag:
         if not os.path.isdir(datasets_day_hour_path):
             os.makedirs(datasets_day_hour_path)
 
-        # Create sensors folder
-        sensors = ['flir_spinnaker_stereo_camera', 'mk_ii', 'norbit_wbms_multibeam']
-        for sensor in sensors:
+        # Create launched sensors folder
+        for sensor in self.sensors.keys():
             sensor_path = os.path.join(datasets_day_hour_path, sensor)
             if not os.path.isdir(sensor_path):
                 os.makedirs(sensor_path)
-            if 'flir_spinnaker_stereo_camera' == sensor:
-                rospy.set_param(os.path.join('flir_spinnaker_stereo_camera', 'store_path'), sensor_path)
-                self.__reload_flir_spinnaker_stereo_camera_params__()
-            elif 'mk_ii' == sensor:
-                rospy.set_param(os.path.join('marinesonic_scoutmkii_sidescan', 'log_path'), sensor_path)
-                self.__reload_mk_ii_params__()
-            elif 'norbit_wbms_multibeam' == sensor:
-                rospy.set_param(os.path.join('norbit_wbms_multibeam', 'store_path'), sensor_path)
-                self.__reload_norbit_wbms_multibeam_params__()
+            rospy.set_param(os.path.join(sensor, 'store_path'), sensor_path)
+            self.sensors[sensor]()
 
         # Create bags folder
         bags_path = os.path.join(datasets_day_hour_path, 'bags')
