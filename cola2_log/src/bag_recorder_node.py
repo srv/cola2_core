@@ -92,9 +92,8 @@ class LogBag:
         caller_id = req._connection_header['callerid']
 
         # Start launch file subprocess
-        command = ("roslaunch cola2_sparus2 bag.launch robot_name:={:s} launch_number:={:s} output_path:={:s}").format(self.robot_name, str(self.launch_number), bags_path + '_' + self.robot_name)
+        command = ("roslaunch cola2_sparus2 bag.launch robot_name:={:s} launch_number:={:s} output_path:={:s}").format(self.robot_name, str(self.launch_number), os.path.join(bags_path, self.robot_name))
         self.launch_number = self.launch_number + 1
-        #subprocess.Popen(command, stdin=subprocess.PIPE, shell=True, cwd="./")
         pro = subprocess.Popen(command, stdin=subprocess.PIPE, shell=True, cwd="./", preexec_fn=os.setsid)
 
         # Add subprocess to the stack associated with the caller id
