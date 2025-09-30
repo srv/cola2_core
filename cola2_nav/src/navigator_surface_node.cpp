@@ -15,7 +15,7 @@ private:
   ros::Subscriber sub_gps_;             // [x y]
   // ros::Subscriber sub_dvl_;             // [vx vy vz]
   ros::Subscriber sub_imu_;             // [roll pitch yaw vroll vpitch vyaw]
-  ros::Subscriber sub_sound_velocity_;  // sound velocity from SVS
+  // ros::Subscriber sub_sound_velocity_;  // sound velocity from SVS
   // ros::Subscriber sub_altitude_;        // altitude from seafloor
 
 public:
@@ -37,7 +37,7 @@ NavigatorSurfaceNode::NavigatorSurfaceNode()
   // sub_dvl_ = nh_.subscribe("dvl", 2, &EKFBaseROS::updateVelocityDVLMsg, reinterpret_cast<EKFBaseROS*>(this));
   sub_imu_ = nh_.subscribe("imu", 2, &EKFBaseROS::updateIMUMsg, reinterpret_cast<EKFBaseROS*>(this));
   // Other data
-  sub_sound_velocity_ = nh_.subscribe("sound_velocity", 2, &EKFBaseROS::updateSoundVelocityMsg, reinterpret_cast<EKFBaseROS*>(this));
+  // sub_sound_velocity_ = nh_.subscribe("sound_velocity", 2, &EKFBaseROS::updateSoundVelocityMsg, reinterpret_cast<EKFBaseROS*>(this));
   // sub_altitude_ = nh_.subscribe("altitude", 2, &EKFBaseROS::updateAltitudeMsg, reinterpret_cast<EKFBaseROS*>(this));
   // clang-format on
 }
