@@ -42,14 +42,16 @@ class LogBag:
             ns = ns[:-1]
         self.robot_name = ns
 
+        # COMMENTED BECAUSE IT GIVES PROBLEMS ('UNUSED SERVICE?'):
+
         # Get launched sensors
-        self.sensors = {}
-        sensor_names = rospy.get_param('sensors', [])
-        for sensor_name in sensor_names:
-            print(sensor_name)
-            service_name = sensor_name + '/reload_params'
-            self.sensors[sensor_name] = rospy.ServiceProxy(service_name, Trigger)
-            rospy.wait_for_service(service_name, 2)
+        # self.sensors = {}
+        # sensor_names = rospy.get_param('sensors', [])
+        # for sensor_name in sensor_names:
+        #     print(sensor_name)
+        #     service_name = sensor_name + '/reload_params'
+        #     self.sensors[sensor_name] = rospy.ServiceProxy(service_name, Trigger)
+        #     rospy.wait_for_service(service_name, 2)
 
         # Start timer
         rospy.Timer(rospy.Duration(1), self.diagnostics_timer)
@@ -92,7 +94,7 @@ class LogBag:
         caller_id = req._connection_header['callerid']
 
         # Start launch file subprocess
-        command = ("roslaunch cola2_sparus2 bag.launch robot_name:={:s} launch_number:={:s} output_path:={:s}").format(self.robot_name, str(self.launch_number), os.path.join(bags_path, self.robot_name))
+        command = ("roslaunch cola2_xiroi bag.launch robot_name:={:s} launch_number:={:s} output_path:={:s}").format(self.robot_name, str(self.launch_number), os.path.join(bags_path, self.robot_name))
         self.launch_number = self.launch_number + 1
         pro = subprocess.Popen(command, stdin=subprocess.PIPE, shell=True, cwd="./", preexec_fn=os.setsid)
 
