@@ -165,8 +165,8 @@ SafetySupervisor::SafetySupervisor()
       rules_.push_back(new SafetyRules::Teleoperation(rule_name, &nh_));
     else if (rule_type.compare("Manual") == 0)
       rules_.push_back(new SafetyRules::Manual(rule_name, &nh_));
-    else if (rule_type.compare("Navigator") == 0)
-      rules_.push_back(new SafetyRules::Navigator(rule_name, &nh_));
+    // else if (rule_type.compare("Navigator") == 0)
+    //   rules_.push_back(new SafetyRules::Navigator(rule_name, &nh_));
     else if (rule_type.compare("Temperature") == 0)
       rules_.push_back(new SafetyRules::Temperature(rule_name));
     else if (rule_type.compare("VirtualCage") == 0)
@@ -254,8 +254,8 @@ void SafetySupervisor::diagnosticsCallback(const diagnostic_msgs::DiagnosticArra
   {
     if (diagnostic_status.level == diagnostic_msgs::DiagnosticStatus::STALE)
       continue;
-    if (diagnostic_status.name.compare("/navigation/navigator") != 0)
-      continue;
+    // if (diagnostic_status.name.compare("/navigation/navigator") != 0)
+    //   continue;
     for (const auto& key_value : diagnostic_status.values)
     {
       if (key_value.key.compare("filter_init") == 0)
