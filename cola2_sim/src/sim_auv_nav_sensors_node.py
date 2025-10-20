@@ -75,8 +75,10 @@ class SimAUVNavSensors(object):
         if self.dvl_period > 0:
             self.pub_dvl = rospy.Publisher(self.ns + 'navigator/dvl', DVL, queue_size=2)
             self.pub_altitude = rospy.Publisher(self.ns + 'navigator/altitude', Range, queue_size=2)
-        # if self.imu_period > 0:
-        #     self.pub_imu = rospy.Publisher(self.ns + 'navigator/imu', Imu, queue_size=2)
+        if self.imu_period > 0:
+            self.pub_imu = rospy.Publisher(self.ns + 'navigator/imu', Imu, queue_size=2)
+            self.pub_imu_ned = rospy.Publisher(self.ns + 'navigator/imu_ned', Imu, queue_size=2)
+
 
         # Odometry subscriber
         rospy.Subscriber(self.ns + 'dynamics/odometry', Odometry, self.update_odometry, queue_size=1)
@@ -107,11 +109,11 @@ class SimAUVNavSensors(object):
                     r = tf.transformations.euler_matrix(dvl_rpy[0], dvl_rpy[1], dvl_rpy[2])[:3, :3]
                     self.tf_dvl = v, r.T  # special case (coordinates from base_link to sensor to transform velocity)
                     rospy.loginfo("dvl tf loaded")
-                # # IMU
-                # if self.imu_period > 0:
-                #     _, imu_xyz, imu_rpy = self.tf_handler.get_transform(self.ns[1:] + 'imu_filter')
-                #     self.tf_imu_filter = transform_from_tf(imu_xyz, imu_rpy)
-                #     rospy.loginfo("imu tf loaded")
+                # IMU
+                if self.imu_period > 0:
+                    _, imu_xyz, imu_rpy = self.tf_handler.get_transform(self.ns[1:] + 'imu_filter')
+                    self.tf_imu_filter = transform_from_tf(imu_xyz, imu_rpy)
+                    rospy.loginfo("imu tf loaded")
                 # USBL
                 if self.usbl_period > 0:
                     _, usbl_xyz, usbl_rpy = self.tf_handler.get_transform(self.ns[1:] + 'modem')
@@ -132,8 +134,8 @@ class SimAUVNavSensors(object):
             rospy.Timer(rospy.Duration(self.depth_period), self.publish_depth)
         if self.dvl_period > 0:
             rospy.Timer(rospy.Duration(self.dvl_period), self.publish_dvl)
-        # if self.imu_period > 0:
-        #     rospy.Timer(rospy.Duration(self.imu_period), self.publish_imu)
+        if self.imu_period > 0:
+            rospy.Timer(rospy.Duration(self.imu_period), self.publish_imu)
         if self.usbl_period > 0:
             rospy.Timer(rospy.Duration(self.usbl_period), self.publish_usbl)
 
@@ -349,42 +351,117 @@ class SimAUVNavSensors(object):
         self.diagnostic_dvl.report_valid_data(event.current_real)
         self.diagnostic_dvl.publish(event.current_real)
 
-    # def publish_imu(self, event):
-    #     """Publish IMU according to the current orientation."""
-    #     # Exit if no odom
-    #     if not self.has_odom:
-    #         return
-    #     # Measurement
-    #     r = self.rpy[0] + np.random.normal(0.0, np.sqrt(self.imu_orientation_covariance[0]))
-    #     p = self.rpy[1] + np.random.normal(0.0, np.sqrt(self.imu_orientation_covariance[1]))
-    #     y = self.rpy[2] + np.random.normal(0.0, np.sqrt(self.imu_orientation_covariance[2]))
-    #     rot = tf.transformations.euler_matrix(r, p, y)[:3, :3]
-    #     # TODO: Is this right? Maybe vehicle_rpy * self.imu_tf.M instead???
-    #     wrot = np.eye(4)
-    #     # wrot[:3, :3] = self.tf_imu_filter[1].dot(rot)
-    #     wrot[:3, :3] = rot.dot(self.tf_imu_filter[1].T)
-    #     quat = tf.transformations.quaternion_from_matrix(wrot)
-    #     # IMU
-    #     msg = Imu()
-    #     msg.header.stamp = event.current_real
-    #     msg.header.frame_id = this_node.get_namespace_no_initial_dash() + '/imu_filter'
-    #     msg.orientation.x = quat[0]
-    #     msg.orientation.y = quat[1]
-    #     msg.orientation.z = quat[2]
-    #     msg.orientation.w = quat[3]
-    #     msg.orientation_covariance[0] = self.output_imu_orientation_covariance[0]
-    #     msg.orientation_covariance[4] = self.output_imu_orientation_covariance[1]
-    #     msg.orientation_covariance[8] = self.output_imu_orientation_covariance[2]
-    #     # TODO: WARNING! the angular velocity is not rotated!
-    #     msg.angular_velocity = self.odom.twist.twist.angular
-    #     msg.angular_velocity_covariance[0] = 0.1
-    #     msg.angular_velocity_covariance[4] = 0.1
-    #     msg.angular_velocity_covariance[8] = 0.1
-    #     self.pub_imu.publish(msg)
-    #     # Diagnostic message
-    #     self.diagnostic_imu.set_level_and_message(DiagnosticStatus.OK)
-    #     self.diagnostic_imu.report_valid_data(event.current_real)
-    #     self.diagnostic_imu.publish(event.current_real)
+    # Converts [x,y,z,w] NED->ENU
+    def ned_to_enu_quaternion(self, q_ned):
+        # R_ned2enu = tf.transformations.euler_matrix(np.pi, 0, np.pi/2)[:3, :3]
+        self.R_ned2enu = np.array([
+            [0,1,0],
+            [1,0,0],
+            [0,0,-1]
+        ])
+        q_mat = tf.transformations.quaternion_matrix(q_ned)
+        # print(q_mat)
+        # print(q_mat[:3, :3])
+        q_mat[:3, :3] = self.R_ned2enu.dot(q_mat[:3,:3])
+        # print(q_mat[:3, :3])
+        q_enu = tf.transformations.quaternion_from_matrix(q_mat)
+        return q_enu
+    
+    def publish_imu(self, event):
+        try:        
+            """Publish IMU according to the current orientation."""
+            # Exit if no odom
+            if not self.has_odom:
+                # rospy.loginfo("publish_imu: No odometry yet")
+                return
+            # rospy.loginfo("publish_imu: Odometry received, computing IMU")
+            # Measurement
+            r = self.rpy[0] + np.random.normal(0.0, np.sqrt(self.imu_orientation_covariance[0]))
+            p = self.rpy[1] + np.random.normal(0.0, np.sqrt(self.imu_orientation_covariance[1]))
+            y = self.rpy[2] + np.random.normal(0.0, np.sqrt(self.imu_orientation_covariance[2]))
+            rot = tf.transformations.euler_matrix(r, p, y)[:3, :3]
+            # TODO: Is this right? Maybe vehicle_rpy * self.imu_tf.M instead???
+            wrot = np.eye(4)
+            # wrot[:3, :3] = self.tf_imu_filter[1].dot(rot)
+            wrot[:3, :3] = rot.dot(self.tf_imu_filter[1].T)
+            quat = tf.transformations.quaternion_from_matrix(wrot)
+            # IMU
+            msg_ned = Imu()
+            msg_ned.header.stamp = event.current_real
+            msg_ned.header.frame_id = this_node.get_namespace_no_initial_dash() + '/imu_ned'
+            msg_ned.orientation.x = quat[0]
+            msg_ned.orientation.y = quat[1]
+            msg_ned.orientation.z = quat[2]
+            msg_ned.orientation.w = quat[3]
+            msg_ned.orientation_covariance[0] = self.output_imu_orientation_covariance[0]
+            msg_ned.orientation_covariance[4] = self.output_imu_orientation_covariance[1]
+            msg_ned.orientation_covariance[8] = self.output_imu_orientation_covariance[2]
+            # TODO: WARNING! the angular velocity is not rotated!
+            msg_ned.angular_velocity = self.odom.twist.twist.angular
+            msg_ned.angular_velocity_covariance[0] = 0.1
+            msg_ned.angular_velocity_covariance[4] = 0.1
+            msg_ned.angular_velocity_covariance[8] = 0.1
+            # rospy.loginfo(f"Publishing IMU NED: orientation={msg_ned.orientation}")
+            self.pub_imu_ned.publish(msg_ned)
+        
+        except Exception as e:
+            rospy.logerr(f"Error in publish_imu_ned:{e}")
+
+        try:
+            # Convert msgs NED -> ENU
+            # q_ned = [msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w]
+            q_ned = [quat[0], quat[1], quat[2], quat[3]]
+            q_enu = self.ned_to_enu_quaternion(q_ned)
+
+            msg_enu = Imu()
+            msg_enu.header = msg_ned.header
+            msg_enu.header.frame_id = this_node.get_namespace_no_initial_dash() + '/imu'
+            msg_enu.orientation.x = q_enu[0]
+            msg_enu.orientation.y = q_enu[1]
+            msg_enu.orientation.z = q_enu[2]
+            msg_enu.orientation.w = q_enu[3]
+            
+            w_ned = np.array([
+                msg_ned.angular_velocity.x,
+                msg_ned.angular_velocity.y,
+                msg_ned.angular_velocity.z
+            ])
+
+            w_enu = self.R_ned2enu.dot(w_ned)
+
+            msg_enu.angular_velocity.x = w_enu[0]
+            msg_enu.angular_velocity.y = w_enu[1]
+            msg_enu.angular_velocity.z = w_enu[2]
+            
+            # msg_enu.angular_velocity = msg_ned.angular_velocity
+
+            if hasattr(self.odom.twist.twist, 'linear'):
+                a_ned = np.array([
+                    self.odom.twist.twist.linear.x,
+                    self.odom.twist.twist.linear.y,
+                    self.odom.twist.twist.linear.z
+                ])
+            
+                a_enu = self.R_ned2enu.dot(a_ned)
+                msg_enu.linear_acceleration.x = a_enu[0]
+                msg_enu.linear_acceleration.y = a_enu[1]
+                msg_enu.linear_acceleration.z = a_enu[2]
+ 
+            msg_enu.angular_velocity_covariance = msg_ned.angular_velocity_covariance
+            msg_enu.orientation_covariance = msg_ned.orientation_covariance
+
+
+            # rospy.loginfo(f"Publishing IMU ENU: orientation={msg_enu.orientation}")
+            # rospy.loginfo_throttle(2.0, f"IMU ENU: q={np.round(q_enu,3)}, w={np.round(w_enu,3)}, a={np.round(a_enu,3)}")
+            self.pub_imu.publish(msg_enu)
+
+            # Diagnostic message
+            self.diagnostic_imu.set_level_and_message(DiagnosticStatus.OK)
+            self.diagnostic_imu.report_valid_data(event.current_real)
+            self.diagnostic_imu.publish(event.current_real)
+        
+        except Exception as e:
+            rospy.logerr(f"Error in publish_imu_enu: {e}")
 
 
 if __name__ == '__main__':
